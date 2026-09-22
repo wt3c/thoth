@@ -416,3 +416,39 @@ tablatura legível e errada — o pior modo de falha possível, porque não se a
 O round-trip é verificado contra as bibliotecas reais (grava arquivo, relê, compara
 corda, traste, altura, afinação, andamento e clave). Isso prova consistência, **não**
 validade para outro leitor — a verificação no TuxGuitar continua sendo manual.
+
+## ADR-014 — O pipeline descarta e relata, em vez de falhar
+**Data:** 2026-09-22 · **Status:** aceito
+
+Dois casos derrubavam o pipeline inteiro num erro, e os dois são esperados em
+áudio real:
+
+1. **Notas simultâneas.** `assign` é monofônico e `rhythm.eventos` recusa duas
+   notas no mesmo tick. O corpus de baixo mal tem simultaneidade (ADR-010: máximo
+   de 1 no stem das duas faixas medidas), mas "mal tem" não é "não tem" — um
+   dobrado ou um harmônico mal decodificado basta.
+2. **Notas fora do braço.** É a assinatura exata do erro de oitava do Demucs
+   (ADR-010: B0 onde a mix diz B1): num baixo de 4 cordas, B0 simplesmente não
+   existe. `assign` levanta `AlturaImpossivelError`.
+
+**Decisão:** nenhum dos dois é fatal. A simultaneidade é reduzida à **nota mais
+grave** do grupo; a nota fora do braço é removida. Ambas vão para o `Resultado`
+(`descartadas`, `fora_do_braco`) e para o relatório da CLI.
+
+**Por que a mais grave:** num acorde de contrabaixo quem sustenta a harmonia é a
+fundamental, e o que costuma acompanhá-la é vazamento de outro instrumento ou
+parcial mal decodificada — não uma segunda voz.
+
+**Por que não falhar:** o pipeline custa ~2,5× a duração do áudio em CPU, ~16 min
+para uma música de 5 min. Perder isso por causa de uma nota é desproporcional; a
+tablatura com uma nota a menos é utilizável, e o relatório diz onde olhar.
+
+**Por que não descartar em silêncio:** silêncio aqui viraria exatamente o defeito
+que o verificador de oitava foi feito para evitar — erro plausível que nenhuma
+etapa posterior detecta.
+
+**A colisão é medida na grade, não no relógio.** Duas notas a 20 ms de distância
+são eventos distintos no áudio e o mesmo tick de semicolcheia. Quem recusa é o
+tick, então quem filtra tem de olhar o tick — filtrar por onset cru deixaria o
+erro passar intacto para o exportador. Por isso `monofonizar` mora em
+`services/rhythm.py`, ao lado da grade, e não no pipeline.

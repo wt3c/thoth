@@ -65,6 +65,12 @@ A avaliação **não depende de saber tocar** (ADR-006).
       por nota, limiar 0,40, 7 testes contra WAV real gerado pelo ffmpeg.
       Roda sobre o **stem**, não sobre a mix: validado nos dois, pega 12/12 no
       stem e só 6/12 na mix (bumbo e guitarra enchem a banda de 30,9 Hz).
+- [ ] Mais um dado para essa validação (2026-09-22, primeira execução da CLI
+      ponta a ponta): no stem do Demucs da fixture `walking` o limiar sinaliza
+      **4 de 15 notas** (27%), todas G2/A2 — bem acima dos 8,7% medidos em
+      material real. Fixture sintética passada pelo Demucs não é material real,
+      então isto não condena o limiar; é mais uma amostra de que a taxa de
+      alarme depende forte do material
 - [ ] Validar o limiar **fora do Equus** — ele foi calibrado nas mesmas 12 notas
       em que foi medido. Taxa de alarme por faixa: jorge 1,9%, sade 12,9%,
       neo 15,8%; sem referência não dá para saber quanto disso é erro real.
@@ -105,10 +111,9 @@ A avaliação **não depende de saber tocar** (ADR-006).
       `PADRAO`: custo linear por traste não separa os modos. Quem separa é a
       penalidade fora da primeira posição (ADR-012)
 - [x] Hypothesis: pitch(corda,traste) == pitch original; nenhum traste > `max_fret`
-- [ ] **Acordes / notas simultâneas** — `assign` trata a linha como monofônica;
-      duas notas no mesmo onset podem cair na mesma corda (impossível de tocar).
-      Latente hoje (o corpus de baixo não tem simultaneidade), vira GP5 inválido
-      na Fase 4 se aparecer
+- [x] **Acordes / notas simultâneas** — resolvido na borda do pipeline, não no
+      motor: `monofonizar` reduz o grupo à nota mais grave e relata o descarte
+      (ADR-014). `assign` continua monofônico de propósito
 
 **Medido:** as seis fixtures caem em primeira posição sob os **dois** presets — o
 corpus sintético vive no grave, onde tocável e ótimo coincidem, e portanto **não**
@@ -125,9 +130,10 @@ linha permitir, verificado por propriedade — não por execução no instrument
       indicações) — `MusicXmlExporter`
 - [x] Round-trip: grava → relê → mesmas cordas e trastes. 16 testes contra as
       bibliotecas reais (Regra 3), nenhum mock
-- [ ] **Abrir no TuxGuitar** — verificação manual, é o único leitor independente
-      disponível (o TuxGuitar não tem modo headless). Round-trip prova
-      consistência com quem escreveu, não validade do formato
+- [x] **Abrir no TuxGuitar** — verificado pelo Welington em 2026-09-22: os quatro
+      GP5 e os quatro MusicXML (incluindo `graves`, de 5 cordas) abriram
+      corretamente. É o único leitor independente disponível — o round-trip
+      sozinho prova consistência com quem escreveu, não validade do formato
 - [ ] Ligaduras no GP5 (hoje: figura + pausa; ataque exato, duração truncada — ADR-013)
 
 **Pronto quando:** abrir sem erro no TuxGuitar.
@@ -141,6 +147,31 @@ linha permitir, verificado por propriedade — não por execução no instrument
       (ADR-003 corrigido), não condicional. Pendente: `cloud.cp.jku.at` inacessível
       daqui, então ou achamos espelho do `beat_this-final0.ckpt`, ou escrevemos o
       quantizador e rodamos sempre com `--detect-tempo false`.
+
+## Fase 4.5 — Pipeline ponta a ponta ⬅️ **ATUAL**
+
+Pré-requisito invisível até agora: a Fase 5 só existe se houver o que o
+`POST /jobs` chame. Hoje os estágios existem isolados e nada os liga.
+
+- [x] `DemucsSeparator` atrás do `Separator` (ADR-010) — `htdemucs_ft`,
+      `--two-stems=bass`, `uvx --with "numpy<2"` (o demucs declara mal suas
+      dependências). Stem descoberto por glob, não por caminho reconstruído
+- [x] `services/pipeline.py` — `ref → artefatos`, uma função, sem fila nem estado
+- [x] **Política de simultaneidade** (ADR-014) — decidir na borda do pipeline, não
+      descobrir no meio de uma música: `assign` é monofônico e `rhythm.eventos`
+      levanta erro. Deixa de ser latente no primeiro áudio real
+- [x] Rótulo do instrumento por **conjunto** (`electric_bass`, `acoustic_bass`,
+      `contrabass`), nunca literal — o rótulo depende de contexto (emenda do
+      ADR-008) e não foi medido sobre stem do Demucs. `Counter` dos rótulos no
+      resultado, como no gate de regressão
+- [x] **Nota fora do braço não é fatal** (ADR-014) — apareceu no primeiro teste:
+      é a assinatura do erro de oitava do Demucs, e `assign` levantava
+      `AlturaImpossivelError` matando a música inteira por causa de uma nota
+- [x] BPM plumbado ponta a ponta (entrada, não estimativa — ADR-013)
+- [x] `thoth transcribe <ref> --out <dir> --bpm` na CLI
+
+**Pronto quando:** `thoth transcribe` sobre um áudio real produzir `.gp5` e
+`.musicxml` que abram, com o rótulo e os avisos de oitava no relatório.
 
 ## Fase 5 — API e UI
 

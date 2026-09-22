@@ -73,6 +73,16 @@ def _posicoes(pitch: int, tuning: tuple[int, ...], max_fret: int) -> list[tuple[
     ]
 
 
+def cabe_no_braco(pitch: int, tuning: tuple[int, ...], max_fret: int = 24) -> bool:
+    """Existe alguma casa para esta altura nesta afinação?
+
+    Serve a quem precisa **filtrar** antes de posicionar: o `assign` levanta
+    erro, e para um pipeline inteiro uma nota fora do braço não pode custar a
+    música toda.
+    """
+    return bool(_posicoes(pitch, tuning, max_fret))
+
+
 @dataclass(frozen=True, slots=True)
 class ViterbiFretAssigner:
     """Implementa o `FretAssigner`. Ótimo global sobre a frase, não guloso nota a nota."""

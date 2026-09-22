@@ -12,7 +12,7 @@ from __future__ import annotations
 from collections.abc import Sequence
 from itertools import pairwise
 
-from thoth.domain.models import TabNote
+from thoth.domain.models import NoteEvent, TabNote
 
 PPQ = 960  # ticks por semínima (convenção do GP5)
 GRADE = PPQ // 4  # semicolcheia: a menor figura que a grade reconhece
@@ -22,6 +22,36 @@ COMPASSO = PPQ * 4  # 4/4
 def para_ticks(segundos: float, bpm: int) -> int:
     """Quantiza para a grade de semicolcheia."""
     return round(segundos * bpm / 60 * PPQ / GRADE) * GRADE
+
+
+def monofonizar(
+    notes: Sequence[NoteEvent], bpm: int
+) -> tuple[list[NoteEvent], list[NoteEvent]]:
+    """Reduz cada grupo simultâneo à nota mais grave; devolve `(mantidas, descartadas)`.
+
+    A colisão é medida **na grade**, não no relógio: duas notas a 20 ms de
+    distância são eventos distintos no áudio e o mesmo tick de semicolcheia, e é
+    o tick que `eventos` recusa. Filtrar por onset cru deixaria o erro passar
+    para o exportador.
+
+    A escolha da mais grave é do domínio: num acorde de baixo quem sustenta a
+    harmonia é a fundamental, e o resto costuma ser vazamento de outro
+    instrumento ou harmônico mal decodificado (ADR-014). Nada é descartado em
+    silêncio — a lista de descartes é devolvida para quem chamou relatar.
+    """
+    melhor: dict[int, NoteEvent] = {}
+    descartadas: list[NoteEvent] = []
+    for nota in sorted(notes, key=lambda n: n.onset_s):
+        tick = para_ticks(nota.onset_s, bpm)
+        anterior = melhor.get(tick)
+        if anterior is None or nota.pitch < anterior.pitch:
+            melhor[tick] = nota
+            if anterior is not None:
+                descartadas.append(anterior)
+        else:
+            descartadas.append(nota)
+
+    return sorted(melhor.values(), key=lambda n: n.onset_s), descartadas
 
 
 def eventos(notes: Sequence[TabNote], bpm: int) -> list[tuple[int, int, TabNote]]:
