@@ -1,0 +1,57 @@
+[project]
+name = "thoth"
+version = "0.1.0"
+description = "Áudio → partitura e tablatura, com foco em contrabaixo elétrico"
+readme = "README.md"
+authors = [
+    { name = "Welington Carlos", email = "wcarlos3@gmail.com" }
+]
+# Teto em 3.13: o MuScriptor exige Python 3.10–3.12.
+requires-python = ">=3.12,<3.13"
+dependencies = [
+    "typer>=0.15",
+]
+
+[project.scripts]
+thoth = "thoth.cli:app"
+
+[dependency-groups]
+dev = [
+    "pytest>=8.3",
+    "pytest-xdist>=3.6",
+    "hypothesis>=6.122",
+    "ruff>=0.9",
+    "mypy>=1.14",
+]
+
+[build-system]
+requires = ["uv_build>=0.12.10,<0.13.0"]
+build-backend = "uv_build"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+# Testes que carregam modelo ou tocam a rede ficam FORA da suíte padrão.
+addopts = "-m 'not slow and not network'"
+markers = [
+    "slow: exercita modelo/ferramenta real (MuScriptor, Demucs, ffmpeg) — minutos em CPU",
+    "network: depende de rede real",
+]
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B", "SIM", "RUF"]
+
+[tool.mypy]
+python_version = "3.12"
+strict = true
+# O domínio não importa ML; os adapters importam libs sem stubs.
+[[tool.mypy.overrides]]
+module = ["thoth.adapters.*"]
+ignore_missing_imports = true
+
+[tool.ruff.lint.flake8-bugbear]
+# Typer expressa a CLI por defaults; não é o bug que o B008 procura.
+extend-immutable-calls = ["typer.Argument", "typer.Option"]

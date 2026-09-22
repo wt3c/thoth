@@ -216,3 +216,13 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+
+# Thoth
+cache/
+models/
+*.gp5
+*.musicxml
+spike/
+
+# IDE
+.idea/
