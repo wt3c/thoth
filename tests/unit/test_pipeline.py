@@ -15,6 +15,7 @@ import pytest
 
 from tests.sintetico import SOUNDFONT, renderizar
 from thoth.domain.models import TUNING_BASS_5, NoteEvent
+from thoth.services.cache_notas import ler
 from thoth.services.pipeline import ROTULOS_DE_BAIXO, transcrever
 
 
@@ -120,3 +121,15 @@ def test_caminho_completo_com_demucs_e_muscriptor_reais(tmp_path: Path) -> None:
 
     assert resultado.notas > 10  # a escala tem 15 notas
     assert all(c.exists() for c in resultado.artefatos.values())
+
+
+@requer_soundfont
+def test_guarda_as_notas_no_cache_da_fonte(tmp_path: Path) -> None:
+    """A transcrição custa minutos; jogar as notas fora obrigaria a pagar de novo."""
+    resultado = _rodar(tmp_path, (_nota(36, 0.0), _nota(38, 0.7)))
+    guardadas = ler(tmp_path / "cache" / resultado.asset.source_id / "notas.jsonl")
+
+    # São as notas que entraram na tablatura, já sem as descartadas: é o que a
+    # auralização precisa comparar com o original.
+    assert [n.pitch for n in guardadas] == [36, 38]
+    assert len(guardadas) == resultado.notas

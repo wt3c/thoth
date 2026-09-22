@@ -29,6 +29,7 @@ from thoth.adapters.separation import DemucsSeparator
 from thoth.adapters.transcription.muscriptor import MuscriptorTranscriber
 from thoth.domain.models import TUNING_BASS_4, AudioAsset, NoteEvent
 from thoth.domain.ports import Exporter, FretAssigner, Separator, Transcriber
+from thoth.services.cache_notas import gravar
 from thoth.services.fretboard import ViterbiFretAssigner, cabe_no_braco
 from thoth.services.nomes import nome_de_arquivo
 from thoth.services.octave_check import OctaveWarning, verificar_oitavas
@@ -103,6 +104,9 @@ def transcrever(
     mantidas, simultaneas = monofonizar(no_braco, bpm)
     descartadas = sorted(simultaneas + fora, key=lambda n: n.onset_s)
     avisos = verificar_oitavas(stem, mantidas)
+    # A transcrição custa minutos de CPU e morria com o processo: os artefatos
+    # guardam só o tempo já quantizado. Isto guarda o tempo absoluto.
+    gravar(mantidas, cache_dir / asset.source_id / "notas.jsonl")
     tabs = assigner.assign(mantidas, tuning)
 
     out_dir.mkdir(parents=True, exist_ok=True)

@@ -11,6 +11,9 @@ from thoth.adapters.ingest import resolver_fonte
 from thoth.api.app import criar_app
 from thoth.domain.models import TUNING_BASS_4, TUNING_BASS_5
 from thoth.services import pipeline
+from thoth.services.auralizacao import auralizar as _auralizar
+from thoth.services.cache_notas import ler
+from thoth.services.nomes import nome_de_arquivo
 
 app = typer.Typer(help="Áudio → partitura e tablatura, com foco em contrabaixo.")
 
@@ -30,6 +33,26 @@ def fetch(
     """Normaliza o áudio para WAV 44.1 kHz estéreo no cache."""
     ativo = resolver_fonte(ref).fetch(ref, cache)
     typer.echo(f"{ativo.source_id}  {ativo.duration_s:.1f}s  {ativo.wav}")
+
+
+@app.command()
+def auralizar(
+    ref: str = typer.Argument(..., help="Caminho do áudio ou URL do YouTube."),
+    out: Path = typer.Option(Path("out"), help="Onde gravar o WAV estéreo."),
+    cache: Path = typer.Option(CACHE_PADRAO, help="Diretório de cache."),
+) -> None:
+    """Original à esquerda, transcrição à direita — ouvir se descola."""
+    ativo = resolver_fonte(ref).fetch(ref, cache)
+    notas_jsonl = cache / ativo.source_id / "notas.jsonl"
+    if not notas_jsonl.exists():
+        typer.secho(
+            f"sem notas em cache para {ativo.title!r}: rode `thoth transcribe {ref}` antes",
+            fg=typer.colors.RED,
+        )
+        raise typer.Exit(code=1)
+
+    destino = _auralizar(ativo.wav, ler(notas_jsonl), out / f"{nome_de_arquivo(ativo)}.aural.wav")
+    typer.echo(destino)
 
 
 @app.command()

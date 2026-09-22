@@ -65,3 +65,47 @@ def test_serve_monta_o_app_sem_subir_o_servidor(monkeypatch) -> None:
     assert resultado.exit_code == 0, resultado.output
     assert recebido["port"] == 9123
     assert recebido["app"].title == "Thoth"
+
+
+def _wav(destino: Path, segundos: int = 2) -> Path:
+    subprocess.run(
+        ["ffmpeg", "-y", "-f", "lavfi", "-i", f"sine=frequency=110:duration={segundos}",
+         "-ac", "2", "-ar", "44100", "-loglevel", "error", str(destino)],
+        check=True,
+    )
+    return destino
+
+
+def test_auralizar_usa_as_notas_do_cache(tmp_path: Path) -> None:
+    """Auralizar não pode recomeçar a transcrição: ela já foi paga uma vez."""
+    from thoth.domain.models import NoteEvent
+    from thoth.services.cache_notas import gravar
+
+    origem = _wav(tmp_path / "t.wav")
+    cache = tmp_path / "c"
+    runner.invoke(app, ["fetch", str(origem), "--cache", str(cache)])
+    fonte = next(p for p in cache.iterdir() if p.is_dir())
+    gravar(
+        [NoteEvent(pitch=40, onset_s=0.0, offset_s=0.8, instrument="electric_bass")],
+        fonte / "notas.jsonl",
+    )
+
+    resultado = runner.invoke(
+        app, ["auralizar", str(origem), "--cache", str(cache), "--out", str(tmp_path / "o")]
+    )
+
+    assert resultado.exit_code == 0, resultado.output
+    assert (tmp_path / "o" / "t.aural.wav").exists()
+
+
+def test_auralizar_sem_cache_orienta_a_transcrever(tmp_path: Path) -> None:
+    """Erro mudo aqui pareceria bug do áudio; o recado tem que dizer o que fazer."""
+    origem = _wav(tmp_path / "t.wav", segundos=1)
+
+    resultado = runner.invoke(
+        app, ["auralizar", str(origem), "--cache", str(tmp_path / "c"),
+              "--out", str(tmp_path / "o")]
+    )
+
+    assert resultado.exit_code != 0
+    assert "transcribe" in resultado.output
