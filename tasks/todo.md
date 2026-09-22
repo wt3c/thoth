@@ -61,11 +61,14 @@ A avaliação **não depende de saber tocar** (ADR-006).
 
 ## Fase 2 — MuScriptor + ground truth ⬅️ **ATUAL**
 
-- [ ] **Verificador de oitava** — para cada nota, comparar a energia em `f0` e
-      `2·f0` no espectro do **áudio original** (não do stem) e sinalizar a
-      divergência. Primeiro item do portão: é o erro que atravessa até a Fase 4
-      sem nenhuma etapa posterior detectá-lo. Caso de teste depende do `.gp5` de
-      referência (ADR-007) — 12 notas de *Equus* com divergência conhecida.
+- [x] **Verificador de oitava** (`services/octave_check.py`) — razão `f0 / 2·f0`
+      por nota, limiar 0,40, 7 testes contra WAV real gerado pelo ffmpeg.
+      Roda sobre o **stem**, não sobre a mix: validado nos dois, pega 12/12 no
+      stem e só 6/12 na mix (bumbo e guitarra enchem a banda de 30,9 Hz).
+- [ ] Validar o limiar **fora do Equus** — ele foi calibrado nas mesmas 12 notas
+      em que foi medido. Taxa de alarme por faixa: jorge 1,9%, sade 12,9%,
+      neo 15,8%; sem referência não dá para saber quanto disso é erro real.
+      Depende do `.gp5` de *Equus* (ADR-007), a baixar manualmente do UG.
 - [ ] `MuscriptorTranscriber` atrás do `Protocol Transcriber`
 - [ ] `models.lock.toml` com SHA-256 dos pesos (checkpoints somem da internet)
 - [ ] Promover as fixtures da Fase 0 a **gate de regressão** travado no CI
