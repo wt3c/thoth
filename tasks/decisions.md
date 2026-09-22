@@ -270,11 +270,18 @@ si**: no Ne Obliviscaris a mix leva 106s para 30s de áudio (1238 eventos, dos q
 gasta passos com instrumentos que vamos descartar. Quanto mais cheio o arranjo,
 mais barato fica separar antes.
 
-A escuta do `neo_STEM` trouxe *"pegou o som da dedilhada"*. Investigado: o ruído
-**não** virou nota — o stem tem 2 eventos < 100 ms contra 5 da mix. A dedilhada é
-audível porque a separação a desmascara, e está no canal L (o stem), não no MIDI.
-Não afeta esta decisão; entra como nota para a Fase 2 se houver auralização no
-produto final.
+A escuta do `neo_STEM` trouxe *"pegou o som da dedilhada"*. A investigação que
+isso disparou achou um problema diferente e maior: **a separação erra a oitava**.
+Em 12 de 165 notas (7%) o stem diz B0 onde a mix diz B1, e as evidências
+disponíveis — continuidade melódica e espectro — apontam para a mix. Detalhe e
+ressalvas em `fase0-resultados.md`; pendente de escuta A/B focada.
+
+Isto **não reverte** a decisão de separar sempre: o vazamento do teclado no
+`jorge` é erro de instrumento (nota que não existe), enquanto o salto de oitava é
+erro de altura numa nota real — mais barato de corrigir, e corrigível com o
+áudio original em mãos. Mas desmonta a leitura de que separar sai de graça.
+**Condiciona a Fase 1:** o portão de regressão precisa de uma verificação de
+oitava contra o espectro da mix original, não só de métricas contra o stem.
 
 ---
 
