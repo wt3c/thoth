@@ -86,10 +86,10 @@ A avaliação **não depende de saber tocar** (ADR-006).
       antes de medir. Sem folga: renderização byte-idêntica e
       `muscriptor@0.3.0` pregado. Cobre também o avaliador, agora em
       `thoth.services.evaluation` com 8 testes contra o mir_eval real.
-- [ ] **Travar o gate no CI** — não há CI neste repositório ainda. Falta job que
-      instale fluidsynth + `FluidR3_GM.sf2` e rode `-m slow`, com os `skipif` de
-      soundfont/fluidsynth virando falha lá (gate que pula em silêncio é pior
-      que gate nenhum). Decisão pendente: GitHub Actions no `wt3c/thoth`.
+- [x] ~~Travar o gate no CI~~ — **descartado** (2026-09-22, decisão do Welington):
+      projeto pessoal, sem necessidade de CI. O portão roda localmente sob
+      demanda: `uv run pytest -m slow`. Consequência aceita: ele só protege
+      quando alguém o roda — não há nada impedindo um commit de regredir.
 - [x] `@pytest.mark.slow` para o que carrega modelo
 
 **Pronto quando:** o F1 estiver documentado e travado.
@@ -120,9 +120,15 @@ linha permitir, verificado por propriedade — não por execução no instrument
 
 ## Fase 4 — Exportadores
 
-- [ ] GP5 via PyGuitarPro (afinação, corda/traste, tempo)
-- [ ] MusicXML via music21 (clave de Fá 8vb, tonalidade, compasso)
-- [ ] Round-trip: grava → relê → mesmas cordas e trastes
+- [x] GP5 via PyGuitarPro (afinação, corda/traste, tempo) — `Gp5Exporter`
+- [x] MusicXML via music21 (clave de Fá 8vb, compasso, corda/traste como
+      indicações) — `MusicXmlExporter`
+- [x] Round-trip: grava → relê → mesmas cordas e trastes. 16 testes contra as
+      bibliotecas reais (Regra 3), nenhum mock
+- [ ] **Abrir no TuxGuitar** — verificação manual, é o único leitor independente
+      disponível (o TuxGuitar não tem modo headless). Round-trip prova
+      consistência com quem escreveu, não validade do formato
+- [ ] Ligaduras no GP5 (hoje: figura + pausa; ataque exato, duração truncada — ADR-013)
 
 **Pronto quando:** abrir sem erro no TuxGuitar.
 

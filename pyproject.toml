@@ -9,7 +9,9 @@ authors = [
 # Teto em 3.13: o MuScriptor exige Python 3.10–3.12.
 requires-python = ">=3.12,<3.13"
 dependencies = [
+    "music21>=10.5.0",
     "numpy>=2.5.3",
+    "pyguitarpro>=0.11",
     "typer>=0.15",
 ]
 
@@ -53,8 +55,15 @@ strict = true
 # Bibliotecas de áudio/MIR sem stubs nem py.typed. O override nomeia o módulo
 # IMPORTADO — nomear quem importa não tem efeito.
 [[tool.mypy.overrides]]
-module = ["pretty_midi.*", "mir_eval.*"]
+module = ["pretty_midi.*", "mir_eval.*", "guitarpro.*"]
 ignore_missing_imports = true
+
+# O music21 tem `py.typed`, mas seus construtores não são anotados. Exigir
+# chamada tipada aqui obrigaria a encher o adapter de `cast`, o que esconderia
+# erro real em vez de encontrar algum.
+[[tool.mypy.overrides]]
+module = ["thoth.adapters.export.musicxml"]
+disallow_untyped_calls = false
 
 [tool.ruff.lint.flake8-bugbear]
 # Typer expressa a CLI por defaults; não é o bug que o B008 procura.

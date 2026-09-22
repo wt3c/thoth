@@ -387,3 +387,32 @@ o argmin. Nenhuma reponderação dos quatro termos originais separa os modos.
 primeira posição sob os **dois** presets: elas vivem no registro grave, onde a solução
 tocável e a ótima coincidem. A distinção se apoia num teste de contraste explícito e na
 varredura aleatória, não nas fixtures.
+
+---
+
+## ADR-013 — Andamento é entrada do exportador, não estimativa
+**Data:** 2026-09-22 · **Status:** aceito
+
+Nenhum formato de partitura guarda segundos: GP5 e MusicXML guardam compassos,
+tempos e figuras. A transcrição, porém, sai em segundos absolutos — e o Thoth não
+estima andamento, porque o checkpoint do Beat This! está inacessível (C2).
+
+**Decisão:** `bpm` é parâmetro explícito dos exportadores, com grade de semicolcheia
+e compasso fixo 4/4. Não há palpite silencioso: um BPM errado não quebra nada, produz
+tablatura legível e errada — o pior modo de falha possível, porque não se anuncia.
+
+**Consequências assumidas nesta primeira versão:**
+
+- **GP5 sem ligaduras.** Nota mais longa que a maior figura representável vira a maior
+  figura que couber, e o resto vira pausa. O *ataque* fica exato, que é o que se lê numa
+  tablatura. O MusicXML não tem esse limite: o `makeNotation` do music21 resolve
+  ligaduras e pausas sozinho a partir dos offsets.
+- **Monofonia.** Notas que caem no mesmo tique são **recusadas** (`ValueError`), não
+  empilhadas — a tablatura é monofônica (ADR-012) e empilhar produziria posição
+  impossível de tocar. Falhar alto é melhor que emitir tab que ninguém consegue tocar.
+- **4/4 fixo.** Compasso composto ou mudança de fórmula ficam para quando houver
+  material que exija.
+
+O round-trip é verificado contra as bibliotecas reais (grava arquivo, relê, compara
+corda, traste, altura, afinação, andamento e clave). Isso prova consistência, **não**
+validade para outro leitor — a verificação no TuxGuitar continua sendo manual.

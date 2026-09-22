@@ -1,0 +1,114 @@
+"""Exportador MusicXML — round-trip contra o music21 real, gravando arquivo.
+
+A clave é o detalhe que mais erra em partitura de baixo: o instrumento soa uma
+oitava abaixo do escrito, e sem `Bass8vb` a leitura sai uma oitava acima.
+"""
+
+from __future__ import annotations
+
+from pathlib import Path
+
+import pytest
+from music21 import articulations, clef, converter, note, tempo
+
+from thoth.adapters.export.musicxml import MusicXmlExporter
+from thoth.domain.models import TUNING_BASS_4, NoteEvent, TabNote
+from thoth.services.fretboard import ViterbiFretAssigner
+
+BPM = 90
+SEMINIMA = 60.0 / BPM
+
+
+def _tabs(pitches: list[int], passo: float = SEMINIMA) -> list[TabNote]:
+    notas = [
+        NoteEvent(pitch=p, onset_s=i * passo, offset_s=i * passo + passo * 0.9,
+                  instrument="electric_bass")
+        for i, p in enumerate(pitches)
+    ]
+    return ViterbiFretAssigner().assign(notas, TUNING_BASS_4)
+
+
+def _exportar(tabs: list[TabNote], destino: Path):  # type: ignore[no-untyped-def]
+    alvo = MusicXmlExporter(bpm=BPM).export(tabs, destino / "tab.musicxml", TUNING_BASS_4)
+    assert alvo.exists()
+    return converter.parse(str(alvo))
+
+
+def test_round_trip_preserva_as_alturas(tmp_path: Path) -> None:
+    pitches = [36, 38, 40, 41, 43, 45, 47, 48]
+    lido = _exportar(_tabs(pitches), tmp_path)
+
+    assert [n.pitch.midi for n in lido.flatten().notes] == pitches
+
+
+def test_clave_de_fa_oitava_abaixo(tmp_path: Path) -> None:
+    lido = _exportar(_tabs([36, 38]), tmp_path)
+
+    claves = lido.flatten().getElementsByClass(clef.Clef)
+    assert isinstance(claves[0], clef.Bass8vbClef)
+
+
+def test_andamento_vai_no_arquivo(tmp_path: Path) -> None:
+    lido = _exportar(_tabs([36, 38]), tmp_path)
+
+    marcas = lido.flatten().getElementsByClass(tempo.MetronomeMark)
+    assert [m.number for m in marcas] == [BPM]
+
+
+def test_corda_e_traste_acompanham_cada_nota(tmp_path: Path) -> None:
+    tabs = _tabs([36, 43, 31])
+    lido = _exportar(tabs, tmp_path)
+
+    lidas = [
+        (
+            next(a.number for a in n.articulations
+                 if isinstance(a, articulations.StringIndication)),
+            next(a.number for a in n.articulations
+                 if isinstance(a, articulations.FretIndication)),
+        )
+        for n in lido.flatten().notes
+    ]
+    # MusicXML numera as cordas como o GP: 1 = mais aguda.
+    assert lidas == [(len(TUNING_BASS_4) - t.string, t.fret) for t in tabs]
+
+
+def test_duracoes_seguem_a_grade(tmp_path: Path) -> None:
+    """Semínima, colcheia e semicolcheia — a grade não pode arredondar para zero."""
+    notas = [
+        NoteEvent(pitch=36, onset_s=0.0, offset_s=SEMINIMA, instrument="electric_bass"),
+        NoteEvent(pitch=38, onset_s=SEMINIMA, offset_s=SEMINIMA * 1.5,
+                  instrument="electric_bass"),
+        NoteEvent(pitch=40, onset_s=SEMINIMA * 1.5, offset_s=SEMINIMA * 1.75,
+                  instrument="electric_bass"),
+    ]
+    lido = _exportar(ViterbiFretAssigner().assign(notas, TUNING_BASS_4), tmp_path)
+
+    assert [n.quarterLength for n in lido.flatten().notes] == [1.0, 0.5, 0.25]
+
+
+def test_silencio_vira_pausa(tmp_path: Path) -> None:
+    notas = [
+        NoteEvent(pitch=36, onset_s=0.0, offset_s=SEMINIMA, instrument="electric_bass"),
+        NoteEvent(pitch=36, onset_s=SEMINIMA * 3, offset_s=SEMINIMA * 4,
+                  instrument="electric_bass"),
+    ]
+    lido = _exportar(ViterbiFretAssigner().assign(notas, TUNING_BASS_4), tmp_path)
+
+    pausas = lido.flatten().getElementsByClass(note.Rest)
+    assert sum(p.quarterLength for p in pausas) == 2.0
+
+
+def test_sem_notas_e_erro(tmp_path: Path) -> None:
+    with pytest.raises(ValueError, match="sem notas"):
+        MusicXmlExporter().export([], tmp_path / "vazio.musicxml", TUNING_BASS_4)
+
+
+def test_notas_simultaneas_sao_recusadas(tmp_path: Path) -> None:
+    simultaneas = [
+        NoteEvent(pitch=36, onset_s=0.0, offset_s=0.4, instrument="electric_bass"),
+        NoteEvent(pitch=43, onset_s=0.01, offset_s=0.4, instrument="electric_bass"),
+    ]
+    tabs = ViterbiFretAssigner().assign(simultaneas, TUNING_BASS_4)
+
+    with pytest.raises(ValueError, match="simultâne"):
+        MusicXmlExporter(bpm=BPM).export(tabs, tmp_path / "acorde.musicxml", TUNING_BASS_4)
