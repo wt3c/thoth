@@ -277,3 +277,35 @@ o detecte. Entra como **primeiro item do portão de regressão da Fase 1**.
 disse *"as notas parecem corretas"*. Doze notas erradas de oitava, numa linha
 rápida de metal, soando junto com o original — a Camada 2 não discrimina isso sem
 um A/B focado. Limite metodológico da escuta, registrado.
+
+### O ouvido não arbitra oitava no grave — e isso era previsível
+
+Submetido o A/B com a linha completa (112 notas, só as 12 em disputa diferindo),
+o veredito foi *"agora as duas ficaram perfeitas"*. Não é indecisão do ouvinte:
+medido no FluidR3, o B0 rende −35,3 dBFS com **24% da energia abaixo de 50 Hz**
+(fora do alcance de caixa e fone comuns), enquanto o B1 rende −30,4 dBFS com 0%.
+O que sobra audível de um B0 são seus harmônicos, e o primeiro deles é 61,7 Hz —
+a fundamental do B1. **As duas hipóteses soam quase iguais por construção.**
+
+Registrado como ponto cego da Camada 2 no ADR-006. A questão de oitava é da
+Camada 3 (referência externa), como o próprio ADR-006 já antecipava.
+
+**Primeira aplicação concreta do ADR-007:** para fechar isto é preciso uma
+tablatura humana de *Equus* em `.gp5`, baixada manualmente (o Welington tem
+assinatura do Ultimate Guitar). Sem ela, a divergência fica registrada e o
+verificador de oitava da Fase 1 nasce sem caso de teste.
+
+### Nota de método: dois erros meus nesta rodada
+
+1. **A/B sem contexto.** A primeira versão isolava só as 12 notas em disputa —
+   tirava justamente a linha melódica que permite julgar oitava. Pedir veredito
+   sobre isso teria produzido resposta sem valor.
+2. **Bug silencioso no A/B.** A versão "B1" alterou 2 das 12 notas, não 12: o
+   pareamento usava o onset da *mix* para localizar a nota do *stem*, que difere
+   em até 50 ms. Os dois arquivos eram quase idênticos. Só foi pego porque o
+   Welington estranhou a esparsidade e perguntou.
+
+Os dois falham do mesmo jeito: **artefato de avaliação entregue sem verificação
+própria**. O portão da Fase 1 precisa valer para o código de avaliação também,
+não só para o pipeline — um avaliador quebrado produz decisão errada com a mesma
+facilidade com que um transcritor quebrado produz tablatura errada.

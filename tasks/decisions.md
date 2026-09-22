@@ -124,6 +124,26 @@ instrumental:
 3. **Referência externa:** comparar com tablatura humana publicada de uma música
    conhecida, para conferir oitava e notas sem precisar tocar.
 
+**Ponto cego medido na Camada 2 (2026-09-22).** A Camada 2 **não arbitra oitava no
+registro grave** — e isso não é falta de treino do ouvinte, é física somada à
+cadeia de reprodução. Renderizando as duas hipóteses com o FluidR3:
+
+| nota | RMS | energia abaixo de 50 Hz | 2º harmônico |
+|---|---|---|---|
+| B0 (30,9 Hz) | −35,3 dBFS | **24%** | 61,7 Hz |
+| B1 (61,7 Hz) | −30,4 dBFS | 0% | 123,5 Hz |
+
+Um quarto da energia do B0 está abaixo de 50 Hz, que caixa e fone comuns não
+reproduzem. O que sobra audível do B0 são seus harmônicos — a começar por 61,7 Hz,
+que é exatamente a **fundamental do B1**. As duas hipóteses soam quase iguais por
+construção. Submetido o A/B com a linha completa, o veredito foi *"agora as duas
+ficaram perfeitas"*: a Camada 2 funcionou como projetada e disse, corretamente,
+que não distingue.
+
+**Consequência:** erro de oitava no registro grave é da **Camada 3**, não da 2 —
+como este ADR já previa ao escrever "para conferir oitava". Nenhuma quantidade de
+escuta substitui a referência externa aqui.
+
 **Consequência de produto — o iniciante muda as prioridades:**
 - O `FretAssigner` ganha um **modo iniciante**: preferir primeira posição, cordas
   soltas e trastes baixos. Para quem começa, tocabilidade vale mais que otimização
