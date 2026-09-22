@@ -201,3 +201,22 @@ Pré-requisito invisível até agora: a Fase 5 só existe se houver o que o
 ## Pendências para o Welington
 
 - [ ] Aval para `omarchy-pkg-install musescore` (não instalado; TuxGuitar já está)
+
+## 🐛 Aberto — GP5 gravado perde beats no round-trip (2026-09-22)
+
+Achado ao verificar o ADR-018 com o CLI real, **não introduzido por ele** (o mesmo
+resultado aparece com as mudanças em `git stash`).
+
+- **Sintoma:** `out/escala.gp5` relido com PyGuitarPro traz 4 beats com nota em vez
+  de 15; cada compasso vira **um** beat com todas as notas empilhadas dentro.
+- **Delimitado:** a `Song` **em memória** está correta na hora do `gp.write`
+  (4 compassos × 4 beats, 1 nota por beat, `measureHeaders == len(measures)`).
+  A perda é no `write`→`parse`. O MusicXML do mesmo material está correto (15 notas,
+  15 `<lyric>`), então o defeito é só do caminho GP5.
+- **Hipótese descartada:** 4 vozes por compasso em vez das 2 do formato — forçar 2
+  vozes não muda nada.
+- **Por que a suíte não pega:** `tests/unit/test_gp5_export.py` exporta com o BPM
+  padrão (120) notas espaçadas a 90, então cai numa grade rítmica que não dispara o
+  bug. Um teste com BPM coerente com o espaçamento reproduz na hora.
+- **Próximo passo:** sessão de `systematic-debugging` própria — comparar os bytes
+  gravados com um GP5 de referência do próprio Guitar Pro. Não emendar sem causa raiz.
