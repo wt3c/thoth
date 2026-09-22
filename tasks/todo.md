@@ -79,10 +79,18 @@ A avaliação **não depende de saber tocar** (ADR-006).
       do HF e licença. Conferido contra o cache real da estação por teste `slow`
       (1,6 GB em ~5 s). Pesos seguem fora do versionamento (ADR-005); o lock
       guarda só a identidade deles.
-- [ ] Promover as fixtures da Fase 0 a **gate de regressão** travado no CI
-      (válido só para o `small` — ADR-009 — e cobrindo também o código de
-      avaliação, que já produziu dois artefatos errados na Fase 0)
-- [ ] `@pytest.mark.slow` para o que carrega modelo
+- [x] Promover as fixtures da Fase 0 a **gate de regressão** — `tests/sintetico.py`
+      (regera as seis fixtures; áudio nunca versionado, ADR-005) +
+      `tests/integration/test_regressao_fase0.py`. Válido só para o `small`
+      (ADR-009) sobre o checkpoint de `models.lock.toml`, conferido por hash
+      antes de medir. Sem folga: renderização byte-idêntica e
+      `muscriptor@0.3.0` pregado. Cobre também o avaliador, agora em
+      `thoth.services.evaluation` com 8 testes contra o mir_eval real.
+- [ ] **Travar o gate no CI** — não há CI neste repositório ainda. Falta job que
+      instale fluidsynth + `FluidR3_GM.sf2` e rode `-m slow`, com os `skipif` de
+      soundfont/fluidsynth virando falha lá (gate que pula em silêncio é pior
+      que gate nenhum). Decisão pendente: GitHub Actions no `wt3c/thoth`.
+- [x] `@pytest.mark.slow` para o que carrega modelo
 
 **Pronto quando:** o F1 estiver documentado e travado.
 **Cuidado:** F1 sintético é métrica de regressão, não de qualidade real.

@@ -50,9 +50,10 @@ select = ["E", "F", "I", "UP", "B", "SIM", "RUF"]
 [tool.mypy]
 python_version = "3.12"
 strict = true
-# O domínio não importa ML; os adapters importam libs sem stubs.
+# Bibliotecas de áudio/MIR sem stubs nem py.typed. O override nomeia o módulo
+# IMPORTADO — nomear quem importa não tem efeito.
 [[tool.mypy.overrides]]
-module = ["thoth.adapters.*"]
+module = ["pretty_midi.*", "mir_eval.*"]
 ignore_missing_imports = true
 
 [tool.ruff.lint.flake8-bugbear]

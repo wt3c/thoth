@@ -339,3 +339,40 @@ para baixo.
 o motor não emite partitura), o Demucs virou etapa fixa (ADR-010), o escopo
 fechou em baixo (ADR-011) e o portão de regressão passa a cobrir o próprio
 código de avaliação, não só o pipeline.
+
+---
+
+## Adendo (2026-09-22): as fixtures viraram portão de regressão
+
+A tabela da Camada 1 saiu do scratchpad e virou teste: `tests/sintetico.py` regera as seis
+fixtures (MIDI → fluidsynth → normalização de pico; áudio nunca versionado, ADR-005) e
+`tests/integration/test_regressao_fase0.py` cobra os números medidos, com o avaliador
+agora dentro do repositório (`thoth.services.evaluation`).
+
+Reprodução das seis, modelo `small`, condição livre — idêntica à Fase 0 na terceira casa:
+
+| fixture | onset F1 | nota F1 | ref | est |
+|---|---|---|---|---|
+| escala | 1,000 | 0,968 | 15 | 16 |
+| graves | 1,000 | 1,000 | 10 | 10 |
+| groove16 | 1,000 | 1,000 | 32 | 32 |
+| oitavas | 1,000 | 1,000 | 12 | 12 |
+| walking | 0,938 | 0,968 | 16 | 15 |
+| misto | 0,938 | 0,682 | 16 | 28 |
+
+O portão roda sem folga (`FOLGA = 0.0`): a renderização é byte-idêntica entre execuções
+(conferido por SHA-256), o transcritor está pregado em `muscriptor@0.3.0` e os pesos são
+conferidos contra `models.lock.toml` antes de medir — medir outro checkpoint torna os
+pisos sem sentido. Uma folga uniforme também seria enganosa: 0,03 absorveria uma nota
+perdida em `groove16` (32 notas) e nenhuma em `graves` (10).
+
+**Terceiro erro meu, da mesma família dos dois anteriores.** Reescrevi a fixture `misto` de
+memória em vez de copiar o gerador: nota F1 deu 0,882 contra a baseline 0,682 — e a
+direção do erro (para melhor) é a que menos desperta suspeita. Só apareceu porque imprimi
+os valores medidos ao lado das baselines em vez de aceitar o verde do portão. Registrado
+em `tasks/lessons/workflow.md`.
+
+**Aberto:** não há CI neste repositório. O portão existe e reproduz localmente, mas
+"travado no CI" ainda não é verdade — falta um job que instale fluidsynth + soundfont e
+rode `-m slow`, com os dois `skipif` virando falha nesse job (portão que pula em silêncio
+é pior que portão nenhum).

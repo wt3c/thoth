@@ -64,7 +64,7 @@ class MuscriptorTranscriber:
 
     model: str = "small"
     device: str = "cpu"  # a estação não tem CUDA; ROCm não está no escopo
-    binary: tuple[str, ...] = field(default=("uvx", "--python", "3.12", "muscriptor"))
+    binary: tuple[str, ...] = field(default=("uvx", "--python", "3.12", "muscriptor@0.3.0"))
 
     def _comando(self, audio: Path, saida: Path) -> list[str]:
         return [
