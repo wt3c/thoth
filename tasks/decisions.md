@@ -553,3 +553,34 @@ remontou o nome a partir do `source_id`.
 **Teste.** `tests/unit/test_nomes.py` usa os títulos reais do cache (o do Toshiki
 Soejima tem `:` e `/` no mesmo título) e cobre o fallback: título que se reduz a
 nada volta ao `source_id`, senão o artefato viraria um `.gp5` oculto e sem nome.
+
+---
+
+## ADR-018 — Nome da nota escrito na partitura e na tablatura
+
+**Data:** 2026-09-22 · **Status:** aceito
+
+**Contexto.** Ler tablatura de baixo é ler traste, não nota: o estudo fica preso
+à posição e não vira conhecimento do braço. O nome da nota ao lado da figura
+fecha essa lacuna sem exigir nada do leitor.
+
+**Decisão.** Cada nota exportada leva o nome da sua classe de altura, via
+`services/notas.nome_da_nota()` — no GP5 como `Beat.text` (é o que o Guitar Pro e
+o alphaTab desenham sobre o beat) e no MusicXML como `lyric` (é o que o MuseScore
+desenha sob a nota). Ambos já existiam nas dependências atuais; nenhuma entrou.
+
+**Sem oitava.** `E`, não `E1`. A oitava já está dita pela corda e pelo traste, e
+repeti-la em cada figura polui a leitura — que é justamente o que a mudança quer
+melhorar.
+
+**Sempre sustenido.** A tecla preta entre lá e si sai `A#`, nunca `Bb`, inclusive
+numa música em fá. Distinguir as duas exige armadura de clave, e o Thoth não
+estima tonalidade (mesma família do `--bpm`, ADR-013). Fica declarado no módulo,
+não escondido.
+
+**Pausa não recebe texto**, senão apareceria um rótulo solto no meio do compasso.
+Tem teste próprio.
+
+**Teste.** Round-trip real nos dois formatos (`test_gp5_export.py`,
+`test_musicxml_export.py`): grava o arquivo, relê com PyGuitarPro e com music21 e
+confere o texto na nota certa. Mock aqui provaria só que chamo a API como imagino.

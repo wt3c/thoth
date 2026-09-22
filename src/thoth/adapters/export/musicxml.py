@@ -21,6 +21,7 @@ from music21 import articulations, clef, instrument, meter, note, stream, tempo
 
 from thoth.domain.models import TabNote
 from thoth.domain.ports import Exporter
+from thoth.services.notas import nome_da_nota
 from thoth.services.rhythm import PPQ, eventos
 
 
@@ -43,6 +44,7 @@ class MusicXmlExporter:
 
         for inicio, duracao, tab in eventos(notes, self.bpm):
             n = note.Note(tab.event.pitch, quarterLength=duracao / PPQ)
+            n.lyric = nome_da_nota(tab.event.pitch)
             n.articulations = [
                 # MusicXML numera as cordas como o GP: 1 = mais aguda.
                 articulations.StringIndication(len(tuning) - tab.string),

@@ -112,3 +112,11 @@ def test_notas_simultaneas_sao_recusadas(tmp_path: Path) -> None:
 
     with pytest.raises(ValueError, match="simultâne"):
         MusicXmlExporter(bpm=BPM).export(tabs, tmp_path / "acorde.musicxml", TUNING_BASS_4)
+
+
+def test_escreve_o_nome_da_nota_sob_a_pauta(tmp_path: Path) -> None:
+    """No MusicXML o nome vai como lyric — é o que o MuseScore desenha sob a nota."""
+    partitura = _exportar(_tabs([28, 34, 36]), tmp_path)
+
+    lidos = [n.lyric for n in partitura.recurse().notes]
+    assert lidos == ["E", "A#", "C"]

@@ -115,3 +115,28 @@ def test_notas_simultaneas_sao_recusadas(tmp_path: Path) -> None:
 
     with pytest.raises(ValueError, match="simultâne"):
         Gp5Exporter(bpm=BPM).export(tabs, tmp_path / "acorde.gp5", TUNING_BASS_4)
+
+
+def test_escreve_o_nome_da_nota_no_beat(tmp_path: Path) -> None:
+    """O nome viaja como texto do beat: é o que o Guitar Pro e o alphaTab mostram."""
+    song = _exportar(_tabs([28, 34, 36]), tmp_path)
+
+    textos = [
+        beat.text
+        for medida in song.tracks[0].measures
+        for beat in medida.voices[0].beats
+        if beat.notes
+    ]
+    assert textos == ["E", "A#", "C"]
+
+
+def test_pausa_nao_recebe_texto(tmp_path: Path) -> None:
+    """Texto em pausa apareceria como rótulo solto no meio do compasso."""
+    song = _exportar(_tabs([28], passo=SEMINIMA * 4), tmp_path)
+
+    assert all(
+        beat.text is None
+        for medida in song.tracks[0].measures
+        for beat in medida.voices[0].beats
+        if not beat.notes
+    )
