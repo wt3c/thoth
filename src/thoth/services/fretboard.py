@@ -18,11 +18,13 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from itertools import pairwise
+from typing import TYPE_CHECKING
 
 from thoth.domain.models import NoteEvent, TabNote
+from thoth.domain.ports import FretAssigner
 
 
-class IMPOSSIVEL(ValueError):
+class AlturaImpossivelError(ValueError):
     """A altura não existe neste braço: grave demais, ou acima do último traste."""
 
 
@@ -95,14 +97,25 @@ class ViterbiFretAssigner:
     def assign(
         self, notes: list[NoteEvent], tuning: tuple[int, ...], max_fret: int = 24
     ) -> list[TabNote]:
+        """Posiciona a linha, em ordem de onset.
+
+        **Pressupõe linha monofônica.** Notas simultâneas são tratadas como
+        sequência, então nada impede que duas caiam na mesma corda — o que é
+        impossível de tocar. O corpus de baixo medido até aqui não tem
+        simultaneidade; acordes exigem um passo a mais, não este algoritmo.
+        """
         if not notes:
             return []
+
+        # A ordem é parte do problema: o custo de transição só faz sentido entre
+        # vizinhas no tempo. O `FretAssigner` não exige entrada ordenada.
+        notes = sorted(notes, key=lambda n: (n.onset_s, n.pitch))
 
         estados: list[list[tuple[int, int]]] = []
         for nota in notes:
             opcoes = _posicoes(nota.pitch, tuning, max_fret)
             if not opcoes:
-                raise IMPOSSIVEL(
+                raise AlturaImpossivelError(
                     f"pitch {nota.pitch} em {nota.onset_s:.2f}s não cabe na afinação "
                     f"{tuning} até o traste {max_fret}"
                 )
@@ -136,3 +149,7 @@ class ViterbiFretAssigner:
             TabNote(event=nota, string=opcoes[i][0], fret=opcoes[i][1])
             for nota, opcoes, i in zip(notes, estados, caminho, strict=True)
         ]
+
+
+if TYPE_CHECKING:  # pragma: no cover — trava a assinatura contra o Protocol
+    _: FretAssigner = ViterbiFretAssigner()

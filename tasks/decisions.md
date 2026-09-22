@@ -351,3 +351,39 @@ o motor for o MuScriptor. Não gastar Fase 4 tentando gerar tablatura de guitarr
 **Limitação adjacente:** o `htdemucs_ft` não tem stem de guitarra — ela cai em
 `other`, junto com teclados e sopros. Mesmo que o motor melhorasse, o separador
 não entrega guitarra isolada.
+
+---
+
+## ADR-012 — Custo de tablatura: o que separa iniciante de experiente
+**Data:** 2026-09-22 · **Status:** aceito
+
+O posicionamento é um caminho ótimo sobre a frase (Viterbi), com cinco pesos:
+`traste_alto` e `corda_solta` na emissão, `deslocamento` e `troca_corda` na transição,
+e `acima_da_janela` na emissão. Dois presets: `PADRAO` e `INICIANTE` (ADR-006).
+
+**O achado que motiva este ADR é negativo.** Na primeira versão os dois presets
+produziam **tablatura idêntica** em todas as linhas testadas — o modo iniciante existia
+só como rótulo. A causa não é calibração ruim: um custo *linear* por traste desloca
+todas as opções de uma nota na mesma direção, então mudar seu peso quase nunca inverte
+o argmin. Nenhuma reponderação dos quatro termos originais separa os modos.
+
+**Decisão:** o que separa é uma penalidade que só morde *fora* da zona confortável —
+`acima_da_janela * max(0, traste - 5)`, zero em `PADRAO` e alta em `INICIANTE`. Com ela,
+170 de 400 linhas aleatórias divergem, e na direção certa (o iniciante desce o braço).
+
+**Duas limitações, explícitas:**
+
+1. A janela é **absoluta** (trastes 0–5), não a posição corrente da mão que a expressão
+   "janela de posição da mão" do `todo.md` sugeria. Para quem está aprendendo, a
+   primeira posição é o objetivo em si — uma janela móvel premiaria ficar coerente em
+   qualquer região do braço, inclusive alta, que é o oposto do ADR-006. A mão móvel já
+   está representada pelo termo de `deslocamento`.
+2. Acima do traste 5 o termo vira **offset constante** dentro da linha: numa frase que
+   vive genuinamente entre os trastes 7 e 12, ele não discrimina nada e a escolha volta
+   a ser dos outros quatro termos. Isso é aceitável porque tal frase não tem alternativa
+   em primeira posição — mas não confunda com "o modo iniciante age em toda linha".
+
+**O corpus sintético não valida essa distinção.** As seis fixtures da Fase 0 caem em
+primeira posição sob os **dois** presets: elas vivem no registro grave, onde a solução
+tocável e a ótima coincidem. A distinção se apoia num teste de contraste explícito e na
+varredura aleatória, não nas fixtures.

@@ -18,10 +18,10 @@ from tests.sintetico import FIXTURES
 from thoth.domain.models import TUNING_BASS_4, TUNING_BASS_5, NoteEvent
 from thoth.services.evaluation import notas_do_midi
 from thoth.services.fretboard import (
-    IMPOSSIVEL,
     INICIANTE,
     PADRAO,
     PRIMEIRA_POSICAO,
+    AlturaImpossivelError,
     ViterbiFretAssigner,
 )
 
@@ -48,12 +48,12 @@ def test_cinco_cordas_alcanca_si_zero() -> None:
 
 
 def test_grave_demais_para_a_afinacao_e_erro() -> None:
-    with pytest.raises(IMPOSSIVEL, match="23"):
+    with pytest.raises(AlturaImpossivelError, match="23"):
         _posicoes([23])  # B0 não existe num baixo de 4 cordas
 
 
 def test_agudo_demais_para_o_braco_e_erro() -> None:
-    with pytest.raises(IMPOSSIVEL, match="96"):
+    with pytest.raises(AlturaImpossivelError, match="96"):
         _posicoes([96])
 
 
@@ -158,3 +158,12 @@ def test_fixtures_cabem_na_primeira_posicao(
     assert notas, f"{nome}: fixture sem notas de baixo"
     assert max(t.fret for t in tabs) <= PRIMEIRA_POSICAO
     assert all(afinacao[t.string] + t.fret == t.event.pitch for t in tabs)
+
+
+def test_entrada_fora_de_ordem_e_posicionada_pelo_tempo() -> None:
+    """O custo de transição só significa algo entre vizinhas no tempo."""
+    fora_de_ordem = [_linha([36, 48])[1], _linha([36, 48])[0]]
+
+    tabs = ViterbiFretAssigner().assign(fora_de_ordem, TUNING_BASS_4)
+
+    assert [t.event.pitch for t in tabs] == [36, 48]

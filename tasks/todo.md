@@ -97,12 +97,23 @@ A avaliação **não depende de saber tocar** (ADR-006).
 
 ## Fase 3 — Motor de tablatura (Viterbi/DP)
 
-- [ ] Estados (corda, traste) válidos por afinação: EADG · BEADG · Drop D · custom
-- [ ] Custo: distância de traste, troca de corda, janela de posição da mão,
-      bônus de corda solta, penalidade de traste alto
-- [ ] **Modo iniciante** (ADR-006): preferir primeira posição, cordas soltas e
-      trastes baixos — tocabilidade acima de otimização de deslocamento
-- [ ] Hypothesis: pitch(corda,traste) == pitch original; nenhum traste > `max_fret`
+- [x] Estados (corda, traste) válidos por afinação — qualquer tupla de afinação;
+      EADG, BEADG e Drop D já em `thoth.domain.models`
+- [x] Custo: traste alto, corda solta, deslocamento, troca de corda e janela da
+      mão (ADR-012). A janela é **absoluta** (trastes 0–5), não móvel — ver ADR-012
+- [x] **Modo iniciante** (ADR-006) — preset `INICIANTE`. Nasceu idêntico ao
+      `PADRAO`: custo linear por traste não separa os modos. Quem separa é a
+      penalidade fora da primeira posição (ADR-012)
+- [x] Hypothesis: pitch(corda,traste) == pitch original; nenhum traste > `max_fret`
+- [ ] **Acordes / notas simultâneas** — `assign` trata a linha como monofônica;
+      duas notas no mesmo onset podem cair na mesma corda (impossível de tocar).
+      Latente hoje (o corpus de baixo não tem simultaneidade), vira GP5 inválido
+      na Fase 4 se aparecer
+
+**Medido:** as seis fixtures caem em primeira posição sob os **dois** presets — o
+corpus sintético vive no grave, onde tocável e ótimo coincidem, e portanto **não**
+valida o modo iniciante. A distinção se apoia no teste de contraste e na varredura
+de 400 linhas aleatórias (170 divergem).
 
 **Pronto quando:** as tabs das fixtures couberem na primeira posição quando a
 linha permitir, verificado por propriedade — não por execução no instrumento.
