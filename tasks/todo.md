@@ -75,7 +75,10 @@ A avaliação **não depende de saber tocar** (ADR-006).
 - [ ] **Não fatiar áudio antes de transcrever** — o rótulo do instrumento depende
       de contexto (emenda do ADR-008): 2,9 s viram `acoustic_piano`, 8 s viram
       `electric_bass`. Vale como restrição ao montar o serviço de pipeline.
-- [ ] `models.lock.toml` com SHA-256 dos pesos (checkpoints somem da internet)
+- [x] `models.lock.toml` com SHA-256 dos pesos — `small` e `medium`, com revisão
+      do HF e licença. Conferido contra o cache real da estação por teste `slow`
+      (1,6 GB em ~5 s). Pesos seguem fora do versionamento (ADR-005); o lock
+      guarda só a identidade deles.
 - [ ] Promover as fixtures da Fase 0 a **gate de regressão** travado no CI
       (válido só para o `small` — ADR-009 — e cobrindo também o código de
       avaliação, que já produziu dois artefatos errados na Fase 0)

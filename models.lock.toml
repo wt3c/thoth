@@ -1,0 +1,35 @@
+# Pesos travados por conteúdo. Gerado a partir do cache local; conferido pelo
+# teste `test_lock_do_projeto_bate_com_os_pesos_da_estacao`.
+#
+# Licença CC BY-NC 4.0: uso não comercial, aceita por repositório no HuggingFace.
+# Os pesos NÃO são versionados aqui (ADR-005) — só a identidade deles.
+[muscriptor-small]
+repo = "MuScriptor/muscriptor-small"
+revision = "8c127f603b807520fa465c838e9bfee8a91ada4e"
+licenca = "CC BY-NC 4.0"
+
+[[muscriptor-small.arquivos]]
+path = "config.json"
+sha256 = "3008fc481e4a1cd978e337eb3759260c270892204db5039235ac939e1f42aeb2"
+bytes = 124
+
+[[muscriptor-small.arquivos]]
+path = "model.safetensors"
+sha256 = "bbd482c786b895cf7d8f44185073d951adae2ebb8a66f82ca84cd1f84569549c"
+bytes = 411888600
+
+[muscriptor-medium]
+repo = "MuScriptor/muscriptor-medium"
+revision = "f32236969308476e01fd3aae67357de5feb05a2d"
+licenca = "CC BY-NC 4.0"
+
+[[muscriptor-medium.arquivos]]
+path = "config.json"
+sha256 = "43e13a70fc9ae0af36b7447c06f3eac2282daeb69d79c1ff840ede7fdaa26a3b"
+bytes = 126
+
+[[muscriptor-medium.arquivos]]
+path = "model.safetensors"
+sha256 = "ac80adbdf85d87231735fd948af7013441c0afced316c4e9067fd5d8a7fb97ec"
+bytes = 1228144472
+
