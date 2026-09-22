@@ -43,15 +43,21 @@ class Executor(Protocol):
     """O pipeline, injetável — rodar o real num teste custa minutos de CPU."""
 
     def __call__(
-        self, ref: str, out_dir: Path, *, bpm: int, tuning: tuple[int, ...], cache_dir: Path
+        self,
+        ref: str,
+        out_dir: Path,
+        *,
+        bpm: int | None,
+        tuning: tuple[int, ...],
+        cache_dir: Path,
     ) -> Resultado: ...
 
 
 class Pedido(BaseModel):
-    """`bpm` é entrada e não estimativa (ADR-013); `cordas` escolhe a afinação."""
+    """`bpm` vazio faz o Thoth estimar do áudio (ADR-019); `cordas` escolhe a afinação."""
 
     ref: str = Field(..., description="Caminho do áudio ou URL do YouTube.")
-    bpm: int = Field(120, ge=20, le=300)
+    bpm: int | None = Field(None, ge=20, le=300)
     cordas: int = Field(4, ge=4, le=5)
 
 
@@ -70,7 +76,7 @@ def _resumo(job: Job) -> dict[str, Any]:
         "id": job.id,
         "status": job.status,
         "ref": job.pedido.ref,
-        "bpm": job.pedido.bpm,
+        "bpm": r.bpm if r else job.pedido.bpm,
         "erro": job.erro,
         "titulo": r.asset.title if r else None,
         "notas": r.notas if r else None,
@@ -86,6 +92,8 @@ def _resumo(job: Job) -> dict[str, Any]:
             else None
         ),
         "formatos": sorted(r.artefatos) if r else [],
+        "bpm_estimado": bool(r and r.andamento),
+        "bpm_confiavel": bool(r and r.andamento and r.andamento.confiavel),
     }
 
 

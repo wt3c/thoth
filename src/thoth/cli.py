@@ -36,7 +36,9 @@ def fetch(
 def transcribe(
     ref: str = typer.Argument(..., help="Caminho do áudio ou URL do YouTube."),
     out: Path = typer.Option(Path("out"), help="Onde gravar .gp5 e .musicxml."),
-    bpm: int = typer.Option(120, help="Andamento: entrada, não estimativa (ADR-013)."),
+    bpm: int | None = typer.Option(
+        None, help="Andamento. Sem ele, o Thoth estima do áudio e avisa (ADR-019)."
+    ),
     cordas: int = typer.Option(4, help="4 ou 5 cordas."),
     cache: Path = typer.Option(CACHE_PADRAO, help="Diretório de cache."),
 ) -> None:
@@ -44,6 +46,16 @@ def transcribe(
     afinacao = TUNING_BASS_5 if cordas == 5 else TUNING_BASS_4
     typer.echo("separando e transcrevendo — ~2,5x a duração do áudio em CPU…")
     r = pipeline.transcrever(ref, out, bpm=bpm, tuning=afinacao, cache_dir=cache)
+
+    if r.andamento is not None:
+        recado = (
+            f"andamento ESTIMADO: {r.bpm} BPM"
+            if r.andamento.confiavel
+            else f"andamento ESTIMADO: {r.bpm} BPM — pouca confiança, o segundo "
+            f"método leu {r.andamento.conferencia}"
+        )
+        typer.secho(recado, fg=typer.colors.YELLOW)
+        typer.secho("confira ouvindo; se soar errado, reexporte com --bpm", fg=typer.colors.YELLOW)
 
     typer.echo(f"{r.notas} notas de baixo em {r.rotulos}")
     if r.descartadas:

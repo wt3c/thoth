@@ -584,3 +584,46 @@ Tem teste próprio.
 **Teste.** Round-trip real nos dois formatos (`test_gp5_export.py`,
 `test_musicxml_export.py`): grava o arquivo, relê com PyGuitarPro e com music21 e
 confere o texto na nota certa. Mock aqui provaria só que chamo a API como imagino.
+
+---
+
+## ADR-019 — `--bpm` opcional: estimativa declarada em vez de exigência
+
+**Data:** 2026-09-22 · **Status:** aceito · **Emenda o ADR-013**
+
+**Contexto.** O ADR-013 fez do andamento uma entrada obrigatória para evitar
+palpite silencioso virando tablatura errada. A justificativa continua correta, mas
+a decisão tinha uma suposição não declarada: a de que quem usa sabe o BPM. O
+Welington disse, com todas as letras, que está começando os estudos e não sabe o
+andamento de nenhuma das músicas. Para esse usuário, o ADR-013 exigia a resposta
+antes de permitir a pergunta — a ferramenta ficava inutilizável.
+
+**Decisão.** `--bpm` passa a ser opcional. Informado, manda sempre e nada muda.
+Ausente, o andamento é estimado do **mix** (não do stem: o pulso está na bateria,
+que a separação justamente remove) e o resultado é **anunciado em amarelo** no
+CLI, exposto no JSON do job (`bpm_estimado`, `bpm_confiavel`) e marcado como aviso
+na página. O que o ADR-013 proibia era o palpite *silencioso*; um palpite alto e
+corrigível não viola o princípio, cumpre.
+
+**Dois estimadores, não um.** Medindo as fixtures de andamento conhecido (90 BPM),
+cada método errou onde o outro acertou: `beat_track` leu o `misto` a 45 (metade) e
+`feature.tempo` leu o `groove16` a 117. O desacordo entre eles vira o campo
+`confiavel` — é o sinal honesto de "confira este aqui". Nas seis músicas do acervo
+os dois concordam em quatro e divergem em três casos previsíveis (prog metal e
+neo-soul rubato).
+
+**Dobra para a faixa musical (70–160).** O erro de dobro/metade é o modo de falha
+clássico, e é o que aparece nos dados. Dobrar ou dividir até cair na faixa corrige
+o `misto` (45 → 90) sem inventar nada.
+
+**Custo aceito:** entra o `librosa` (BSD) como dependência de produção. É a mesma
+peça prevista para o C2, então não é dívida nova.
+
+**Limite conhecido, não resolvido aqui:** um único BPM global não representa
+música que muda de andamento — o *Equus* é exatamente esse caso. Seguir a curva de
+tempo real exigiria mudança de andamento por compasso no exportador, que hoje é
+4/4 fixo. Fica anotado, não escondido.
+
+**Teste.** `tests/unit/test_tempo.py` roda o estimador real contra áudio real
+renderizado a 90 BPM — inclusive o `misto`, que sem a dobra sairia a 45, e o
+`groove16`, que precisa relatar desacordo.

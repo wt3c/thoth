@@ -46,8 +46,8 @@
         <input id="ref" placeholder="/caminho/musica.mp3" style="width:100%">
       </div>
       <div>
-        <label for="bpm">Andamento da música (BPM)</label>
-        <input id="bpm" type="number" value="120" min="20" max="300">
+        <label for="bpm">Andamento da música (BPM) — deixe vazio para o Thoth estimar</label>
+        <input id="bpm" type="number" placeholder="estimar do áudio" min="20" max="300">
       </div>
       <div>
         <label for="cordas">Cordas</label>
@@ -107,6 +107,11 @@ $('repetir').addEventListener('change', (e) => { api.isLooping = e.target.checke
 const relatar = (job) => {
   const partes = [`${job.status}`];
   if (job.notas != null) partes.push(`${job.notas} notas — ${JSON.stringify(job.rotulos)}`);
+  if (job.bpm_estimado) {
+    partes.push(job.bpm_confiavel
+      ? `⚠ andamento ESTIMADO: ${job.bpm} BPM — confira ouvindo`
+      : `⚠ andamento ESTIMADO: ${job.bpm} BPM, com pouca confiança — confira ouvindo`);
+  }
   if (job.descartadas) partes.push(`${job.descartadas} nota(s) descartada(s): simultâneas`);
   if (job.fora_do_braco) partes.push(`${job.fora_do_braco} fora do braço`);
   if (job.avisos_de_oitava?.length) {
@@ -156,7 +161,8 @@ $('enviar').addEventListener('click', async () => {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         ref: $('ref').value,
-        bpm: Number($('bpm').value),
+        // Vazio vira `null`, não `0`: é o que faz o servidor estimar.
+        bpm: $('bpm').value === '' ? null : Number($('bpm').value),
         cordas: Number($('cordas').value),
       }),
     });

@@ -56,6 +56,7 @@ def _partitura_real(out_dir: Path, **_: object) -> Resultado:
         stem=out_dir / "bass.wav",
         artefatos={"gp5": artefato},
         notas=len(notas),
+        bpm=BPM,
         rotulos={"electric_bass": len(notas)},
         descartadas=[],
         fora_do_braco=[],

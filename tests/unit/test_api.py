@@ -29,6 +29,7 @@ def _resultado_falso(out_dir: Path, **_: object) -> Resultado:
         notas=15,
         rotulos={"electric_bass": 15},
         descartadas=[descartada],
+        bpm=90,
         fora_do_braco=[],
         avisos_de_oitava=[],
     )

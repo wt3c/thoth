@@ -40,7 +40,7 @@ def test_transcribe_relata_descartes_e_avisos(tmp_path: Path, monkeypatch) -> No
         lambda *a, **k: Resultado(
             asset=asset, stem=tmp_path / "bass.wav",
             artefatos={"gp5": tmp_path / "abc123.gp5"}, notas=12,
-            rotulos={"electric_bass": 13}, descartadas=[nota], fora_do_braco=[],
+            rotulos={"electric_bass": 13}, descartadas=[nota], fora_do_braco=[], bpm=90,
             avisos_de_oitava=[],
         ),
     )

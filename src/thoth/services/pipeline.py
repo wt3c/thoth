@@ -33,6 +33,7 @@ from thoth.services.fretboard import ViterbiFretAssigner, cabe_no_braco
 from thoth.services.nomes import nome_de_arquivo
 from thoth.services.octave_check import OctaveWarning, verificar_oitavas
 from thoth.services.rhythm import monofonizar
+from thoth.services.tempo import Andamento, estimar_andamento
 
 #: Os três nomes que o MuScriptor usa para baixo (`list-instruments`, v0.3.0).
 ROTULOS_DE_BAIXO = frozenset({"electric_bass", "acoustic_bass", "contrabass"})
@@ -50,13 +51,16 @@ class Resultado:
     descartadas: list[NoteEvent]
     fora_do_braco: list[NoteEvent]
     avisos_de_oitava: list[OctaveWarning]
+    bpm: int
+    #: Preenchido só quando o andamento foi estimado — `None` quando veio de você.
+    andamento: Andamento | None = None
 
 
 def transcrever(
     ref: str,
     out_dir: Path,
     *,
-    bpm: int,
+    bpm: int | None = None,
     tuning: tuple[int, ...] = TUNING_BASS_4,
     cache_dir: Path = Path("cache"),
     separator: Separator | None = None,
@@ -66,18 +70,23 @@ def transcrever(
 ) -> Resultado:
     """Caminho ou URL → `.gp5` e `.musicxml` em `out_dir`, nomeados pelo título (ADR-017).
 
-    `bpm` é entrada, não estimativa (ADR-013): nenhum formato de partitura guarda
-    segundos, e o Thoth ainda não estima andamento.
+    `bpm` informado manda sempre. Sem ele, o andamento é estimado do mix e vem
+    relatado no `Resultado` (ADR-019) — estimar em silêncio é que não pode.
     """
     separator = separator or DemucsSeparator()
     transcriber = transcriber or MuscriptorTranscriber()
     assigner = assigner or ViterbiFretAssigner()
+
+    asset = resolver_fonte(ref).fetch(ref, cache_dir)
+    # Estimar pelo mix, não pelo stem: o pulso está na bateria, que a separação tira.
+    andamento = None
+    if bpm is None:
+        andamento = estimar_andamento(asset.wav)
+        bpm = andamento.bpm
     exporters = exporters or {
         "gp5": Gp5Exporter(bpm=bpm),
         "musicxml": MusicXmlExporter(bpm=bpm),
     }
-
-    asset = resolver_fonte(ref).fetch(ref, cache_dir)
     stem = separator.separate(asset.wav, cache_dir / "stems" / asset.source_id)["bass"]
 
     todas = transcriber.transcribe(stem)
@@ -102,6 +111,8 @@ def transcrever(
         for formato, exportador in exporters.items()
     }
     return Resultado(
+        bpm=bpm,
+        andamento=andamento,
         asset=asset,
         stem=stem,
         artefatos=artefatos,
