@@ -220,3 +220,37 @@ pontual em áudio real.
 para `small`**. Rodar `medium` contra fixtures de fluidsynth mede distância da
 distribuição de treino, não qualidade de transcrição. Fixtures sintéticas são
 métrica de regressão, nunca de qualidade — agora com evidência de por quê.
+
+---
+
+## ADR-010 — Demucs promovido de condicional a etapa do pipeline
+**Data:** 2026-09-22 · **Status:** aceito · **Revoga:** condicional C1
+
+A C1 previa separação por fonte só se a Fase 0 mostrasse ganho. Mostrou.
+
+Medido em 30s de mix real, `htdemucs_ft --two-stems=bass`, `small` livre:
+
+| | mix direta | stem |
+|---|---|---|
+| Sade, *Is It A Crime* (ao vivo) | 67 notas, E1..C3, 1 simultânea | 62 notas, E1..C3, 1 simultânea |
+| Seu Jorge, *Tive Razão* | 63 notas, E1..**F#4**, **4 simultâneas** | 52 notas, E1..F#3, 1 simultânea |
+
+**Confirmação perceptual (Camada 2, ADR-006).** O Welington ouviu os dois pares:
+*"a versão jorge_STEM ficou muito melhor, na versão MIX tem um teclado no meio"*.
+O teclado do arranjo aparece **dentro do canal do baixo** na transcrição da mix.
+
+O detalhe que importa: o MuScriptor **detectou o teclado corretamente** — 341 notas
+rotuladas `acoustic_piano` no mesmo arquivo — e ainda assim vazou parte dele para o
+`electric_bass`. Rotular certo não impede o vazamento. Nenhum ajuste de flag
+resolve isso; só remover o instrumento do áudio antes da transcrição.
+
+**Decisão:** `DemucsSeparator` (`htdemucs_ft`, `--two-stems=bass`) entra no caminho
+crítico, antes do transcritor.
+
+**Custo aceito:** separação de 30s leva 88s em CPU; transcrever o stem cai para 10s
+(contra 42s na mix, pois há um instrumento só). Total ~2,4× mais lento — ~16 min
+para uma música de 5 min, contra ~7 min. Aceitável para uso pessoal.
+
+**Armadilha de empacotamento:** o `demucs` declara mal suas dependências — falha com
+`ModuleNotFoundError: numpy`. Exige `--with "numpy<2"` no `uvx`, ou pin equivalente
+no adaptador.

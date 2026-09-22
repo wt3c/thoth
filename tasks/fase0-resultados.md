@@ -114,3 +114,30 @@ Zero notas de baixo em `oitavas`/`walking` livre.
 soundfont limpo, um instrumento só, sem ruído nem ambiência. **No áudio real o
 `medium` se comporta bem** (94 notas, coerente com as 89 do `small`) — o problema é
 a fixture, não o modelo. Ver ADR-009.
+
+## Grupo B — mix real, e a decisão da C1
+
+Trechos de 30s escolhidos por energia em 60–250 Hz (não por chute): Sade em
+t=240s, Seu Jorge em t=180s.
+
+### Transcrição da mix direta (`small`, livre)
+
+| | total | baixo | extensão | máx. simultâneas |
+|---|---|---|---|---|
+| Sade | 456 | 67 | E1..C3 | 1 |
+| Seu Jorge | 686 | 63 | E1..**F#4** | **4** |
+
+O Sade sai plausível. O Seu Jorge não: F#4 está fora de qualquer baixo de 4 ou 5
+cordas, e quatro notas simultâneas não é linha de contrabaixo.
+
+### Com separação (`htdemucs_ft --two-stems=bass`)
+
+| | baixo | extensão | máx. simultâneas | concordância de onsets |
+|---|---|---|---|---|
+| Sade | 62 | E1..C3 | 1 | 79% |
+| Seu Jorge | 52 | E1..F#3 | 1 | 87% |
+
+Os artefatos do Seu Jorge desaparecem por completo. A escuta confirmou a causa:
+**teclado vazando para dentro do canal do baixo** na versão sem separação.
+
+Decisão registrada no ADR-010: Demucs deixa de ser condicional.
