@@ -483,3 +483,40 @@ pedido antes da hora.
 
 **O que a API expõe de propósito:** contagem de descartes, notas fora do braço e
 avisos de oitava (ADR-014). A tablatura sozinha não avisa o que foi jogado fora.
+
+---
+
+## ADR-016 — A página de estudo não configura `scrollElement`
+
+**Contexto.** A página abria e não mostrava nada. O alphaTab dava todos os sinais
+de sucesso: `scoreLoaded`, `renderStarted`, `renderFinished`, a superfície
+`.at-surface` criada com 358 px de altura e três blocos filhos com as larguras
+certas. Só que os três blocos estavam vazios — nenhum `<svg>` no documento.
+
+**Causa raiz.** `player.scrollElement` apontava para `#tab`, o próprio container
+da partitura. O `scrollElement` é o *viewport que rola*, não o conteúdo que é
+rolado; com ele apontando para o próprio conteúdo, o lazy loading do alphaTab
+conclui que nenhuma parte está visível e nunca dispara `partialRenderFinished` —
+os blocos são posicionados pelo layout e ficam sem desenho.
+
+**Decisão.** Remover `scrollElement`. O `#tab` mora num `.painel` sem `overflow`,
+então quem rola é o documento — que já é o padrão do alphaTab. Se um dia o `#tab`
+for embrulhado num container `overflow:auto`, o certo é `scrollElement` apontar
+para *esse* embrulho, nunca para o `#tab`.
+
+**Descartado:** `useWorkers: false` e `enableLazyLoading: false`. Ambos fazem a
+página renderizar, e ambos tratam sintoma: o primeiro não tem relação nenhuma com
+a falha (foi diagnóstico errado — ver lição), o segundo desliga um recurso bom
+para contornar uma configuração errada.
+
+**Reabrir um job pronto (`?job=<id>`).** Entrou junto porque era o que faltava
+para o teste de regressão existir sem re-rodar o pipeline, e é útil por si: dá
+para voltar a uma transcrição sem gastar minutos de CPU de novo. Abriu um caminho
+de 404 que antes era inalcançável (o id vinha sempre de um POST recém-aceito), daí
+a guarda no `acompanhar` — sem ela o laço giraria para sempre com a tela em branco.
+
+**Teste.** `tests/navegador/` (marcador `navegador`, fora da suíte padrão) sobe a
+API com executor de mentira e artefato GP5 de verdade, abre o Chromium e conta
+`#tab svg`. Verificado nos dois sentidos: passa com o fix e falha com o
+`scrollElement` de volta. Nenhuma asserção mais fraca serve — `renderFinished`,
+`.at-surface` presente e `innerHTML` não vazio **passam** com o bug ativo.

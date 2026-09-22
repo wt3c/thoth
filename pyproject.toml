@@ -30,6 +30,7 @@ dev = [
     "mir-eval>=0.8.2",
     "pretty-midi>=0.2.11.post0",
     "httpx>=0.28.1",
+    "websockets>=17.1",
 ]
 
 [build-system]
@@ -39,10 +40,11 @@ build-backend = "uv_build"
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 # Testes que carregam modelo ou tocam a rede ficam FORA da suíte padrão.
-addopts = "-m 'not slow and not network'"
+addopts = "-m 'not slow and not network and not navegador'"
 markers = [
     "slow: exercita modelo/ferramenta real (MuScriptor, Demucs, ffmpeg) — minutos em CPU",
     "network: depende de rede real",
+    "navegador: abre um Chromium de verdade e inspeciona a página renderizada",
 ]
 
 [tool.ruff]

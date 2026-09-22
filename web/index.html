@@ -72,7 +72,7 @@ Separar e transcrever leva cerca de 2,5× a duração do áudio em CPU.</div>
     </div>
   </section>
 
-  <section class="painel"><div id="tab">Nada carregado ainda.</div></section>
+  <section class="painel"><div id="tab"></div></section>
 </main>
 
 <script type="module">
@@ -88,7 +88,6 @@ const api = new alphaTab.AlphaTabApi($('tab'), {
     enableCursor: true,
     enableUserInteraction: true,
     soundFont: 'vendor/alphatab/soundfont/sonivox.sf3',
-    scrollElement: $('tab'),
   },
 });
 
@@ -128,13 +127,24 @@ const carregar = async (ident) => {
 
 const acompanhar = async (ident) => {
   for (;;) {
-    const job = await (await fetch(`/jobs/${ident}`)).json();
+    // O identificador pode vir da URL (?job=), então 404 aqui é alcançável:
+    // sem esta guarda o laço giraria para sempre com a tela em branco.
+    const resposta = await fetch(`/jobs/${ident}`);
+    if (!resposta.ok) {
+      estado.textContent = `job ${ident} não encontrado`;
+      estado.classList.add('aviso');
+      return;
+    }
+    const job = await resposta.json();
     relatar(job);
     if (job.status === 'pronto') return carregar(ident);
     if (job.status === 'erro') return;
     await new Promise((r) => setTimeout(r, 2000));
   }
 };
+
+const jobDaUrl = new URLSearchParams(location.search).get('job');
+if (jobDaUrl) acompanhar(jobDaUrl);
 
 $('enviar').addEventListener('click', async () => {
   const botao = $('enviar');

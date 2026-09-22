@@ -184,9 +184,13 @@ Pré-requisito invisível até agora: a Fase 5 só existe se houver o que o
       `scripts/vendor_alphatab.py` resolve os `import` em vez de listar arquivos;
       a lista fixa trazia só a fachada de 4 KB e deixava a página em branco
 - [x] `thoth serve` — sobe API e página em `127.0.0.1` por padrão
-- [ ] **Abrir a página no navegador** — verificação manual, como foi com o
-      TuxGuitar: servidor respondendo 200 para todos os ativos prova que o
-      servidor está certo, não que o alphaTab renderiza e toca
+- [x] **Abrir a página no navegador** — não renderizava. Causa: `scrollElement`
+      apontando para o próprio `#tab`, que faz o lazy loading do alphaTab achar
+      que nada está visível (ADR-016). Fechado com teste de navegador de verdade
+      (`tests/navegador/`, marcador `navegador`), verificado nos dois sentidos
+- [x] Reabrir job pronto por `?job=<id>`, com guarda para id inexistente
+- [ ] **Tocar e cursor** — ainda verificação manual: o teste conta SVG, não prova
+      que o áudio sai nem que o cursor anda
 
 ## Fase 6 — Opcionais
 
