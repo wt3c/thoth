@@ -23,10 +23,9 @@ A avaliação **não depende de saber tocar** (ADR-006).
       soundfont → WAV normalizado a −1 dBFS
 - [x] **Onset F1** com `mir_eval` (`services/evaluation.py`), travado por fixture
       como portão de regressão em `tests/integration/test_regressao_fase0.py`
-- [ ] Medir o **pipeline completo** (com separação) e não só o transcritor: o
-      número que interessa é o `misto`, hoje 0,682 de nota F1 **sem** separação —
-      é ele que valida ou derruba o ADR-010 contra ground truth. As outras cinco
-      são baixo solo: com Demucs elas medem "atrapalha?", não "ajuda?"
+- [x] Medir o **pipeline completo** (com separação) contra ground truth: no
+      `misto`, nota F1 0,682 → **0,968** com separação, onset inalterado em 0,938
+      (ADR-010, emenda de 2026-09-22). Separar recupera altura, não tempo
 - [ ] Repetir com `small` vs `medium`, cronometrando em CPU — **medição
       registrada, não portão**: `models.lock.toml` só tem `muscriptor-small`, e
       parametrizar o portão nos dois levantaria `KeyError` no setup

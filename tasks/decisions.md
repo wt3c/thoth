@@ -328,6 +328,29 @@ erro de altura numa nota real — mais barato de corrigir, e corrigível com o
 **Condiciona a Fase 1:** o portão de regressão precisa de uma verificação de
 oitava contra o espectro da mix original, não só de métricas contra o stem.
 
+### Emenda (2026-09-22, ground truth)
+
+Tudo acima foi decidido por escuta e por contagem de notas — nunca contra
+gabarito, porque o acervo real não tem. A fixture `misto` tem: baixo e piano
+saem do mesmo MIDI, e o que o piano ocupa é conhecido nota a nota.
+
+| `misto`, `small`, tolerância 50 ms | onset F1 | nota F1 |
+|---|---|---|
+| sem separação | 0,938 | 0,682 |
+| com separação | 0,938 | **0,968** |
+
+**O onset não se move.** Separar não recupera *quando* — recupera *qual*. O piano
+não estava criando ataques falsos; estava sequestrando a altura de notas de baixo
+que o transcritor já ouvia no tempo certo. Bate exatamente com o que a escuta do
+`jorge` dizia, e explica por que rotular certo não bastava: o rótulo é do evento,
+a altura vem do espectro misturado.
+
+Vale para uma fixture sintética, e só. As outras cinco são baixo solo saído de
+MIDI limpo — medi-las com Demucs responderia *"atrapalha?"*, não *"ajuda?"*.
+Travado em `tests/integration/test_separacao_fase0.py`, com o número sem
+separação como piso: se uma troca de modelo o derrubar, o que se reabre é este
+ADR, não o piso.
+
 ---
 
 ## ADR-011 — Baixo-primeiro é limite medido, não preferência
