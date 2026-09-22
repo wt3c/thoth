@@ -69,7 +69,12 @@ A avaliação **não depende de saber tocar** (ADR-006).
       em que foi medido. Taxa de alarme por faixa: jorge 1,9%, sade 12,9%,
       neo 15,8%; sem referência não dá para saber quanto disso é erro real.
       Depende do `.gp5` de *Equus* (ADR-007), a baixar manualmente do UG.
-- [ ] `MuscriptorTranscriber` atrás do `Protocol Transcriber`
+- [x] `MuscriptorTranscriber` atrás do `Protocol Transcriber` — subprocesso via
+      `uvx` (torch fora do projeto), `small` + livre + `--detect-tempo false`.
+      7 testes: 6 de parsing puro + 1 contra o modelo real (`slow`).
+- [ ] **Não fatiar áudio antes de transcrever** — o rótulo do instrumento depende
+      de contexto (emenda do ADR-008): 2,9 s viram `acoustic_piano`, 8 s viram
+      `electric_bass`. Vale como restrição ao montar o serviço de pipeline.
 - [ ] `models.lock.toml` com SHA-256 dos pesos (checkpoints somem da internet)
 - [ ] Promover as fixtures da Fase 0 a **gate de regressão** travado no CI
       (válido só para o `small` — ADR-009 — e cobrindo também o código de

@@ -217,6 +217,31 @@ entra como otimização consciente de velocidade, jamais como seletor de instrum
 **Custo aceito:** decodificação livre é ~2,7× mais lenta (1,06× tempo real com
 `small`; ~5 min de CPU para uma música de 5 min). Aceitável para uso pessoal.
 
+### Emenda (2026-09-22) — o rótulo depende de contexto, e o filtro depende dele
+
+Medido ao escrever o teste real do adapter: a **mesma** linha de baixo, mesmo
+programa GM e mesmo soundfont, renderizada em dois comprimentos:
+
+| fixture | duração | rótulo atribuído |
+|---|---|---|
+| 5 notas | 2,9 s | `acoustic_piano` |
+| 15 notas | 8,1 s | `electric_bass` |
+
+As alturas saem corretas nos dois casos — o que muda é só o rótulo. Como esta
+ADR escolhe **filtrar por rótulo** depois da decodificação livre, um rótulo
+errado descarta a linha inteira em silêncio, que é pior que transcrever errado.
+
+**Restrição derivada para o pipeline:** transcrever a faixa inteira de uma vez,
+nunca fatiar em trechos curtos antes da transcrição. Se algum dia o processamento
+em blocos for necessário (memória, paralelismo), o bloco precisa de contexto
+suficiente — e a decisão passa a exigir medição, não suposição.
+
+Isto **não** reabre o `--instruments`: condicionar continua sendo pior (medido no
+próprio ADR-008). O que a emenda diz é que o filtro tem um modo de falha próprio,
+e ele é silencioso.
+
+---
+
 ## ADR-009 — Modelo `small` como padrão
 **Data:** 2026-09-21 · **Status:** aceito
 
