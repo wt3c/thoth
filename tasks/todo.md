@@ -3,7 +3,7 @@
 > Áudio → partitura e tablatura, foco em contrabaixo. Uso pessoal. CPU-only.
 > Decisões em `tasks/decisions.md`.
 
-## Fase 0 — Spike de viabilidade ⬅️ **ATUAL**
+## Fase 0 — Spike de viabilidade ✅ **CONCLUÍDA (2026-09-22) — veredito: SEGUIR**
 
 Sem escrever código do pipeline. Medir se a qualidade justifica o projeto.
 A avaliação **não depende de saber tocar** (ADR-006).
@@ -16,7 +16,7 @@ A avaliação **não depende de saber tocar** (ADR-006).
       Nomes de instrumento (`list-instruments`): `electric_bass`, `acoustic_bass`,
       `contrabass`, `clean_electric_guitar`, `distorted_electric_guitar`, `drums`…
       **Sem MusicXML/PDF/tab** — ver correção no ADR-003.
-- [ ] Aceitar a licença CC BY-NC 4.0 no HuggingFace + `hf auth login` na estação
+- [x] Aceitar a licença CC BY-NC 4.0 no HuggingFace + `hf auth login` na estação
 
 ### Camada 1 — objetiva (critério principal)
 - [ ] Fixtures: 5–10 linhas de baixo em MIDI (escalas, walking, groove em
@@ -59,11 +59,18 @@ A avaliação **não depende de saber tocar** (ADR-006).
 - [x] `cli.py` (Typer): `thoth fetch <arquivo|URL>`
 - [x] 6 testes contra **ffmpeg real** (sem mock — Regra 3); ruff + mypy strict limpos
 
-## Fase 2 — MuScriptor + ground truth
+## Fase 2 — MuScriptor + ground truth ⬅️ **ATUAL**
 
+- [ ] **Verificador de oitava** — para cada nota, comparar a energia em `f0` e
+      `2·f0` no espectro do **áudio original** (não do stem) e sinalizar a
+      divergência. Primeiro item do portão: é o erro que atravessa até a Fase 4
+      sem nenhuma etapa posterior detectá-lo. Caso de teste depende do `.gp5` de
+      referência (ADR-007) — 12 notas de *Equus* com divergência conhecida.
 - [ ] `MuscriptorTranscriber` atrás do `Protocol Transcriber`
 - [ ] `models.lock.toml` com SHA-256 dos pesos (checkpoints somem da internet)
 - [ ] Promover as fixtures da Fase 0 a **gate de regressão** travado no CI
+      (válido só para o `small` — ADR-009 — e cobrindo também o código de
+      avaliação, que já produziu dois artefatos errados na Fase 0)
 - [ ] `@pytest.mark.slow` para o que carrega modelo
 
 **Pronto quando:** o F1 estiver documentado e travado.
@@ -91,8 +98,13 @@ linha permitir, verificado por propriedade — não por execução no instrument
 
 ## Condicionais — só com evidência da Fase 0
 
-- [ ] **C1** `DemucsSeparator` (`htdemucs_ft`) — só se F1 com separação > sem
-- [ ] **C2** Beat This! + quantizador próprio — só se o ritmo do MuScriptor decepcionar
+- [x] **C1** `DemucsSeparator` (`htdemucs_ft`) — **aprovada** e promovida a etapa
+      fixa do pipeline (ADR-010). Custo conhecido: erra a oitava em 7% das notas
+      no material grave e denso — mitigação na Fase 2, não motivo para reverter.
+- [ ] **C2** quantizador próprio — o Beat This! é dependência dura do MuScriptor
+      (ADR-003 corrigido), não condicional. Pendente: `cloud.cp.jku.at` inacessível
+      daqui, então ou achamos espelho do `beat_this-final0.ckpt`, ou escrevemos o
+      quantizador e rodamos sempre com `--detect-tempo false`.
 
 ## Fase 5 — API e UI
 

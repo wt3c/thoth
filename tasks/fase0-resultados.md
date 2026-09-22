@@ -309,3 +309,33 @@ Os dois falham do mesmo jeito: **artefato de avaliação entregue sem verificaç
 própria**. O portão da Fase 1 precisa valer para o código de avaliação também,
 não só para o pipeline — um avaliador quebrado produz decisão errada com a mesma
 facilidade com que um transcritor quebrado produz tablatura errada.
+
+## Veredito da Fase 0: **SEGUIR**
+
+O critério era descobrir se a qualidade justifica construir o projeto. Justifica,
+para baixo.
+
+**O que sustenta o "seguir":**
+
+- Simultaneidade **1** na linha de baixo em **todas** as faixas medidas — Sade,
+  Seu Jorge, Ne Obliviscaris. É a propriedade que torna o baixo verificável sem
+  referência externa: linha de baixo com notas simultâneas é erro visível.
+- A extensão sai sempre dentro de um baixo real: `E1..C3`, `E1..F#3`, `B0..D3`.
+  Nenhuma faixa exigiu vocabulário fora de `TUNING_BASS_5`.
+- A previsão de falha no caso extremo (prog metal, baixo estendido) **não se
+  confirmou** — e a refutação veio de medição, não de otimismo.
+- Separação de fontes resolvida com evidência, não com heurística (ADR-010).
+
+**O que sabemos que está quebrado, e não impede seguir:**
+
+| problema | onde dói | mitigação |
+|---|---|---|
+| oitava errada em 7% (material grave e denso) | Fase 4 — corda e casa erradas | verificador espectral, primeiro item da Fase 2 |
+| polifonia densa ilegível | objetivo secundário | fora de escopo (ADR-011) |
+| `beat_this-final0.ckpt` inacessível | andamento | `--detect-tempo false` + quantizador próprio |
+| dedilhada exposta pela separação | nada hoje | reavaliar se houver auralização no produto |
+
+**O que a Fase 0 mudou no plano:** a Fase 4 virou caminho crítico (ADR-003 —
+o motor não emite partitura), o Demucs virou etapa fixa (ADR-010), o escopo
+fechou em baixo (ADR-011) e o portão de regressão passa a cobrir o próprio
+código de avaliação, não só o pipeline.
