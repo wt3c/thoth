@@ -627,3 +627,45 @@ tempo real exigiria mudança de andamento por compasso no exportador, que hoje �
 **Teste.** `tests/unit/test_tempo.py` roda o estimador real contra áudio real
 renderizado a 90 BPM — inclusive o `misto`, que sem a dobra sairia a 45, e o
 `groove16`, que precisa relatar desacordo.
+
+---
+
+## ADR-020 — Auralização nativa, com as notas em cache
+
+**Data:** 2026-09-22 · **Status:** aceito · **Implementa a Camada 2 do ADR-006**
+
+**Contexto.** A Camada 2 existia desde o ADR-006, mas era feita por fora: o
+MuScriptor gerava a auralização, o Thoth não. Isso deixava a única verificação de
+qualidade que não exige tab humana nem treino musical dependente de uma ferramenta
+que o Thoth não controla — e fora do alcance de quem só roda `thoth`.
+
+**Decisão.** `thoth auralizar <ref>` gera um WAV estéreo: o mix original à
+esquerda, a transcrição renderizada à direita.
+
+**As notas vão para o cache.** A transcrição custa minutos de CPU por música, e o
+resultado dela morria com o processo: sobravam o `.gp5` e o `.musicxml`, ambos já
+quantizados pelo BPM. Auralizar a partir deles mediria o exportador junto com o
+transcritor — uma estimativa de andamento dobrada apareceria como transcrição
+descolada, e o diagnóstico apontaria para o lugar errado. O pipeline passa a
+gravar `cache/<id>/notas.jsonl`, em tempo absoluto, e a auralização lê de lá.
+JSONL porque música longa passa de três mil notas e o arquivo continua legível
+com `head`.
+
+**Soundfont, não onda sintética.** Um seno em E1 (41 Hz) é quase inaudível em
+caixa de notebook — exatamente na região que mais importa no baixo. O
+`FluidR3_GM.sf2` (Electric Bass finger, GM 33) traz os harmônicos pelos quais a
+altura é reconhecida no meio da música.
+
+**O canal curto é esticado, nunca truncado.** `apad` iguala a transcrição à
+duração do original. Cortar no menor dos dois esconderia o fim da música, que é
+justamente onde o erro de andamento mais acumula.
+
+**Custo aceito:** `pretty-midi` sai do grupo de dev para dependência de runtime, e
+`fluidsynth` + soundfont viram pré-requisito da auralização (só dela — o resto do
+pipeline não os toca). Ausência de qualquer um dos dois falha com mensagem
+explícita, não silenciosamente.
+
+**Teste.** `tests/unit/test_auralizacao.py` roda fluidsynth e ffmpeg de verdade
+sobre áudio de verdade: confere que os dois canais existem e diferem, que a
+duração bate com a do original e que o canal da direita tem mais energia durante
+uma nota do que no intervalo entre notas.

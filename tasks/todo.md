@@ -19,14 +19,21 @@ A avaliação **não depende de saber tocar** (ADR-006).
 - [x] Aceitar a licença CC BY-NC 4.0 no HuggingFace + `hf auth login` na estação
 
 ### Camada 1 — objetiva (critério principal)
-- [ ] Fixtures: 5–10 linhas de baixo em MIDI (escalas, walking, groove em
-      semicolcheias, graves no E/B) → fluidsynth + soundfont → WAV
-- [ ] Rodar o pipeline e medir **Onset F1** com `mir_eval`
-- [ ] Repetir com `small` vs `medium`, cronometrando em CPU
+- [x] Fixtures: 6 linhas de baixo em MIDI (`tests/sintetico.py`) → fluidsynth +
+      soundfont → WAV normalizado a −1 dBFS
+- [x] **Onset F1** com `mir_eval` (`services/evaluation.py`), travado por fixture
+      como portão de regressão em `tests/integration/test_regressao_fase0.py`
+- [ ] Medir o **pipeline completo** (com separação) e não só o transcritor: o
+      número que interessa é o `misto`, hoje 0,682 de nota F1 **sem** separação —
+      é ele que valida ou derruba o ADR-010 contra ground truth. As outras cinco
+      são baixo solo: com Demucs elas medem "atrapalha?", não "ajuda?"
+- [ ] Repetir com `small` vs `medium`, cronometrando em CPU — **medição
+      registrada, não portão**: `models.lock.toml` só tem `muscriptor-small`, e
+      parametrizar o portão nos dois levantaria `KeyError` no setup
 
 ### Camada 2 — perceptual assistida (dispensa treino)
-- [ ] Auralização: original em um canal, MIDI no outro. Se descolar, qualquer
-      ouvido percebe
+- [x] Auralização: original em um canal, MIDI no outro (`thoth auralizar`,
+      ADR-020). Se descolar, qualquer ouvido percebe
 - [ ] Rodar a auralização sobre o corpus de `tasks/corpus.md` — **reportar F1
       por grupo**, nunca um número agregado (Grupo A é otimista por construção)
 

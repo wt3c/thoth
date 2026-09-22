@@ -225,6 +225,9 @@ models/
 *.gp5
 *.musicxml
 spike/
+# A auralização leva o mix original num dos canais: é o áudio de origem,
+# não um derivado inócuo.
+out/
 
 # IDE
 .idea/
