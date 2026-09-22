@@ -218,6 +218,8 @@ __marimo__/
 .streamlit/secrets.toml
 
 # Thoth
+# Áudio nunca é versionado nem redistribuído (ADR-005) — o repositório é público.
+audio/
 cache/
 models/
 *.gp5
