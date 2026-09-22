@@ -6,7 +6,7 @@ from pathlib import Path
 
 import typer
 
-from thoth.adapters.ingest.local_source import LocalFileSource
+from thoth.adapters.ingest import resolver_fonte
 
 app = typer.Typer(help="Áudio → partitura e tablatura, com foco em contrabaixo.")
 
@@ -20,9 +20,9 @@ def main() -> None:
 
 @app.command()
 def fetch(
-    arquivo: str = typer.Argument(..., help="Caminho do áudio de entrada."),
+    ref: str = typer.Argument(..., help="Caminho do áudio ou URL do YouTube."),
     cache: Path = typer.Option(CACHE_PADRAO, help="Diretório de cache."),
 ) -> None:
     """Normaliza o áudio para WAV 44.1 kHz estéreo no cache."""
-    ativo = LocalFileSource().fetch(arquivo, cache)
+    ativo = resolver_fonte(ref).fetch(ref, cache)
     typer.echo(f"{ativo.source_id}  {ativo.duration_s:.1f}s  {ativo.wav}")

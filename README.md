@@ -8,10 +8,10 @@ Uso pessoal. Tudo open source, rodando localmente em CPU.
 ## Como funciona
 
 ```
-arquivo de áudio
+arquivo de áudio  ou  link do YouTube
    │
    ▼
-[AudioSource]    ffmpeg → WAV 44.1 kHz         cache/<source_id>/mix.wav
+[AudioSource]    ffmpeg | yt-dlp → WAV 44.1 kHz   cache/<source_id>/mix.wav
    ▼
 [Transcriber]    MuScriptor (Kyutai/Mirelo)    → list[NoteEvent]
    ▼
@@ -28,20 +28,31 @@ repositório existe para o que ele não cobre: **GP5 editável**, **afinação c
 
 - Python 3.12 (fixo — o MuScriptor não suporta 3.13+; o `uv` cuida disso)
 - `ffmpeg` e `ffprobe` no PATH
+- `yt-dlp` no PATH (só para links do YouTube)
 - `uv`
 
 ## Uso
 
 ```bash
 uv sync
+
+# arquivo local
 uv run thoth fetch caminho/para/musica.mp3
+
+# link do YouTube
+uv run thoth fetch "https://www.youtube.com/watch?v=QTOyeFQgZKk"
 ```
+
+O `fetch` detecta sozinho se a referência é um caminho ou uma URL. O resultado vai
+para `cache/<source_id>/mix.wav` e não é rebaixado nem reconvertido em execuções
+seguintes.
 
 ## Desenvolvimento
 
 ```bash
 uv run pytest -n auto          # suíte padrão
 uv run pytest -m slow          # carrega modelos de verdade — minutos em CPU
+uv run pytest -m network       # canário: avisa quando o YouTube quebrar o yt-dlp
 uv run ruff check src/ tests/
 uv run mypy src/
 ```
