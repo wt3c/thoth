@@ -83,3 +83,62 @@ inverte a frase: o *Equus* é o único caso **não** problemático.
 Não é ajuste de parâmetro. `rhythm.para_ticks` converte segundos em ticks com um
 escalar, e o exportador escreve 4/4 fixo — a arquitetura não tem onde guardar
 andamento que varia. Decidir antes de implementar.
+
+---
+
+## Revisão (2026-09-22): o piso, e o que ele desmente
+
+As seções acima comparam residuais sem nunca medir o **piso** — quanto do erro é
+desalinhamento de grade e quanto é o erro de onset do próprio MuScriptor. Sem esse
+número, "¼ da grade" não prova colocação aleatória; prova apenas dispersão maior que a
+grade, o que qualquer distribuição larga produz. A linha "erro esperado se aleatório"
+da primeira tabela **afirma mais do que foi medido** e deve ser lida com essa ressalva.
+
+### O piso
+
+Fixtures são metronômicas a 90 BPM exatos, então todo residual nelas é erro do
+transcritor:
+
+| fixture  | verdade | transcrito |
+|----------|---------|------------|
+| escala   | 0,0 ms  | 5,0 ms     |
+| walking  | 0,0 ms  | 8,3 ms     |
+| groove16 | 0,0 ms  | 3,3 ms     |
+| graves   | 0,0 ms  | 3,3 ms     |
+| oitavas  | 0,0 ms  | 10,0 ms    |
+
+**Piso: 3–10 ms.** Os 24–43 ms das músicas reais estão uma ordem de grandeza acima —
+o desalinhamento é real, não jitter do transcritor.
+
+### O erro dominante é o `round()`, não o andamento variável
+
+Busca de BPM restrita a ±3% da estimativa do pipeline (a busca anterior, irrestrita,
+corria até o teto de 192–200 BPM: artefato de faixa, não ausência de pulso):
+
+| música           | int@t=0 | frac@t=0 | frac+fase | local 30 s | BPM ótimo |
+|------------------|---------|----------|-----------|------------|-----------|
+| Equus            | 34,4 ms | 57,2 ms  | 12,6 ms   | 22,1 ms    | 107,50    |
+| Sou Eu           | 29,5 ms | 29,7 ms  | 10,5 ms   | 20,7 ms    | 128,00    |
+| Feel Like        | 43,5 ms | 40,2 ms  | 31,5 ms   | 33,4 ms    | 87,03     |
+| Tive Razão       | 42,6 ms | 32,2 ms  | 20,4 ms   | 16,6 ms    | 102,99    |
+| SOJA             | 24,2 ms | 22,1 ms  | 13,5 ms   | 16,8 ms    | 154,14    |
+| Is It A Crime    | 36,8 ms | 39,6 ms  | 26,2 ms   | 21,1 ms    | 111,82    |
+| Smooth Operator  | 31,3 ms | 39,9 ms  | 16,9 ms   | 24,9 ms    | 119,14    |
+
+**BPM fracionário com fase livre ganha da grade local em 5 das 7.** O andamento não
+precisa variar para o ritmo descolar: `tempo.py:59` faz `bpm=round(bpm)`, e no Equus
+isso são 107,5 → 108, 0,46% de erro, 3,5 s de deriva acumulada em 756 s.
+
+**Os dois parâmetros são acoplados.** A coluna `frac@t=0` mostra que refinar só o BPM,
+mantendo a âncora em `t=0`, *piora* 4 das 7 (Equus 34 → 57 ms): grade mais precisa,
+ancorada no lugar errado, erra mais. Ajuste conjunto ou nenhum — não há meia correção
+barata aqui.
+
+Isso também desfaz a contradição da versão anterior, que chamava 107,5 vs 108 de
+"praticamente ótimo" numa seção e de deriva catastrófica em outra. É catastrófico, e é
+o achado principal.
+
+**Andamento variável continua sem veredito.** Tive Razão, Is It A Crime e Feel Like
+ainda preferem a grade local depois do ajuste conjunto — mas essas três são as que
+ficam mais longe do piso, e pode ser conteúdo (ao vivo, rubato) e não arquitetura.
+Decidir isso depois de medir com a grade conjunta implementada, não agora.
