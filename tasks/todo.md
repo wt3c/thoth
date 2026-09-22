@@ -9,9 +9,14 @@ Sem escrever código do pipeline. Medir se a qualidade justifica o projeto.
 A avaliação **não depende de saber tocar** (ADR-006).
 
 ### Preparo
-- [ ] `uvx muscriptor transcribe --help` → **verificar** as flags reais
-      (`--instruments`, `--model`, `--format`, auralização). Não assumir.
-- [ ] Aceitar a licença CC BY-NC 4.0 no HuggingFace
+- [x] `uvx muscriptor transcribe --help` → flags verificadas na v0.3.0 (2026-09-21):
+      `-f midi|json|jsonl` · `-m small|medium|large` · `-d auto|cpu|cuda|mps` ·
+      `--instruments` · `--auralize` + `--soundfont` · `--detect-tempo
+      true|false|best-effort` · `--sampling/-t` · `--cfg-coef` · `--notes` · `-o -`
+      Nomes de instrumento (`list-instruments`): `electric_bass`, `acoustic_bass`,
+      `contrabass`, `clean_electric_guitar`, `distorted_electric_guitar`, `drums`…
+      **Sem MusicXML/PDF/tab** — ver correção no ADR-003.
+- [ ] Aceitar a licença CC BY-NC 4.0 no HuggingFace + `hf auth login` na estação
 
 ### Camada 1 — objetiva (critério principal)
 - [ ] Fixtures: 5–10 linhas de baixo em MIDI (escalas, walking, groove em
@@ -22,15 +27,21 @@ A avaliação **não depende de saber tocar** (ADR-006).
 ### Camada 2 — perceptual assistida (dispensa treino)
 - [ ] Auralização: original em um canal, MIDI no outro. Se descolar, qualquer
       ouvido percebe
-- [ ] Vídeo de referência: SOJA — Everything Changes (`QTOyeFQgZKk`), reggae,
-      baixo em primeiro plano e repetitivo
+- [ ] Rodar a auralização sobre o corpus de `tasks/corpus.md` — **reportar F1
+      por grupo**, nunca um número agregado (Grupo A é otimista por construção)
 
-### Camada 3 — referência externa
-- [ ] Conferir oitava e notas contra tablatura humana publicada de uma música
-      conhecida (Songsterr/Ultimate Guitar)
+### Camada 3 — referência externa (ADR-007)
+- [ ] Escolher música clássica com tab de baixo **humana** — filtrar
+      `aiGenerated == false` em `/api/meta/{songId}/revisions` do Songsterr
+      (verificados: 14, 14046, 371). A tab da SOJA é `aiGenerated: true` e
+      **não serve** — seria circular
+- [ ] Conferir oitava e notas contra essa tab
+- [ ] Opcional: baixar manualmente o `.gp5` da tab da comunidade no UG Pro e
+      ler com PyGuitarPro. Download manual — o Thoth não faz scraping do UG
 
 ### Comparações a fazer
-- [ ] **mix direto** vs **stem do Demucs** → decide a condicional C1
+- [ ] **mix direto** vs **stem do Demucs** → decide a condicional C1.
+      Medir no **Grupo B** (mix real); o Grupo A não discrimina separação
 - [ ] **com** vs **sem** `--instruments` → decide se vale condicionar
 
 **Pronto quando:** planilha com F1 por condição + tempo em CPU + decisão

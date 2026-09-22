@@ -22,6 +22,8 @@ dev = [
     "hypothesis>=6.122",
     "ruff>=0.9",
     "mypy>=1.14",
+    "mir-eval>=0.8.2",
+    "pretty-midi>=0.2.11.post0",
 ]
 
 [build-system]
