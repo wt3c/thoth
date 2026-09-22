@@ -261,3 +261,41 @@ para uma música de 5 min, contra ~7 min. Aceitável para uso pessoal.
 **Armadilha de empacotamento:** o `demucs` declara mal suas dependências — falha com
 `ModuleNotFoundError: numpy`. Exige `--with "numpy<2"` no `uvx`, ou pin equivalente
 no adaptador.
+
+### Emenda (2026-09-22, após o Grupo C)
+
+O "custo aceito" acima vale para mix esparsa. Em mix densa a separação **paga por
+si**: no Ne Obliviscaris a mix leva 106s para 30s de áudio (1238 eventos, dos quais
+769 de guitarra distorcida) e o stem leva 20s — 5× mais rápido, pois o decoder não
+gasta passos com instrumentos que vamos descartar. Quanto mais cheio o arranjo,
+mais barato fica separar antes.
+
+A escuta do `neo_STEM` trouxe *"pegou o som da dedilhada"*. Investigado: o ruído
+**não** virou nota — o stem tem 2 eventos < 100 ms contra 5 da mix. A dedilhada é
+audível porque a separação a desmascara, e está no canal L (o stem), não no MIDI.
+Não afeta esta decisão; entra como nota para a Fase 2 se houver auralização no
+produto final.
+
+---
+
+## ADR-011 — Baixo-primeiro é limite medido, não preferência
+**Data:** 2026-09-22 · **Status:** aceito
+
+O objetivo secundário ("idealmente qualquer instrumento") encontra um teto no
+motor escolhido. Medido no Grupo C com guitarra neo-soul (Toshiki Soejima):
+208 notas na mix, **7–8 simultâneas** — acorde real, não artefato.
+
+Diferente do baixo, aqui não há teste de plausibilidade estrutural: uma linha de
+baixo com 6 notas juntas é obviamente erro; um acorde de neo-soul não é. A
+verificação teve que ser perceptual, e o veredito foi *"o som ficou misturado"* —
+a manifestação audível da fraqueza já documentada do MuScriptor em notas
+sobrepostas do mesmo instrumento (onset F1 60,4 → 51,8).
+
+**Decisão:** o pipeline é validado, medido e entregue **para baixo**. Outros
+instrumentos monofônicos (voz, contrabaixo, fagote) são extensão plausível;
+polifonia densa (guitarra de acompanhamento, piano) fica fora de escopo enquanto
+o motor for o MuScriptor. Não gastar Fase 4 tentando gerar tablatura de guitarra.
+
+**Limitação adjacente:** o `htdemucs_ft` não tem stem de guitarra — ela cai em
+`other`, junto com teclados e sopros. Mesmo que o motor melhorasse, o separador
+não entrega guitarra isolada.

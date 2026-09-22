@@ -179,3 +179,57 @@ referência externa.
 Observação lateral: o `htdemucs_ft` não tem stem de guitarra — ela cai em `other`
 junto com teclados e sopros. Para o objetivo secundário multi-instrumento isso é
 uma limitação a considerar, não resolvida pelo pipeline atual.
+
+## Escuta do Grupo C — e o que a medição diz sobre ela
+
+Veredito do usuário (2026-09-22): `neo_MIX` "muito bom"; `neo_STEM` "as notas
+parecem corretas, mas pegou o som da dedilhada"; `soul_GUITARRA` "o som ficou
+misturado".
+
+### A dedilhada não está na transcrição — está no canal esquerdo
+
+O arquivo de escuta é L = áudio de referência, R = MIDI sintetizado. No
+`neo_STEM` o canal L é o **stem do Demucs**, não a mix. Pareando as duas
+transcrições nota a nota (onset ≤50 ms + mesma altura):
+
+| | mix | stem |
+|---|---|---|
+| notas de baixo | 176 | 165 |
+| casadas entre si | 127 (77% do stem) | — |
+| onset F1 mix~stem | 0,891 | — |
+| notas < 100 ms (candidatas a ruído) | 5 (3%) | **2 (1%)** |
+
+Se o ruído de dedilhada virasse nota, o stem teria **mais** eventos curtos que a
+mix. Tem menos. A dedilhada é audível porque a separação a desmascara — na mix
+ela fica encoberta por guitarra e bateria; isolada, aparece. Não é ganho de
+volume: a mix está a −13,0 LUFS e o stem a −16,5, então o `loudnorm` até
+**atenua** a mix mais do que amplifica o stem. **A separação não sujou a
+transcrição; ela expôs um som que já existia no sinal.**
+
+Corolário para a Fase 2: dedilhada exposta é irrelevante para nós (o MIDI é o
+produto), mas será relevante se algum dia auralizarmos para o usuário final.
+
+### O que separar mudou de verdade, por faixa
+
+| faixa | notas só na mix | alturas dessas notas | leitura |
+|---|---|---|---|
+| jorge | 15 | 28..**66** | F#4 num baixo: **teclado vazando**, exatamente o que o ouvido pegou |
+| sade | 15 | 29..37 | dentro do baixo — divergência comum, sem viés detectável |
+| neo | 49 | 23..38 | dentro do baixo — sem ground truth, não dá para dizer quem acerta |
+
+Só no `jorge` a separação corrige um erro **identificável sem referência**. Nas
+outras duas ela não degrada, e no `neo` economiza 5× de tempo. O ADR-010
+(separar sempre) continua de pé, mas por motivos diferentes do que eu supunha:
+o ganho de qualidade é específico de mix com vazamento, o ganho de velocidade é
+geral.
+
+### Guitarra: onde o sistema quebra
+
+"O som ficou misturado" é o veredito perceptual da fraqueza já documentada do
+MuScriptor em notas simultâneas do mesmo instrumento (onset F1 60,4 → 51,8). Com
+7–8 vozes de neo-soul, as alturas saem plausíveis e o conjunto não se sustenta.
+
+**Consequência de escopo:** o objetivo secundário (qualquer instrumento) não é
+alcançável com este motor para material polifônico denso. O baixo — monofônico,
+simultaneidade 1 medida em todas as faixas — é onde o sistema funciona. O
+projeto segue baixo-primeiro não por preferência, mas por limite medido.
