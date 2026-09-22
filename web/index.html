@@ -1,0 +1,164 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Thoth — estudo de contrabaixo</title>
+<style>
+  :root { --fundo: #14161a; --painel: #1d2025; --borda: #2c313a; --texto: #e6e8eb;
+          --suave: #9aa3ad; --destaque: #6ea8fe; --alerta: #e0a458; }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--fundo); color: var(--texto);
+         font: 15px/1.5 system-ui, sans-serif; }
+  header, main { max-width: 1100px; margin: 0 auto; padding: 16px; }
+  h1 { font-size: 20px; margin: 0 0 4px; }
+  .sub { color: var(--suave); font-size: 13px; margin-bottom: 16px; }
+  .painel { background: var(--painel); border: 1px solid var(--borda);
+            border-radius: 10px; padding: 14px; margin-bottom: 14px; }
+  label { display: block; font-size: 12px; color: var(--suave); margin-bottom: 4px; }
+  input, select, button { font: inherit; color: var(--texto); background: #23272e;
+            border: 1px solid var(--borda); border-radius: 7px; padding: 8px 10px; }
+  button { cursor: pointer; }
+  button:hover:not(:disabled) { border-color: var(--destaque); }
+  button:disabled { opacity: .45; cursor: default; }
+  .linha { display: flex; gap: 10px; flex-wrap: wrap; align-items: flex-end; }
+  .linha > div { flex: 1 1 160px; }
+  .linha > div.largo { flex: 3 1 320px; }
+  #estado { font-size: 13px; color: var(--suave); margin-top: 10px; white-space: pre-wrap; }
+  .aviso { color: var(--alerta); }
+  #tab { background: #fff; border-radius: 10px; padding: 8px; overflow-x: auto; min-height: 120px; }
+  #andamento { width: 100%; }
+  .valor { font-variant-numeric: tabular-nums; color: var(--destaque); }
+  .oculto { display: none; }
+</style>
+</head>
+<body>
+<header>
+  <h1>Thoth</h1>
+  <div class="sub">Áudio → tablatura de contrabaixo. Tudo local: nenhum arquivo sai desta máquina.</div>
+</header>
+
+<main>
+  <section class="painel">
+    <div class="linha">
+      <div class="largo">
+        <label for="ref">Arquivo local ou URL do YouTube</label>
+        <input id="ref" placeholder="/caminho/musica.mp3" style="width:100%">
+      </div>
+      <div>
+        <label for="bpm">Andamento da música (BPM)</label>
+        <input id="bpm" type="number" value="120" min="20" max="300">
+      </div>
+      <div>
+        <label for="cordas">Cordas</label>
+        <select id="cordas"><option value="4">4</option><option value="5">5</option></select>
+      </div>
+      <div><button id="enviar">Transcrever</button></div>
+    </div>
+    <div id="estado">O BPM é entrada, não estimativa: se errar, a leitura sai errada.
+Separar e transcrever leva cerca de 2,5× a duração do áudio em CPU.</div>
+  </section>
+
+  <section class="painel oculto" id="controles">
+    <div class="linha">
+      <div class="largo">
+        <label for="andamento">Andamento de estudo — <span class="valor" id="rotuloAndamento">60%</span></label>
+        <input id="andamento" type="range" min="25" max="100" step="5" value="60">
+      </div>
+      <div><button id="tocar">Tocar</button></div>
+      <div><button id="parar">Parar</button></div>
+      <div><label for="metronomo">Metrônomo</label><input id="metronomo" type="checkbox"></div>
+      <div><label for="repetir">Repetir</label><input id="repetir" type="checkbox"></div>
+    </div>
+  </section>
+
+  <section class="painel"><div id="tab">Nada carregado ainda.</div></section>
+</main>
+
+<script type="module">
+import * as alphaTab from './vendor/alphatab/alphaTab.min.mjs';
+
+const $ = (id) => document.getElementById(id);
+const estado = $('estado');
+
+const api = new alphaTab.AlphaTabApi($('tab'), {
+  core: { fontDirectory: 'vendor/alphatab/font/' },
+  player: {
+    enablePlayer: true,
+    enableCursor: true,
+    enableUserInteraction: true,
+    soundFont: 'vendor/alphatab/soundfont/sonivox.sf3',
+    scrollElement: $('tab'),
+  },
+});
+
+// O andamento de estudo é o recurso central (ADR-006): 60% é o ponto de partida
+// recomendado para iniciante, e 100% só depois que a mão souber o caminho.
+const aplicarAndamento = () => {
+  const pct = Number($('andamento').value);
+  $('rotuloAndamento').textContent = `${pct}%`;
+  api.playbackSpeed = pct / 100;
+};
+$('andamento').addEventListener('input', aplicarAndamento);
+$('tocar').addEventListener('click', () => api.playPause());
+$('parar').addEventListener('click', () => api.stop());
+$('metronomo').addEventListener('change', (e) => { api.metronomeVolume = e.target.checked ? 1 : 0; });
+$('repetir').addEventListener('change', (e) => { api.isLooping = e.target.checked; });
+
+const relatar = (job) => {
+  const partes = [`${job.status}`];
+  if (job.notas != null) partes.push(`${job.notas} notas — ${JSON.stringify(job.rotulos)}`);
+  if (job.descartadas) partes.push(`${job.descartadas} nota(s) descartada(s): simultâneas`);
+  if (job.fora_do_braco) partes.push(`${job.fora_do_braco} fora do braço`);
+  if (job.avisos_de_oitava?.length) {
+    const lista = job.avisos_de_oitava.map((a) => `${a.pitch}@${a.onset_s}s`).join(', ');
+    partes.push(`⚠ conferir a oitava de: ${lista}`);
+  }
+  if (job.erro) partes.push(`erro: ${job.erro}`);
+  estado.textContent = partes.join('\n');
+  estado.classList.toggle('aviso', Boolean(job.erro || job.avisos_de_oitava?.length));
+};
+
+const carregar = async (ident) => {
+  const resposta = await fetch(`/jobs/${ident}/artifacts/gp5`);
+  api.load(new Uint8Array(await resposta.arrayBuffer()));
+  $('controles').classList.remove('oculto');
+  aplicarAndamento();
+};
+
+const acompanhar = async (ident) => {
+  for (;;) {
+    const job = await (await fetch(`/jobs/${ident}`)).json();
+    relatar(job);
+    if (job.status === 'pronto') return carregar(ident);
+    if (job.status === 'erro') return;
+    await new Promise((r) => setTimeout(r, 2000));
+  }
+};
+
+$('enviar').addEventListener('click', async () => {
+  const botao = $('enviar');
+  botao.disabled = true;
+  estado.textContent = 'separando e transcrevendo…';
+  try {
+    const resposta = await fetch('/jobs', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        ref: $('ref').value,
+        bpm: Number($('bpm').value),
+        cordas: Number($('cordas').value),
+      }),
+    });
+    if (!resposta.ok) throw new Error(await resposta.text());
+    await acompanhar((await resposta.json()).id);
+  } catch (erro) {
+    estado.textContent = `falhou: ${erro.message}`;
+    estado.classList.add('aviso');
+  } finally {
+    botao.disabled = false;
+  }
+});
+</script>
+</body>
+</html>

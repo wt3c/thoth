@@ -9,10 +9,12 @@ authors = [
 # Teto em 3.13: o MuScriptor exige Python 3.10–3.12.
 requires-python = ">=3.12,<3.13"
 dependencies = [
+    "fastapi>=0.141.1",
     "music21>=10.5.0",
     "numpy>=2.5.3",
     "pyguitarpro>=0.11",
     "typer>=0.15",
+    "uvicorn[standard]>=0.53.0",
 ]
 
 [project.scripts]
@@ -27,6 +29,7 @@ dev = [
     "mypy>=1.14",
     "mir-eval>=0.8.2",
     "pretty-midi>=0.2.11.post0",
+    "httpx>=0.28.1",
 ]
 
 [build-system]

@@ -148,7 +148,7 @@ linha permitir, verificado por propriedade — não por execução no instrument
       daqui, então ou achamos espelho do `beat_this-final0.ckpt`, ou escrevemos o
       quantizador e rodamos sempre com `--detect-tempo false`.
 
-## Fase 4.5 — Pipeline ponta a ponta ⬅️ **ATUAL**
+## Fase 4.5 — Pipeline ponta a ponta ✅ **CONCLUÍDA (2026-09-22)**
 
 Pré-requisito invisível até agora: a Fase 5 só existe se houver o que o
 `POST /jobs` chame. Hoje os estágios existem isolados e nada os liga.
@@ -173,11 +173,20 @@ Pré-requisito invisível até agora: a Fase 5 só existe se houver o que o
 **Pronto quando:** `thoth transcribe` sobre um áudio real produzir `.gp5` e
 `.musicxml` que abram, com o rótulo e os avisos de oitava no relatório.
 
-## Fase 5 — API e UI
+## Fase 5 — API e UI ⬅️ **ATUAL**
 
-- [ ] FastAPI: `POST /jobs`, `GET /jobs/{id}`, `GET /jobs/{id}/artifacts/{fmt}`
-- [ ] alphaTab servido localmente (sem CDN): renderiza, toca e **controla andamento
-      (estudar a 50–70%)** — ferramenta de estudo central para iniciante (ADR-006)
+- [x] FastAPI: `POST /jobs`, `GET /jobs`, `GET /jobs/{id}`,
+      `GET /jobs/{id}/artifacts/{fmt}`. Jobs em memória e falha de pipeline como
+      estado do job, não 500 (ADR-015). O resumo devolve descartes, notas fora do
+      braço e avisos de oitava — a tablatura sozinha não conta o que foi perdido
+- [x] alphaTab servido localmente (sem CDN): renderiza, toca e **controla andamento
+      (estudar a 50–70%)** — ferramenta de estudo central para iniciante (ADR-006).
+      `scripts/vendor_alphatab.py` resolve os `import` em vez de listar arquivos;
+      a lista fixa trazia só a fachada de 4 KB e deixava a página em branco
+- [x] `thoth serve` — sobe API e página em `127.0.0.1` por padrão
+- [ ] **Abrir a página no navegador** — verificação manual, como foi com o
+      TuxGuitar: servidor respondendo 200 para todos os ativos prova que o
+      servidor está certo, não que o alphaTab renderiza e toca
 
 ## Fase 6 — Opcionais
 

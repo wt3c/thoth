@@ -5,8 +5,10 @@ from __future__ import annotations
 from pathlib import Path
 
 import typer
+import uvicorn
 
 from thoth.adapters.ingest import resolver_fonte
+from thoth.api.app import criar_app
 from thoth.domain.models import TUNING_BASS_4, TUNING_BASS_5
 from thoth.services import pipeline
 
@@ -51,3 +53,15 @@ def transcribe(
         typer.echo(f"{len(r.avisos_de_oitava)} oitava(s) a conferir: {alturas}")
     for caminho in r.artefatos.values():
         typer.echo(str(caminho))
+
+
+@app.command()
+def serve(
+    host: str = typer.Option("127.0.0.1", help="Local por padrão: nada sai da máquina."),
+    port: int = typer.Option(8000),
+    out: Path = typer.Option(Path("out"), help="Onde ficam os artefatos."),
+    cache: Path = typer.Option(CACHE_PADRAO, help="Diretório de cache."),
+) -> None:
+    """Sobe a API e a página de estudo (alphaTab local, sem CDN)."""
+    typer.echo(f"http://{host}:{port}")
+    uvicorn.run(criar_app(out_dir=out, cache_dir=cache), host=host, port=port)

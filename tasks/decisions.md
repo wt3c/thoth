@@ -452,3 +452,34 @@ são eventos distintos no áudio e o mesmo tick de semicolcheia. Quem recusa é 
 tick, então quem filtra tem de olhar o tick — filtrar por onset cru deixaria o
 erro passar intacto para o exportador. Por isso `monofonizar` mora em
 `services/rhythm.py`, ao lado da grade, e não no pipeline.
+
+## ADR-015 — UI local: alphaTab vendorizado, jobs em memória
+**Data:** 2026-09-22 · **Status:** aceito
+
+**alphaTab servido daqui, nunca de CDN.** Estudar é a finalidade do projeto
+(ADR-006) e não pode depender de internet nem transformar cada sessão num pedido
+a um terceiro. Os 4,6 MB de dist **não** são versionados — mesma regra do áudio e
+dos pesos (ADR-005). O que fica no repositório é a identidade: versão `1.8.4` e
+SHA-256 do `.tgz` em `scripts/vendor_alphatab.py`, como o `models.lock.toml` faz
+com os pesos. Faltando o vendor, a raiz responde **503 com o comando**, em vez de
+servir uma página em branco.
+
+**O script resolve os `import`, não carrega uma lista fixa.** A lista fixa falhou
+na primeira tentativa: `alphaTab.min.mjs` tem 4 KB e é só uma fachada que importa
+`core` (2,3 MB), `worker` e `worklet`. O servidor respondia 200 para tudo que eu
+tinha pedido, e a página abriria em branco com um 404 no console do navegador —
+um defeito que nenhum teste de servidor pega, porque o servidor estava certo. O
+teste que fecha isso é estrutural: todo `import` relativo dos módulos
+vendorizados tem de resolver para arquivo existente.
+
+**Jobs vivem em memória, no processo.** Uso pessoal, uma música por vez.
+Reiniciar perde o histórico e não perde nada caro: os artefatos ficam em disco
+nomeados pelo `source_id`, e repetir um job reaproveita o cache de ingestão e o
+de separação. Banco de dados aqui seria estado para um usuário só.
+
+**Falha do pipeline é estado do job, não 500.** "Nenhuma nota de baixo" é
+diagnóstico para quem pediu — o servidor funcionou. O 409 fica para o artefato
+pedido antes da hora.
+
+**O que a API expõe de propósito:** contagem de descartes, notas fora do braço e
+avisos de oitava (ADR-014). A tablatura sozinha não avisa o que foi jogado fora.

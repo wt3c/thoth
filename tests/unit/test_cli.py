@@ -51,3 +51,17 @@ def test_transcribe_relata_descartes_e_avisos(tmp_path: Path, monkeypatch) -> No
     assert "12 notas" in resultado.output
     assert "1 descartada" in resultado.output
     assert "abc123.gp5" in resultado.output
+
+
+def test_serve_monta_o_app_sem_subir_o_servidor(monkeypatch) -> None:
+    """Checa a fiação até o uvicorn — subir servidor de verdade é teste de outro nível."""
+    from thoth import cli
+
+    recebido: dict[str, object] = {}
+    monkeypatch.setattr(cli.uvicorn, "run", lambda app, **kw: recebido.update(kw, app=app))
+
+    resultado = runner.invoke(app, ["serve", "--port", "9123"])
+
+    assert resultado.exit_code == 0, resultado.output
+    assert recebido["port"] == 9123
+    assert recebido["app"].title == "Thoth"

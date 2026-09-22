@@ -226,3 +226,4 @@ spike/
 
 # IDE
 .idea/
+web/vendor/
