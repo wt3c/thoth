@@ -199,15 +199,17 @@ transcrições nota a nota (onset ≤50 ms + mesma altura):
 | onset F1 mix~stem | 0,891 | — |
 | notas < 100 ms (candidatas a ruído) | 5 (3%) | **2 (1%)** |
 
-Se o ruído de dedilhada virasse nota, o stem teria **mais** eventos curtos que a
-mix. Tem menos. A dedilhada é audível porque a separação a desmascara — na mix
-ela fica encoberta por guitarra e bateria; isolada, aparece. Não é ganho de
-volume: a mix está a −13,0 LUFS e o stem a −16,5, então o `loudnorm` até
-**atenua** a mix mais do que amplifica o stem. **A separação não sujou a
-transcrição; ela expôs um som que já existia no sinal.**
+O stem não tem excesso de eventos curtos — tem menos que a mix. Mas **isso não
+prova nada sobre a dedilhada**: a premissa de que ruído de ataque vira nota
+*curta* é minha, nunca foi verificada, e a duração mediana é 140 ms nos quatro
+conjuntos, ou seja, é quantizada demais para discriminar. Descartar a hipótese
+com n=5 contra n=2 de um proxy que não mede o mecanismo seria autoengano.
 
-Corolário para a Fase 2: dedilhada exposta é irrelevante para nós (o MIDI é o
-produto), mas será relevante se algum dia auralizarmos para o usuário final.
+O que é fato: a mix está a −13,0 LUFS e o stem a −16,5, então o `loudnorm`
+**atenua** a mix mais do que amplifica o stem — a dedilhada não ficou mais alta,
+ficou mais exposta. Se isso é desmascaramento (o ruído sempre esteve lá, coberto
+por guitarra e bateria) ou artefato do Demucs, os dados atuais não dizem.
+**Fica em aberto.** O que a investigação encontrou foi outra coisa, pior, abaixo.
 
 ### O que separar mudou de verdade, por faixa
 
@@ -233,3 +235,45 @@ MuScriptor em notas simultâneas do mesmo instrumento (onset F1 60,4 → 51,8). 
 alcançável com este motor para material polifônico denso. O baixo — monofônico,
 simultaneidade 1 medida em todas as faixas — é onde o sistema funciona. O
 projeto segue baixo-primeiro não por preferência, mas por limite medido.
+
+### O achado que o proxy escondia: a separação erra a oitava
+
+O pareamento por onset **e** altura jogava para fora as notas em que os dois
+concordam no tempo e discordam na altura. Casando só por onset:
+
+| faixa | onsets coincidentes | mesma altura | altura divergente |
+|---|---|---|---|
+| neo | 146 | 127 | **19** |
+| jorge | 49 | 48 | 1 |
+| sade | 53 | 52 | 1 |
+
+No `neo`, **13 das 19 divergências são de exatamente ±12 semitons** — e 12 delas
+no mesmo padrão: mix diz B1 (35), stem diz B0 (23). Não é ruído de altura, é
+salto de oitava sistemático, e cai em 7% da linha do stem.
+
+**Qual dos dois acerta?** Três evidências, todas apontando para a mix, nenhuma
+conclusiva sozinha:
+
+1. **Continuidade melódica.** Saltos ≥ 12 semitons: mix 10% das transições, stem
+   **19%**. Salto mediano: mix 2 semitons, stem 4. A linha da mix é mais suave —
+   mas pedal em corda solta grave é idiomático em metal, então o argumento é
+   fraco justamente neste gênero.
+2. **Espectro nos 12 onsets** (janela de 0,6s, no áudio original *e* no stem): a
+   banda de 61,7 Hz (B1) supera a de 30,9 Hz (B0) por 2–6×, e a de 30,9 Hz fica
+   no piso de ruído ou abaixo dele em metade dos casos.
+3. **Teste do 3º harmônico** (92,6 Hz existe em B0, não em B1): **inconclusivo**
+   — ora no piso, ora bem acima dele. E 92,5 Hz é F#2, a quinta que as guitarras
+   tocam o tempo todo numa música em B. O teste não separa as fontes.
+
+**Status: em aberto, com suspeita forte sobre o stem.** Gerado A/B focado para
+decidir por escuta — `~/thoth-fase0/neo_AB_B1_mix.wav` e `neo_AB_B0_stem.wav`,
+com as 12 notas em disputa isoladas no canal direito.
+
+**Por que isto importa além da Fase 0:** oitava errada é corda e casa erradas.
+O erro atravessa intacto até a tablatura da Fase 4 e não há etapa posterior que
+o detecte. Entra como **primeiro item do portão de regressão da Fase 1**.
+
+**Por que a escuta anterior não pegou:** o Welington ouviu o `neo_STEM` inteiro e
+disse *"as notas parecem corretas"*. Doze notas erradas de oitava, numa linha
+rápida de metal, soando junto com o original — a Camada 2 não discrimina isso sem
+um A/B focado. Limite metodológico da escuta, registrado.
