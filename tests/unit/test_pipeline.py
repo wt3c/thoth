@@ -55,12 +55,12 @@ requer_soundfont = pytest.mark.skipif(not SOUNDFONT.exists(), reason="soundfont 
 
 
 @requer_soundfont
-def test_gera_os_dois_artefatos_nomeados_pelo_source_id(tmp_path: Path) -> None:
+def test_gera_os_dois_artefatos_nomeados_pelo_titulo(tmp_path: Path) -> None:
     resultado = _rodar(tmp_path, (_nota(36, 0.0), _nota(38, 0.7)))
 
     assert set(resultado.artefatos) == {"gp5", "musicxml"}
     for caminho in resultado.artefatos.values():
-        assert caminho.exists() and caminho.stem == resultado.asset.source_id
+        assert caminho.exists() and caminho.stem == resultado.asset.title
 
 
 @requer_soundfont

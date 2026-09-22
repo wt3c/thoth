@@ -30,6 +30,7 @@ from thoth.adapters.transcription.muscriptor import MuscriptorTranscriber
 from thoth.domain.models import TUNING_BASS_4, AudioAsset, NoteEvent
 from thoth.domain.ports import Exporter, FretAssigner, Separator, Transcriber
 from thoth.services.fretboard import ViterbiFretAssigner, cabe_no_braco
+from thoth.services.nomes import nome_de_arquivo
 from thoth.services.octave_check import OctaveWarning, verificar_oitavas
 from thoth.services.rhythm import monofonizar
 
@@ -63,7 +64,7 @@ def transcrever(
     assigner: FretAssigner | None = None,
     exporters: dict[str, Exporter] | None = None,
 ) -> Resultado:
-    """Caminho ou URL → `.gp5` e `.musicxml` em `out_dir`, nomeados pelo `source_id`.
+    """Caminho ou URL → `.gp5` e `.musicxml` em `out_dir`, nomeados pelo título (ADR-017).
 
     `bpm` é entrada, não estimativa (ADR-013): nenhum formato de partitura guarda
     segundos, e o Thoth ainda não estima andamento.
@@ -97,7 +98,7 @@ def transcrever(
 
     out_dir.mkdir(parents=True, exist_ok=True)
     artefatos = {
-        formato: exportador.export(tabs, out_dir / f"{asset.source_id}.{formato}", tuning)
+        formato: exportador.export(tabs, out_dir / f"{nome_de_arquivo(asset)}.{formato}", tuning)
         for formato, exportador in exporters.items()
     }
     return Resultado(

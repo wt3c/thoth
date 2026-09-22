@@ -2,7 +2,7 @@
 
 Jobs vivem **em memória**, no processo. Não é descuido: é uso pessoal, uma música
 por vez, e reiniciar o servidor perde o histórico — mas não perde nada caro, já
-que os artefatos ficam em disco nomeados pelo `source_id` e um job repetido
+que os artefatos ficam em disco nomeados pelo título (ADR-017) e um job repetido
 reaproveita o cache de ingestão e de separação.
 
 A UI é servida daqui, com o alphaTab **local** (ADR-006): estudar não pode

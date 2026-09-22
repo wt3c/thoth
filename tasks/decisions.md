@@ -520,3 +520,36 @@ API com executor de mentira e artefato GP5 de verdade, abre o Chromium e conta
 `#tab svg`. Verificado nos dois sentidos: passa com o fix e falha com o
 `scrollElement` de volta. Nenhuma asserção mais fraca serve — `renderFinished`,
 `.at-surface` presente e `innerHTML` não vazio **passam** com o bug ativo.
+
+---
+
+## ADR-017 — Artefatos nomeados pelo título, não pelo `source_id`
+
+**Data:** 2026-09-22 · **Status:** aceito
+
+**Contexto.** O pipeline gravava `out/9aa6eda3591aa060.gp5`. O `source_id` é uma
+boa chave (estável, única, é o que indexa o cache), mas é um péssimo rótulo: com
+meia dúzia de transcrições em `out/`, não dá para saber qual é qual sem abrir. O
+`AudioAsset` já carrega `title` — do `meta.json` no YouTube, do nome do arquivo
+no local — então não foi preciso buscar metadado novo.
+
+**Decisão.** `out/<título>.<formato>`, via `services/nomes.nome_de_arquivo()`.
+Título preservado legível, com acentos: o destino é o gerenciador de arquivos e o
+MuseScore, não uma URL. A sanitização troca `/ \ : * ? " < > |` e controles por
+hífen, colapsa repetições, tira ponto e espaço das pontas (ponto inicial esconde
+o arquivo; final quebra no Windows) e trunca em 120 caracteres — os títulos reais
+do cache trazem `:` e `/`, e a barra criaria diretório em vez de arquivo.
+
+**Colisão resolvida por sobrescrita.** Dois títulos iguais de fontes diferentes
+passam a ocupar o mesmo arquivo. Aceito conscientemente: o uso é pessoal, e a
+alternativa (sufixo do `source_id` ao colidir) troca um nome limpo por um nome
+sujo para um caso que ainda não aconteceu. Reversível quando acontecer.
+
+**O que não muda.** `cache/<source_id>/` e `cache/stems/<source_id>/` continuam
+no id: ali ele é chave de cache, não rótulo para humano. A API também não muda —
+ela serve `job.resultado.artefatos[formato]`, que é o `Path` real, e nunca
+remontou o nome a partir do `source_id`.
+
+**Teste.** `tests/unit/test_nomes.py` usa os títulos reais do cache (o do Toshiki
+Soejima tem `:` e `/` no mesmo título) e cobre o fallback: título que se reduz a
+nada volta ao `source_id`, senão o artefato viraria um `.gp5` oculto e sem nome.
