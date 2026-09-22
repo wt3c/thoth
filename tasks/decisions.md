@@ -245,7 +245,14 @@ rotuladas `acoustic_piano` no mesmo arquivo — e ainda assim vazou parte dele p
 resolve isso; só remover o instrumento do áudio antes da transcrição.
 
 **Decisão:** `DemucsSeparator` (`htdemucs_ft`, `--two-stems=bass`) entra no caminho
-crítico, antes do transcritor.
+crítico, antes do transcritor, **sempre** — sem heurística de "separar só quando
+precisar".
+
+O par de controle decidiu isso. No Sade a separação derrubou 67 notas para 62, o
+que admitia duas leituras opostas: lixo removido ou nota real comida. A escuta
+resolveu — o Welington comparou os dois e eles *"soaram equivalentes"*. Separar
+não custa qualidade em mix limpa, então não há motivo para uma heurística de
+re-execução condicional carregar complexidade no pipeline.
 
 **Custo aceito:** separação de 30s leva 88s em CPU; transcrever o stem cai para 10s
 (contra 42s na mix, pois há um instrumento só). Total ~2,4× mais lento — ~16 min

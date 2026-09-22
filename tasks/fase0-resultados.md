@@ -141,3 +141,41 @@ Os artefatos do Seu Jorge desaparecem por completo. A escuta confirmou a causa:
 **teclado vazando para dentro do canal do baixo** na versão sem separação.
 
 Decisão registrada no ADR-010: Demucs deixa de ser condicional.
+
+## Grupo C — os casos-limite não quebraram como eu previa
+
+### Ne Obliviscaris — *Equus* (prog metal, baixo de extensão estendida)
+
+Trecho de 30s em t=150s. Previsão registrada em `tasks/corpus.md`: **falha
+esperada**, por afinação estendida e velocidade.
+
+| | notas de baixo | extensão | máx. simultâneas | densidade |
+|---|---|---|---|---|
+| mix | 176 | B0..D3 | 1 | 5,9 notas/s |
+| stem | 165 | B0..D3 | 1 | 5,5 notas/s |
+
+**A previsão estava errada.** `B0..D3` cabe exatamente num baixo de 5 cordas
+(`TUNING_BASS_5` já começa em B0=23), sem nenhuma nota simultânea e com densidade
+coerente com o gênero. Mix e stem concordam. Não há evidência de quebra.
+
+Custo: a mix densa levou **106s para 30s de áudio** (3,5× tempo real) por causa
+das 1238 notas totais — o `distorted_electric_guitar` sozinho gera 769. Separar
+antes derruba para 20s, um ganho de 5×. Reforça o ADR-010 por um segundo motivo,
+independente da qualidade: **velocidade**.
+
+### Toshiki Soejima — *Feel Like Makin' Love* (guitarra neo-soul)
+
+| | notas | extensão | máx. simultâneas |
+|---|---|---|---|
+| mix (`clean_electric_guitar`) | 208 | F2..A#5 | 8 |
+| stem `other` (`clean_electric_guitar`) | 188 | A#2..A#6 | 7 |
+
+Sete a oito notas simultâneas é acorde de verdade, não artefato — é o que se
+espera de neo-soul. Aqui a fraqueza documentada do MuScriptor (notas sobrepostas
+do mesmo instrumento: onset F1 60,4 → 51,8) é a métrica que vale, e ela não se
+mede por implausibilidade estrutural como no baixo. Precisa de escuta ou de
+referência externa.
+
+Observação lateral: o `htdemucs_ft` não tem stem de guitarra — ela cai em `other`
+junto com teclados e sopros. Para o objetivo secundário multi-instrumento isso é
+uma limitação a considerar, não resolvida pelo pipeline atual.
