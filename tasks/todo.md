@@ -202,21 +202,21 @@ Pré-requisito invisível até agora: a Fase 5 só existe se houver o que o
 
 - [ ] Aval para `omarchy-pkg-install musescore` (não instalado; TuxGuitar já está)
 
-## 🐛 Aberto — GP5 gravado perde beats no round-trip (2026-09-22)
+## ✅ Resolvido — GP5 gravado perdia beats no round-trip (2026-09-22)
 
 Achado ao verificar o ADR-018 com o CLI real, **não introduzido por ele** (o mesmo
-resultado aparece com as mudanças em `git stash`).
+resultado aparecia com as mudanças em `git stash`).
 
-- **Sintoma:** `out/escala.gp5` relido com PyGuitarPro traz 4 beats com nota em vez
-  de 15; cada compasso vira **um** beat com todas as notas empilhadas dentro.
-- **Delimitado:** a `Song` **em memória** está correta na hora do `gp.write`
-  (4 compassos × 4 beats, 1 nota por beat, `measureHeaders == len(measures)`).
-  A perda é no `write`→`parse`. O MusicXML do mesmo material está correto (15 notas,
-  15 `<lyric>`), então o defeito é só do caminho GP5.
-- **Hipótese descartada:** 4 vozes por compasso em vez das 2 do formato — forçar 2
-  vozes não muda nada.
-- **Por que a suíte não pega:** `tests/unit/test_gp5_export.py` exporta com o BPM
-  padrão (120) notas espaçadas a 90, então cai numa grade rítmica que não dispara o
-  bug. Um teste com BPM coerente com o espaçamento reproduz na hora.
-- **Próximo passo:** sessão de `systematic-debugging` própria — comparar os bytes
-  gravados com um GP5 de referência do próprio Guitar Pro. Não emendar sem causa raiz.
+- **Sintoma:** `out/escala.gp5` relido com PyGuitarPro trazia 4 beats com nota em vez
+  de 15; cada compasso virava **um** beat com todas as notas empilhadas dentro.
+- **Causa raiz:** `gp.Beat.status` nasce `BeatStatus.empty` no PyGuitarPro, e o
+  exportador só ajustava o das pausas (`rest`). Na leitura, `gp3.readBeat` devolve
+  `0` para beat `empty` em vez da duração, então o cursor `start` não avança e
+  `getBeat(voice, start)` devolve o beat anterior — as notas seguintes entram todas
+  nele. Reproduzido com PyGuitarPro puro, sem nada do Thoth: 4 beats escritos com
+  `empty` → `[4]` na leitura; com `normal` → `[1, 1, 1, 1]`.
+- **Correção:** `beat.status = gp.BeatStatus.normal` em `Gp5Exporter._nota`.
+- **Por que a suíte não pegava:** os asserts liam as notas achatadas sobre todos os
+  beats (`_lidas`), o que sobrevive à fusão. `test_cada_nota_ocupa_um_beat_proprio`
+  agora afirma a estrutura, e `test_silencio_vira_pausa_e_nao_desloca_a_nota` passou
+  a cobrar o ataque em ticks em vez da sequência de beats que o bug produzia.

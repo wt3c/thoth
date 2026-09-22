@@ -95,9 +95,14 @@ def test_silencio_vira_pausa_e_nao_desloca_a_nota(tmp_path: Path) -> None:
     ]
     song = _exportar(ViterbiFretAssigner().assign(notas, TUNING_BASS_4), tmp_path, bpm=BPM)
 
-    beats = song.tracks[0].measures[0].voices[0].beats
+    medida = song.tracks[0].measures[0]
+    beats = medida.voices[0].beats
     assert len(_lidas(song)) == 2
-    assert [bool(b.notes) for b in beats] == [True, False, True]  # nota, pausa, nota
+    # O que se lê numa tablatura é o ataque: a segunda nota tem que cair no quarto
+    # tempo, três semínimas depois da primeira, com pausas cobrindo o intervalo.
+    ataques = [beat.start - medida.start for beat in beats if beat.notes]
+    assert ataques == [0, gp.Duration.quarterTime * 3]
+    assert sum(beat.duration.time for beat in beats) == gp.Duration.quarterTime * 4
 
 
 def test_sem_notas_e_erro(tmp_path: Path) -> None:
@@ -140,3 +145,13 @@ def test_pausa_nao_recebe_texto(tmp_path: Path) -> None:
         for beat in medida.voices[0].beats
         if not beat.notes
     )
+
+
+def test_cada_nota_ocupa_um_beat_proprio(tmp_path: Path) -> None:
+    """Regressão: sem `status`, o beat sai `empty`, vale duração zero na releitura e
+    todo o compasso desaba num beat só — as notas sobrevivem, a rítmica não."""
+    song = _exportar(_tabs([36, 38, 40, 41]), tmp_path, bpm=BPM)
+
+    beats = song.tracks[0].measures[0].voices[0].beats
+    assert [len(beat.notes) for beat in beats] == [1, 1, 1, 1]
+    assert all(beat.status is gp.BeatStatus.normal for beat in beats)

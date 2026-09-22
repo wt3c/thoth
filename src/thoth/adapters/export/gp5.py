@@ -120,6 +120,9 @@ class Gp5Exporter:
     def _nota(voz: gp.Voice, tab: TabNote, cordas: int, valor: int, pontuada: bool) -> gp.Beat:
         beat = gp.Beat(voz, duration=gp.Duration(value=valor, isDotted=pontuada))
         beat.notes.append(gp.Note(beat, value=tab.fret, string=cordas - tab.string, velocity=95))
+        # Sem isto o beat sai `empty` (o default do PyGuitarPro): o leitor trata beat
+        # vazio como duração zero, e todos os beats do compasso colapsam num só.
+        beat.status = gp.BeatStatus.normal
         beat.text = nome_da_nota(tab.event.pitch)
         return beat
 
