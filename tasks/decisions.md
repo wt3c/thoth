@@ -1617,3 +1617,77 @@ Nada muda. Semicolcheia reta e andamento constante continuam como estão.
 - Quando reabrir, o conserto do degrau é **mapa de andamento com duas seções**, não
   rastreador de andamento contínuo: a série medida é um platô seguido de outro.
 - Nenhum código mudou, então o portão de entrega da tarefa anterior continua valendo.
+
+---
+
+## ADR-035 — a tablatura mora dentro do MusicXML, em duas pautas
+
+**Data:** 2026-09-23
+**Status:** aceito
+
+### Contexto
+
+O `.musicxml` saía como partitura, e só. Corda e traste viajavam nele desde sempre,
+como `<technical><string>/<fret>` — informação certa, que nenhum leitor desenhava,
+porque o arquivo declarava uma pauta de notação e mais nada. Quem abria via a partitura
+e concluía, com razão, que a tablatura não estava lá.
+
+O `.gp5` não resolve esse lado. Ele declara `TrackSettings.tablature=True`, e o
+TuxGuitar e o Guitar Pro honram: abrem com a tablatura na tela. O MuseScore 4.7
+**ignora** essa flag no importador de Guitar Pro e monta a pauta pelo template
+`electric-bass` dele (`stdNormal`, clave de Fá 8vb). Medido, não suposto: o `.mscx`
+resultante traz um `StaffType group="pitched"` e nenhum de tablatura. Não há nada a
+corrigir no nosso GP5 — o buraco estava no MusicXML, que é o formato que o MuseScore
+lê por inteiro.
+
+Quatro sondagens antes de escrever código:
+
+1. `<staff-details>` depois dos `<clef>`, dentro do mesmo `<attributes>`: aceito.
+2. `<staff-tuning line="1">` é a linha de **baixo** da tablatura, logo a corda mais
+   grave. Com a ordem do nosso `tuning` (grave → agudo), o MuseScore reconstrói
+   `StringData` como `[28, 33, 38, 43]`. Invertida, o arquivo abre sem erro e mostra
+   trastes errados.
+3. O music21 10.5 lê o arquivo de volta como duas `PartStaff`: `parts[0]` notação,
+   `parts[1]` tablatura.
+4. O MuseScore **honra** o nosso `<technical>` — desde que corda e traste sejam
+   compatíveis com a altura da nota. A primeira sondagem mandou digitação
+   contraditória, o MuseScore descartou e recalculou, e isso se disfarçou de "o
+   MuseScore recalcula sempre". Com digitação válida alternativa, ele preserva.
+
+### Decisão
+
+O `MusicXmlExporter` monta **duas `PartStaff` na mesma parte**, sob um `StaffGroup`
+com colchete e barras ligadas: notação em cima, tablatura embaixo.
+
+- **A altura é a mesma nas duas.** Pauta que discorda da outra é pior que pauta
+  nenhuma; há teste afirmando a igualdade.
+- **O nome da nota fica só na notação.** Na tablatura ele repetiria o traste que está
+  ao lado.
+- **Corda e traste ficam só na tablatura**, que é onde se leem.
+- **Andamento e armadura entram pela pauta de notação.** O `<attributes>` é da parte
+  inteira, então o arquivo grava uma armadura só — mas o music21 entrega uma cópia a
+  cada pauta na leitura. Teste que percorre a partitura toda conta duas: ancorar em
+  `parts[0]` não é detalhe de estilo, é o que mantém a asserção com significado.
+- **`<staff-details>` é injetado no XML depois da escrita** (`_com_afinacao`). O
+  music21 10.5 emite `<staves>`, `<staff>` por nota e a clave TAB, mas não emite
+  `staff-lines` nem `staff-tuning` — e sem eles o leitor cai na afinação default. A
+  injeção é costura de formato, então o teste afirma o **XML cru**: é ali que está o
+  contrato com o leitor.
+
+### Alternativa descartada
+
+Promover o script que convertia `.gp5` em `.mscz` de duas pautas via CLI do MuseScore.
+Funcionava, e foi o que entregou os sete arquivos desta sessão — mas resolve na saída
+o que estava errado na origem, amarra o projeto a um binário do MuseScore instalado e
+não beneficia nenhum outro leitor de MusicXML.
+
+### Consequência
+
+- Quem abrir o `.musicxml` — MuseScore, MusicXML de qualquer leitor — vê partitura e
+  tablatura, com a digitação do Viterbi (ADR-032) preservada, não recalculada.
+- Os sete artefatos em `out/` foram gerados antes desta mudança: ainda são de uma
+  pauta. Reexportar é rodar o pipeline de novo.
+- A cinco cordas entra inteira: o si grave é a corda que sumiria numa afinação escrita
+  em tamanho fixo, e há teste com `TUNING_BASS_5` cobrindo isso.
+- Um teste `slow` roda o `mscore` de verdade e afirma a digitação importada, não só a
+  existência da pauta (Regra 3 — o round-trip pelo music21 não prova o leitor).

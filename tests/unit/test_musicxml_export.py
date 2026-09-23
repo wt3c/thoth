@@ -6,13 +6,17 @@ oitava abaixo do escrito, e sem `Bass8vb` a leitura sai uma oitava acima.
 
 from __future__ import annotations
 
+import os
+import re
+import shutil
+import subprocess
 from pathlib import Path
 
 import pytest
 from music21 import articulations, clef, converter, key, note, tempo
 
 from thoth.adapters.export.musicxml import MusicXmlExporter
-from thoth.domain.models import TUNING_BASS_4, NoteEvent, TabNote
+from thoth.domain.models import TUNING_BASS_4, TUNING_BASS_5, NoteEvent, TabNote
 from thoth.services.fretboard import ViterbiFretAssigner
 
 BPM = 90
@@ -28,10 +32,21 @@ def _tabs(pitches: list[int], passo: float = SEMINIMA) -> list[TabNote]:
     return ViterbiFretAssigner().assign(notas, TUNING_BASS_4)
 
 
-def _exportar(tabs: list[TabNote], destino: Path):  # type: ignore[no-untyped-def]
-    alvo = MusicXmlExporter(bpm=BPM).export(tabs, destino / "tab.musicxml", TUNING_BASS_4)
+def _arquivo(tabs: list[TabNote], destino: Path, **kw: object) -> Path:
+    alvo = MusicXmlExporter(bpm=BPM, **kw).export(  # type: ignore[arg-type]
+        tabs, destino / "tab.musicxml", TUNING_BASS_4
+    )
     assert alvo.exists()
-    return converter.parse(str(alvo))
+    return alvo
+
+
+def _exportar(tabs: list[TabNote], destino: Path):  # type: ignore[no-untyped-def]
+    """A pauta de notação. A de tablatura é `parts[1]` (ADR-035).
+
+    Ancorar em `parts[0]` não é detalhe: sem isso cada nota aparece duas vezes e
+    asserções que contam notas mudam de significado sem ficarem vermelhas.
+    """
+    return converter.parse(str(_arquivo(tabs, destino))).parts[0]
 
 
 def test_round_trip_preserva_as_alturas(tmp_path: Path) -> None:
@@ -56,8 +71,9 @@ def test_andamento_vai_no_arquivo(tmp_path: Path) -> None:
 
 
 def test_corda_e_traste_acompanham_cada_nota(tmp_path: Path) -> None:
+    """Na tablatura, que é onde o número do traste se lê (ADR-035)."""
     tabs = _tabs([36, 43, 31])
-    lido = _exportar(tabs, tmp_path)
+    lido = converter.parse(str(_arquivo(tabs, tmp_path))).parts[1]
 
     lidas = [
         (
@@ -157,10 +173,7 @@ def test_a_ligadura_nao_repete_o_nome_da_nota(tmp_path: Path) -> None:
 
 def test_a_armadura_estimada_e_escrita_na_partitura(tmp_path: Path) -> None:
     """Quatro bemóis na pauta, e o nome sob a nota concorda com eles (ADR-031)."""
-    alvo = MusicXmlExporter(bpm=BPM, armadura=-4).export(
-        _tabs([28, 34, 36]), tmp_path / "bemol.musicxml", TUNING_BASS_4
-    )
-    lido = converter.parse(str(alvo))
+    lido = converter.parse(str(_arquivo(_tabs([28, 34, 36]), tmp_path, armadura=-4))).parts[0]
 
     assert [k.sharps for k in lido.recurse().getElementsByClass(key.KeySignature)] == [-4]
     assert [n.lyric for n in lido.recurse().notes] == ["E", "Bb", "C"]
@@ -183,9 +196,126 @@ def test_o_titulo_da_musica_vai_no_arquivo(tmp_path: Path) -> None:
     Afirmo o XML cru porque é o que os leitores abrem: na volta pelo music21 10.5
     o `<work-title>` não reaparece em `metadata.title`, e sim em `bestTitle`.
     """
-    alvo = MusicXmlExporter(bpm=BPM, titulo="Smooth Operator").export(
-        _tabs([36, 38]), tmp_path / "tab.musicxml", TUNING_BASS_4
-    )
+    alvo = _arquivo(_tabs([36, 38]), tmp_path, titulo="Smooth Operator")
 
     assert "<work-title>Smooth Operator</work-title>" in alvo.read_text()
     assert converter.parse(str(alvo)).metadata.bestTitle == "Smooth Operator"
+
+
+# --- Pauta de tablatura (ADR-035) --------------------------------------------
+
+
+requer_musescore = pytest.mark.skipif(
+    shutil.which("mscore") is None, reason="mscore ausente"
+)
+
+
+def test_o_arquivo_traz_partitura_e_tablatura(tmp_path: Path) -> None:
+    """Duas pautas na mesma parte: notação em cima, tablatura embaixo."""
+    lido = converter.parse(str(_arquivo(_tabs([36, 38]), tmp_path)))
+
+    claves = [type(p.recurse().getElementsByClass(clef.Clef)[0]) for p in lido.parts]
+    assert claves == [clef.Bass8vbClef, clef.TabClef]
+
+
+def test_a_tablatura_declara_linhas_e_afinacao(tmp_path: Path) -> None:
+    """Sem `staff-details` o leitor não sabe quantas cordas nem como estão afinadas.
+
+    O music21 10.5 emite `<staves>`, `<staff>` e a clave TAB, mas não isto — daí a
+    injeção depois da escrita. Afirmo o XML cru porque é o contrato com o leitor.
+
+    A linha 1 é a de baixo da tablatura, logo a corda mais grave: trocar a ordem
+    gera arquivo que abre sem erro e mostra os trastes errados.
+    """
+    xml = _arquivo(_tabs([36, 38]), tmp_path).read_text()
+
+    assert "<staff-lines>4</staff-lines>" in xml
+    afinacao = re.findall(
+        r'<staff-tuning line="(\d)">\s*<tuning-step>(\w)</tuning-step>\s*'
+        r"<tuning-octave>(\d)</tuning-octave>",
+        xml,
+    )
+    assert afinacao == [("1", "E", "1"), ("2", "A", "1"), ("3", "D", "2"), ("4", "G", "2")]
+
+
+def test_a_afinacao_de_cinco_cordas_vai_inteira(tmp_path: Path) -> None:
+    """O si grave é a corda que some quando a afinação é escrita em tamanho fixo."""
+    tabs = ViterbiFretAssigner().assign(
+        [NoteEvent(pitch=23, onset_s=0.0, offset_s=SEMINIMA, instrument="electric_bass")],
+        TUNING_BASS_5,
+    )
+    alvo = MusicXmlExporter(bpm=BPM).export(tabs, tmp_path / "cinco.musicxml", TUNING_BASS_5)
+
+    xml = alvo.read_text()
+    assert "<staff-lines>5</staff-lines>" in xml
+    assert '<staff-tuning line="1">\n            <tuning-step>B</tuning-step>' in xml
+
+
+def test_o_nome_da_nota_fica_so_na_partitura(tmp_path: Path) -> None:
+    """Na tablatura o nome duplica o traste, que já está ali — vira ruído."""
+    lido = converter.parse(str(_arquivo(_tabs([28, 34, 36]), tmp_path)))
+
+    assert [n.lyric for n in lido.parts[0].recurse().notes] == ["E", "A#", "C"]
+    assert [n.lyric for n in lido.parts[1].recurse().notes] == [None, None, None]
+
+
+def test_as_duas_pautas_tocam_as_mesmas_notas(tmp_path: Path) -> None:
+    """Pauta que discorda da outra é pior que pauta nenhuma."""
+    lido = converter.parse(str(_arquivo(_tabs([36, 38, 40, 41]), tmp_path)))
+
+    alturas = [[n.pitch.midi for n in p.flatten().notes] for p in lido.parts]
+    assert alturas[0] == alturas[1] == [36, 38, 40, 41]
+
+
+@requer_musescore
+@pytest.mark.slow
+def test_o_musescore_monta_a_tablatura_com_a_nossa_digitacao(tmp_path: Path) -> None:
+    """O leitor de verdade, não o round-trip pelo music21 (Regra 3).
+
+    Afirmo a digitação, não só a existência da pauta: se o MuseScore recalculasse
+    os trastes, a tablatura abriria bonita e jogaria fora o Viterbi (ADR-032).
+    """
+    tabs = _tabs([36, 43, 31])
+    alvo = _arquivo(tabs, tmp_path)
+    destino = tmp_path / "lido.mscx"
+    subprocess.run(
+        ["mscore", str(alvo), "-o", str(destino)],
+        check=True,
+        capture_output=True,
+        env=os.environ | {"QT_QPA_PLATFORM": "offscreen"},
+    )
+
+    mscx = destino.read_text()
+    assert '<StaffType group="tablature">' in mscx
+    # O MuseScore guarda a afinação em `StringData`, do grave para o agudo.
+    cordas = re.search(r"<StringData>.*?</StringData>", mscx, re.S)
+    assert cordas is not None
+    assert re.findall(r"<string>(\d+)</string>", cordas.group()) == [
+        str(v) for v in TUNING_BASS_4
+    ]
+    # E as cordas dele são 0 no topo, ao contrário das nossas.
+    corpo = mscx[mscx.index('<Staff id="2"') :]
+    lidos = re.findall(r"<fret>(\d+)</fret>\s*<string>(\d+)</string>", corpo)
+    assert lidos == [(str(t.fret), str(len(TUNING_BASS_4) - 1 - t.string)) for t in tabs]
+
+
+def test_corda_alterada_leva_o_acidente_na_afinacao(tmp_path: Path) -> None:
+    """Nenhuma afinação do domínio tem corda alterada — o formato, sim.
+
+    Sem `tuning-alter` um sol sustenido sairia como sol e a tablatura inteira
+    deslizaria um semitom. A afinação aqui é arbitrária, só para exercitar o ramo:
+    não é afinação que o `domain/models.py` ofereça. A grafia é a do music21, que
+    escolhe bemol para 27 e sustenido para os outros — o que cobre os dois sinais.
+    """
+    afinacao = (27, 32, 37, 42)
+    tabs = ViterbiFretAssigner().assign(
+        [NoteEvent(pitch=27, onset_s=0.0, offset_s=SEMINIMA, instrument="electric_bass")],
+        afinacao,
+    )
+    alvo = MusicXmlExporter(bpm=BPM).export(tabs, tmp_path / "alterada.musicxml", afinacao)
+
+    xml = alvo.read_text()
+    alterados = re.findall(
+        r"<tuning-step>(\w)</tuning-step>\s*<tuning-alter>(-?\d)</tuning-alter>", xml
+    )
+    assert alterados == [("E", "-1"), ("G", "1"), ("C", "1"), ("F", "1")]

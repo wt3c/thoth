@@ -239,16 +239,21 @@ def test_a_fonte_de_audio_entra_injetada_como_os_outros_estagios(tmp_path: Path)
 
 @requer_soundfont
 def test_o_tom_informado_chega_a_armadura_da_partitura(tmp_path: Path) -> None:
-    """Tom informado manda, como o `--bpm` manda sobre o andamento (ADR-019/031)."""
+    """Tom informado manda, como o `--bpm` manda sobre o andamento (ADR-019/031).
+
+    A leitura é ancorada na pauta de notação: o arquivo traz uma armadura só, mas o
+    `attributes` é da parte inteira e o music21 entrega uma cópia a cada pauta
+    (ADR-035). Percorrer a partitura toda contaria duas e não diria nada de novo.
+    """
     from music21 import converter, key
 
     resultado = _rodar(tmp_path, (_nota(34, 0.0), _nota(36, 0.7)), tom="f menor")
 
     assert resultado.tonalidade is not None
     assert resultado.tonalidade.armadura == -4 and resultado.tonalidade.margem is None
-    lido = converter.parse(str(resultado.artefatos["musicxml"]))
-    assert [k.sharps for k in lido.recurse().getElementsByClass(key.KeySignature)] == [-4]
-    assert "Bb" in [n.lyric for n in lido.recurse().notes]
+    partitura = converter.parse(str(resultado.artefatos["musicxml"])).parts[0]
+    assert [k.sharps for k in partitura.recurse().getElementsByClass(key.KeySignature)] == [-4]
+    assert "Bb" in [n.lyric for n in partitura.recurse().notes]
 
 
 @requer_soundfont

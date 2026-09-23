@@ -373,3 +373,43 @@ decidida na conversa: **decompor no exportador**, não partir o evento no pipeli
 - MusicXML com `Bass8vb` e sem `<transpose>` **não** é defeito: o round-trip devolve
   C2 / MIDI 36, correto, e a posição na pauta é a usual do baixo.
 - `astype(np.float64)` em `_ler_mono` **não** é redundante — o buffer vem `<i2`.
+
+## Fase 9 — tablatura dentro do MusicXML (ADR-035)
+
+> Origem: o MuseScore abria os nossos arquivos só em notação. O `.gp5` já declara
+> `tablature=True` e o importador de Guitar Pro do MuseScore ignora a flag — não há
+> o que corrigir lá. O MusicXML, esse sim, não dizia nada sobre tablatura.
+
+Sondado antes de escrever código, com `mscore` de verdade:
+
+- `<staff-details number="2">` depois dos `<clef>` monta a pauta de tablatura;
+- `<staff-tuning line="N">` com **linha 1 = corda mais grave** devolve
+  `StringData [28, 33, 38, 43]` no MuseScore — a nossa afinação, na ordem certa;
+- na volta pelo music21 10.5 o arquivo vira 2 `PartStaff`: `parts[0]` notação,
+  `parts[1]` tablatura;
+- o MuseScore **honra** o nosso `<technical>`: mandei 8-10-12-13 na corda grave,
+  digitação que algoritmo nenhum escolheria, e foi exatamente o que voltou.
+
+- [x] Testes primeiro: estrutura de duas pautas, linhas e afinação no XML cru,
+      afinação de 5 cordas inteira, nome da nota só na partitura, corda/traste só
+      na tablatura, e um teste contra o `mscore` real (pulado se ausente).
+- [x] `MusicXmlExporter` passa a montar `PartStaff` de notação + `PartStaff` de
+      tablatura sob um `StaffGroup`, e injeta `<staff-details>` após a escrita —
+      o music21 10.5 emite `<staves>`, `<staff>` e a clave TAB, mas não o
+      `staff-details`.
+- [x] Testes existentes ancorados em `parts[0]` — sem isso passam a contar cada
+      nota duas vezes e a asserção muda de significado em silêncio.
+- [x] ADR-035 em `tasks/decisions.md`.
+
+### Fechada
+
+Portão: `pytest -n auto` 279 passando; `-m slow` do exportador passando com o
+`mscore` 4.7.4 instalado; `ruff` e `mypy --strict` limpos.
+
+Uma asserção fora do exportador precisou de âncora: `test_pipeline.py::
+test_o_tom_informado_chega_a_armadura_da_partitura` lia a armadura pela partitura
+toda e passou a ver duas. O arquivo grava **uma** — o `<attributes>` é da parte
+inteira e o music21 dá uma cópia a cada pauta na leitura. Ancorada em `parts[0]`.
+
+Os sete artefatos em `out/` são anteriores a isto: ainda de uma pauta. Reexportar
+é rodar o pipeline de novo nas sete.

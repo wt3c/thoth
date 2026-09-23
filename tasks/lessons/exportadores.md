@@ -44,3 +44,42 @@ abre o arquivo e lê o campo, sempre.
 `metadata.title` (fica `None`) — aparece em `movementName`/`bestTitle`. Um teste
 escrito contra `metadata.title` falha com o arquivo correto. Afirmar o XML cru é o
 que mais se aproxima do que MuseScore e TuxGuitar leem.
+
+## Leitor que mostra tablatura não prova nada sobre outro leitor (2026-09-23)
+
+Afirmei que o MuseScore importava o nosso `.gp5` com pauta de tablatura. O usuário
+corrigiu: *"O TuxGuitar e o Guitar Pro quando eu abro já exibi a tablatura"* — dizendo,
+nas entrelinhas, que o MuseScore não. Ele estava certo.
+
+O nosso GP5 declara `TrackSettings.tablature=True` desde sempre, e o TuxGuitar e o
+Guitar Pro honram. O **MuseScore 4.7 ignora essa flag** no importador de Guitar Pro e
+monta a pauta pelo template `electric-bass` dele: `StaffType group="pitched"`, nome
+`stdNormal`, clave de Fá 8vb. Nenhum `StaffType group="tablature"` no arquivo
+importado. Não é bug do nosso GP5 — é o importador.
+
+**A lição:** a flag no arquivo é o que escrevemos, não o que o leitor faz. Dois
+leitores concordarem não é evidência sobre um terceiro. Para afirmar comportamento de
+leitor, rodar o leitor:
+
+```bash
+QT_QPA_PLATFORM=offscreen mscore entrada.gp5 -o saida.mscx
+grep -c 'StaffType group="tablature"' saida.mscx
+```
+
+O `mscore` precisa do ambiente inteiro (`os.environ | {...}`) — com `env` podado a
+`PATH` ele morre com SIGABRT, porque quer `HOME` e `XDG_*`.
+
+## Sondagem com digitação inválida mede o leitor errado (2026-09-23)
+
+Testando se o MuseScore preserva a nossa digitação, forcei corda/traste
+`(4,15) (3,10) (2,5) (4,12)` nas alturas 36/38/40/41 — combinações que **contradizem**
+essas alturas. O MuseScore descartou e recalculou, e eu quase registrei isso como "o
+MuseScore recalcula os trastes pela regra dele", que é falso.
+
+Com digitação **válida alternativa** — `{36:(4,8), 38:(4,10), 40:(4,12), 41:(4,13)}`,
+tudo na corda grave, escolha que nenhum algoritmo de custo faria — voltou
+`[('8','3'), ('10','3'), ('12','3'), ('13','3')]`: preservado.
+
+**A lição:** sondagem que viola a semântica do formato mede a tolerância do leitor a
+entrada inválida, não a política dele sobre entrada válida. O contraexemplo precisa
+ser legal e improvável, não ilegal.
