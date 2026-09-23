@@ -71,3 +71,20 @@ def test_alinhar_sem_fase_e_inocuo() -> None:
     notas = [_nota(31, 0.0), _nota(36, 1.0)]
 
     assert alinhar(notas, bpm=120, fase=0.0) == notas
+
+
+def test_deduplicar_e_exportar_tem_que_ser_a_mesma_grade() -> None:
+    """Fases diferentes nas duas contas deixam passar um par que `eventos` recusa.
+
+    As duas notas caem em retículos distintos na fase 0 e no mesmo depois do
+    deslocamento: se `monofonizar` rodar antes de `alinhar`, aprova o par e
+    `eventos` estoura. Deslocar primeiro é o que mantém as contas coerentes.
+    """
+    grade = 60.0 / 120 / 4
+    notas = [_nota(31, 4.4 * grade), _nota(36, 4.6 * grade)]
+    fase = 0.45 * grade
+
+    mantidas, descartadas = monofonizar(alinhar(notas, 120, fase), bpm=120)
+
+    assert len(mantidas) == 1 and len(descartadas) == 1
+    eventos([TabNote(event=n, string=0, fret=0) for n in mantidas], bpm=120)

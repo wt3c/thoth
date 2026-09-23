@@ -731,6 +731,10 @@ estimativa do áudio.
   MusicXML só têm campo inteiro de andamento. As posições das notas ficam certas e a
   reprodução corre ~0,5% fora do original — o inverso, quantizar no inteiro, é o bug
   que este ADR corrige.
+- **O deslocamento acontece antes de `monofonizar`.** `monofonizar` deduplica ticks e
+  `eventos` recusa ticks repetidos: as duas contas têm de ser a mesma grade. Feitas em
+  fases diferentes, um par aprovado por uma colapsa na outra e o exportador estoura —
+  reproduzido em teste antes da correção.
 - **O deslocamento de fase é só da partitura.** `notas.jsonl` continua em tempo
   absoluto do áudio: a auralização toca o MIDI contra o original, e deslocar ali
   dessincronizaria os dois canais.
@@ -753,6 +757,10 @@ Melhora nas sete, de 27% a 64%. Quatro chegam perto do piso do transcritor; trê
 (Feel Like, Is It A Crime, Tive Razão) continuam longe e preferiam uma grade
 reajustada a cada 30 s. **Andamento variável segue sem veredito** — pode ser conteúdo
 (ao vivo, rubato) e não arquitetura, e agora dá para medir sem o erro grosso por cima.
+
+Verificado ponta a ponta no Equus (`--cordas 5`, a maior correção de andamento,
+108 → 107,50): exporta sem estourar e mantém 3180 notas contra 3172 antes, com 28
+descartes contra 36. A grade melhor alinhada preserva notas, não as perde.
 
 A busca é O(400 × 120 × notas), alguns segundos numa música longa, contra minutos de
 transcrição: irrelevante no total.

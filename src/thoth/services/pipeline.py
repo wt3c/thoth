@@ -33,7 +33,7 @@ from thoth.services.cache_notas import gravar
 from thoth.services.fretboard import ViterbiFretAssigner, cabe_no_braco
 from thoth.services.nomes import nome_de_arquivo
 from thoth.services.octave_check import OctaveWarning, verificar_oitavas
-from thoth.services.rhythm import alinhar, monofonizar
+from thoth.services.rhythm import deslocar, monofonizar, recuo_de_fase
 from thoth.services.tempo import Andamento, ajustar, estimar_andamento
 
 #: Os três nomes que o MuScriptor usa para baixo (`list-instruments`, v0.3.0).
@@ -105,15 +105,23 @@ def transcrever(
     andamento_fino, fase = ajustar(
         [n.onset_s for n in no_braco], bpm, faixa=None if andamento else 0.0
     )
-    mantidas, simultaneas = monofonizar(no_braco, andamento_fino)
-    descartadas = sorted(simultaneas + fora, key=lambda n: n.onset_s)
-    avisos = verificar_oitavas(stem, mantidas)
+    # Deslocar ANTES de monofonizar: `monofonizar` deduplica ticks e `eventos`
+    # recusa ticks repetidos, e as duas contas precisam ser a mesma grade. Feitas
+    # em fases diferentes, um par aprovado por uma colapsa na outra.
+    recuo = recuo_de_fase(no_braco, andamento_fino, fase)
+    mantidas, simultaneas = monofonizar(deslocar(no_braco, recuo), andamento_fino)
+    # Tudo que é medido contra o áudio ou relatado a você volta ao tempo do
+    # áudio: `verificar_oitavas` sonda o stem no instante da nota, e `fora` nunca
+    # foi deslocada. Só a partitura vive na grade.
+    no_audio = deslocar(mantidas, -recuo)
+    descartadas = sorted(deslocar(simultaneas, -recuo) + fora, key=lambda n: n.onset_s)
+    avisos = verificar_oitavas(stem, no_audio)
     # A transcrição custa minutos de CPU e morria com o processo: os artefatos
     # guardam só o tempo já quantizado. Isto guarda o tempo absoluto.
-    gravar(mantidas, cache_dir / asset.source_id / "notas.jsonl")
-    # Só a partitura é deslocada: o cache guarda o tempo do áudio, e a
+    # Só a partitura fica deslocada: o cache guarda o tempo do áudio, e a
     # auralização toca o MIDI contra o original — deslocar ali dessincronizaria.
-    tabs = assigner.assign(alinhar(mantidas, andamento_fino, fase), tuning)
+    gravar(no_audio, cache_dir / asset.source_id / "notas.jsonl")
+    tabs = assigner.assign(mantidas, tuning)
     exporters = exporters or {
         "gp5": Gp5Exporter(bpm=andamento_fino),
         "musicxml": MusicXmlExporter(bpm=andamento_fino),

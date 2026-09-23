@@ -72,9 +72,9 @@ def transcribe(
 
     if r.andamento is not None:
         recado = (
-            f"andamento ESTIMADO: {r.bpm} BPM"
+            f"andamento ESTIMADO: {r.bpm:.2f} BPM"
             if r.andamento.confiavel
-            else f"andamento ESTIMADO: {r.bpm} BPM — pouca confiança, o segundo "
+            else f"andamento ESTIMADO: {r.bpm:.2f} BPM — pouca confiança, o segundo "
             f"método leu {r.andamento.conferencia}"
         )
         typer.secho(recado, fg=typer.colors.YELLOW)

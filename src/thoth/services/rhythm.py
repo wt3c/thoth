@@ -31,10 +31,21 @@ def alinhar(notes: Sequence[NoteEvent], bpm: float, fase: float) -> list[NoteEve
     `fase` e `fase - grade` descrevem o mesmo retículo, e tempo negativo nenhum
     formato de partitura representa.
     """
-    if not fase:
-        return list(notes)
+    return deslocar(notes, recuo_de_fase(notes, bpm, fase))
+
+
+def recuo_de_fase(notes: Sequence[NoteEvent], bpm: float, fase: float) -> float:
+    """Quanto `alinhar` recua. Devolvido à parte para quem precisa desfazer o recuo."""
+    if not fase or not notes:
+        return 0.0
     grade = 60.0 / bpm / 4
-    recuo = fase if min(n.onset_s for n in notes) >= fase else fase - grade
+    return fase if min(n.onset_s for n in notes) >= fase else fase - grade
+
+
+def deslocar(notes: Sequence[NoteEvent], recuo: float) -> list[NoteEvent]:
+    """Anda com as notas no tempo, ataque e término juntos."""
+    if not recuo:
+        return list(notes)
     return [replace(n, onset_s=n.onset_s - recuo, offset_s=n.offset_s - recuo) for n in notes]
 
 
