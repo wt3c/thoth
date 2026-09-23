@@ -692,3 +692,67 @@ explícita, não silenciosamente.
 sobre áudio de verdade: confere que os dois canais existem e diferem, que a
 duração bate com a do original e que o canal da direita tem mais energia durante
 uma nota do que no intervalo entre notas.
+
+## ADR-021 — O andamento é refinado pelas notas, junto com a fase da grade
+
+**Data:** 2026-09-22 · **Status:** aceito
+
+### Contexto
+
+Escuta das sete transcrições do acervo: só o Equus soou certo, as outras seis com
+"ritmo descolando". A medição está em `tasks/ritmo-diagnostico.md`.
+
+O piso do transcritor, medido nas fixtures (metronômicas a 90 BPM exatos), é de 3 a
+10 ms. As músicas reais ficavam entre 24 e 43 ms de distância mediana da semicolcheia
+mais próxima — uma ordem de grandeza acima. O desalinhamento era real, não jitter.
+
+A causa é `tempo.py`, que devolvia `round(bpm)`. No Equus são 107,5 → 108: 0,46% de
+erro, 3,5 s de deriva acumulada ao longo de 756 s, dezenas de posições de semicolcheia.
+O erro não aparece no início da música, só no fim — que é a descrição literal de
+"descolando". O Equus escapou por ser o único material metronômico do acervo, e mesmo
+ele saía a 34 ms.
+
+### Decisão
+
+`ajustar(onsets, bpm, faixa)` procura andamento e fase **em conjunto**, minimizando a
+distância mediana dos onsets transcritos à grade. A busca fica restrita a ±3% da
+estimativa do áudio.
+
+- **Juntos, não em sequência.** Refinar o BPM mantendo a âncora em `t=0` *piora* quatro
+  das sete (Equus 34 → 57 ms): grade mais precisa ancorada no lugar errado erra mais
+  que grade grosseira alinhada por acaso. Não existe meia correção aqui.
+- **±3% e não busca livre.** A busca irrestrita corria até o teto de 192–200 BPM em
+  seis das sete — artefato de faixa, não pulso encontrado. O mix continua sendo a
+  âncora: as notas refinam o andamento, não o escolhem. Transcrição ruim não pode
+  arrastar o resultado para o dobro.
+- **`--bpm` informado não é refinado** (`faixa=0`), só tem a fase ajustada. O número
+  que você deu continua mandando (ADR-019); a âncora da grade ninguém informou.
+- **O arquivo guarda o BPM arredondado, a quantização usa o fracionário.** GP5 e
+  MusicXML só têm campo inteiro de andamento. As posições das notas ficam certas e a
+  reprodução corre ~0,5% fora do original — o inverso, quantizar no inteiro, é o bug
+  que este ADR corrige.
+- **O deslocamento de fase é só da partitura.** `notas.jsonl` continua em tempo
+  absoluto do áudio: a auralização toca o MIDI contra o original, e deslocar ali
+  dessincronizaria os dois canais.
+
+### Consequência
+
+Residual mediano, medido com as funções entregues:
+
+| música          | antes   | depois  | BPM            |
+|-----------------|---------|---------|----------------|
+| Equus           | 34,4 ms | 12,6 ms | 108 → 107,50   |
+| Sou Eu          | 29,5 ms | 10,5 ms | 129 → 128,00   |
+| Feel Like       | 43,5 ms | 31,5 ms | 86 → 87,03     |
+| Tive Razão      | 42,6 ms | 20,4 ms | 103 → 102,99   |
+| SOJA            | 24,2 ms | 13,5 ms | 152 → 154,14   |
+| Is It A Crime   | 36,8 ms | 26,2 ms | 112 → 111,82   |
+| Smooth Operator | 31,3 ms | 16,9 ms | 117 → 119,14   |
+
+Melhora nas sete, de 27% a 64%. Quatro chegam perto do piso do transcritor; três
+(Feel Like, Is It A Crime, Tive Razão) continuam longe e preferiam uma grade
+reajustada a cada 30 s. **Andamento variável segue sem veredito** — pode ser conteúdo
+(ao vivo, rubato) e não arquitetura, e agora dá para medir sem o erro grosso por cima.
+
+A busca é O(400 × 120 × notas), alguns segundos numa música longa, contra minutos de
+transcrição: irrelevante no total.

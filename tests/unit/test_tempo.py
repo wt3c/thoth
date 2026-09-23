@@ -12,7 +12,7 @@ from pathlib import Path
 import pytest
 
 from tests.sintetico import BPM, SOUNDFONT, renderizar
-from thoth.services.tempo import dobrar_para_faixa, estimar_andamento
+from thoth.services.tempo import ajustar, dobrar_para_faixa, estimar_andamento, residuo
 
 requer_soundfont = pytest.mark.skipif(not SOUNDFONT.exists(), reason="soundfont ausente")
 
@@ -58,3 +58,50 @@ def test_concorda_quando_o_pulso_e_claro(tmp_path: Path) -> None:
     wav, _ = renderizar("walking", tmp_path)
 
     assert estimar_andamento(wav).confiavel
+
+
+# --- Ajuste conjunto de andamento e fase (ADR-021) ---------------------------
+
+
+def _onsets(bpm: float, fase: float, passos: list[int]) -> list[float]:
+    """Onsets exatos numa grade de semicolcheia — o caso que o ajuste tem que recuperar."""
+    grade = 60.0 / bpm / 4
+    return [fase + p * grade for p in passos]
+
+
+def test_recupera_andamento_fracionario_e_fase() -> None:
+    """107,5 BPM é o caso do Equus: arredondar para 108 custa 3,5s de deriva em 756s."""
+    onsets = _onsets(107.5, 0.137, list(range(0, 400, 2)))
+
+    bpm, fase = ajustar(onsets, 108)
+
+    assert bpm == pytest.approx(107.5, abs=0.05)
+    # 2 ms é meio passo da busca de fase, e fica bem abaixo dos 3-10 ms de erro de
+    # onset do próprio transcritor (medido nas fixtures): refinar mais não compra nada.
+    assert residuo(onsets, bpm, fase) < 0.002
+
+
+def test_nao_mexe_no_que_ja_esta_certo() -> None:
+    """Fixtures são 90 BPM exatos ancorados em zero: o ajuste tem que ser inócuo."""
+    onsets = _onsets(90.0, 0.0, list(range(0, 64)))
+
+    bpm, fase = ajustar(onsets, 90)
+
+    assert bpm == pytest.approx(90.0, abs=0.05)
+    assert residuo(onsets, bpm, fase) < 0.002
+
+
+def test_nao_foge_da_estimativa_do_audio() -> None:
+    """O mix é a âncora: notas ruins não podem arrastar o andamento para o dobro."""
+    onsets = _onsets(180.0, 0.0, list(range(0, 200)))
+
+    bpm, _ = ajustar(onsets, 90)
+
+    assert 90 * 0.97 <= bpm <= 90 * 1.03
+
+
+def test_recusa_material_curto_demais() -> None:
+    """Com poucas notas qualquer grade serve: devolver a estimativa original."""
+    bpm, fase = ajustar([0.0, 0.5], 120)
+
+    assert (bpm, fase) == (120.0, 0.0)

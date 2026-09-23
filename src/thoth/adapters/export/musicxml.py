@@ -29,7 +29,7 @@ from thoth.services.rhythm import PPQ, eventos
 class MusicXmlExporter:
     """Implementa o `Exporter`. Round-trip verificado contra o próprio music21."""
 
-    bpm: int = 120
+    bpm: float = 120
     titulo: str = "Thoth"
 
     def export(self, notes: list[TabNote], out: Path, tuning: tuple[int, ...]) -> Path:
@@ -40,7 +40,7 @@ class MusicXmlExporter:
         parte.insert(0, instrument.ElectricBass())
         parte.insert(0, clef.Bass8vbClef())
         parte.insert(0, meter.TimeSignature("4/4"))
-        parte.insert(0, tempo.MetronomeMark(number=self.bpm))
+        parte.insert(0, tempo.MetronomeMark(number=round(self.bpm)))
 
         for inicio, duracao, tab in eventos(notes, self.bpm):
             n = note.Note(tab.event.pitch, quarterLength=duracao / PPQ)

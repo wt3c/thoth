@@ -61,14 +61,17 @@ def _decompor(ticks: int) -> list[tuple[int, bool]]:
 class Gp5Exporter:
     """Implementa o `Exporter`. Round-trip verificado contra o próprio PyGuitarPro."""
 
-    bpm: int = 120
+    bpm: float = 120
     titulo: str = "Thoth"
 
     def export(self, notes: list[TabNote], out: Path, tuning: tuple[int, ...]) -> Path:
         if not notes:
             raise ValueError("sem notas para exportar")
 
-        song = gp.Song(title=self.titulo, tempo=self.bpm)
+        # O GP5 só guarda andamento inteiro no cabeçalho, mas a quantização usa o
+        # fracionário: as posições ficam certas e só a reprodução corre ~0,5%
+        # fora. O inverso — quantizar no inteiro — desloca as notas (ADR-021).
+        song = gp.Song(title=self.titulo, tempo=round(self.bpm))
         song.tracks.clear()
         track = gp.Track(song, number=1, name="Baixo")
         # O GP numera as cordas da mais aguda para a mais grave; nós, o contrário.

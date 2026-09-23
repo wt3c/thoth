@@ -33,8 +33,8 @@ from thoth.services.cache_notas import gravar
 from thoth.services.fretboard import ViterbiFretAssigner, cabe_no_braco
 from thoth.services.nomes import nome_de_arquivo
 from thoth.services.octave_check import OctaveWarning, verificar_oitavas
-from thoth.services.rhythm import monofonizar
-from thoth.services.tempo import Andamento, estimar_andamento
+from thoth.services.rhythm import alinhar, monofonizar
+from thoth.services.tempo import Andamento, ajustar, estimar_andamento
 
 #: Os três nomes que o MuScriptor usa para baixo (`list-instruments`, v0.3.0).
 ROTULOS_DE_BAIXO = frozenset({"electric_bass", "acoustic_bass", "contrabass"})
@@ -52,7 +52,7 @@ class Resultado:
     descartadas: list[NoteEvent]
     fora_do_braco: list[NoteEvent]
     avisos_de_oitava: list[OctaveWarning]
-    bpm: int
+    bpm: float
     #: Preenchido só quando o andamento foi estimado — `None` quando veio de você.
     andamento: Andamento | None = None
 
@@ -84,10 +84,6 @@ def transcrever(
     if bpm is None:
         andamento = estimar_andamento(asset.wav)
         bpm = andamento.bpm
-    exporters = exporters or {
-        "gp5": Gp5Exporter(bpm=bpm),
-        "musicxml": MusicXmlExporter(bpm=bpm),
-    }
     stem = separator.separate(asset.wav, cache_dir / "stems" / asset.source_id)["bass"]
 
     todas = transcriber.transcribe(stem)
@@ -100,14 +96,28 @@ def transcrever(
         )
 
     no_braco = [n for n in baixo if cabe_no_braco(n.pitch, tuning)]
+
     fora = [n for n in baixo if not cabe_no_braco(n.pitch, tuning)]
-    mantidas, simultaneas = monofonizar(no_braco, bpm)
+    # O andamento estimado do mix é inteiro, e arredondar custa caro: 107,5 -> 108
+    # acumulam 3,5 s em 756 s de música (ADR-021). As notas transcritas refinam o
+    # número e, junto com ele, a fase da grade — os dois são acoplados, refinar só
+    # um piora. `bpm` que você informou não é refinado, só ancorado: faixa=0.
+    andamento_fino, fase = ajustar(
+        [n.onset_s for n in no_braco], bpm, faixa=None if andamento else 0.0
+    )
+    mantidas, simultaneas = monofonizar(no_braco, andamento_fino)
     descartadas = sorted(simultaneas + fora, key=lambda n: n.onset_s)
     avisos = verificar_oitavas(stem, mantidas)
     # A transcrição custa minutos de CPU e morria com o processo: os artefatos
     # guardam só o tempo já quantizado. Isto guarda o tempo absoluto.
     gravar(mantidas, cache_dir / asset.source_id / "notas.jsonl")
-    tabs = assigner.assign(mantidas, tuning)
+    # Só a partitura é deslocada: o cache guarda o tempo do áudio, e a
+    # auralização toca o MIDI contra o original — deslocar ali dessincronizaria.
+    tabs = assigner.assign(alinhar(mantidas, andamento_fino, fase), tuning)
+    exporters = exporters or {
+        "gp5": Gp5Exporter(bpm=andamento_fino),
+        "musicxml": MusicXmlExporter(bpm=andamento_fino),
+    }
 
     out_dir.mkdir(parents=True, exist_ok=True)
     artefatos = {
@@ -115,7 +125,7 @@ def transcrever(
         for formato, exportador in exporters.items()
     }
     return Resultado(
-        bpm=bpm,
+        bpm=andamento_fino,
         andamento=andamento,
         asset=asset,
         stem=stem,

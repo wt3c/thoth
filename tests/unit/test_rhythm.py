@@ -2,8 +2,10 @@
 
 from __future__ import annotations
 
+import pytest
+
 from thoth.domain.models import NoteEvent, TabNote
-from thoth.services.rhythm import eventos, monofonizar
+from thoth.services.rhythm import alinhar, eventos, monofonizar
 
 
 def _nota(pitch: int, onset: float) -> NoteEvent:
@@ -42,3 +44,30 @@ def test_monofonizar_devolve_saida_que_eventos_aceita() -> None:
     tabs = [TabNote(event=n, string=0, fret=n.pitch - 28) for n in mantidas]
 
     assert len(eventos(tabs, bpm=120)) == 2
+
+
+# --- Alinhamento à fase da grade (ADR-021) -----------------------------------
+
+
+def test_alinhar_desloca_onset_e_offset_juntos() -> None:
+    """Deslocar só o ataque esticaria a nota — a duração é a mesma música."""
+    (nota,) = alinhar([_nota(31, 1.0)], bpm=120, fase=0.1)
+
+    assert nota.onset_s == pytest.approx(0.9)
+    assert nota.offset_s == pytest.approx(1.3)
+
+
+def test_alinhar_nao_produz_tempo_negativo() -> None:
+    """A fase é uma grade inteira: adiantar para antes do zero é o mesmo retículo."""
+    grade = 60.0 / 120 / 4
+
+    (nota,) = alinhar([_nota(31, 0.02)], bpm=120, fase=0.1)
+
+    assert nota.onset_s >= 0
+    assert nota.onset_s == pytest.approx(0.02 - 0.1 + grade)
+
+
+def test_alinhar_sem_fase_e_inocuo() -> None:
+    notas = [_nota(31, 0.0), _nota(36, 1.0)]
+
+    assert alinhar(notas, bpm=120, fase=0.0) == notas
