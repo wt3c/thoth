@@ -12,7 +12,15 @@ from pathlib import Path
 import pytest
 
 from tests.sintetico import BPM, SOUNDFONT, renderizar
-from thoth.services.tempo import ajustar, dobrar_para_faixa, estimar_andamento, residuo
+from thoth.domain.models import NoteEvent
+from thoth.services.rhythm import monofonizar
+from thoth.services.tempo import (
+    ajustar,
+    desdobrar,
+    dobrar_para_faixa,
+    estimar_andamento,
+    residuo,
+)
 
 requer_soundfont = pytest.mark.skipif(not SOUNDFONT.exists(), reason="soundfont ausente")
 
@@ -105,3 +113,49 @@ def test_recusa_material_curto_demais() -> None:
     bpm, fase = ajustar([0.0, 0.5], 120)
 
     assert (bpm, fase) == (120.0, 0.0)
+
+
+# --- Desdobrar: a grade grosseira colapsa notas (ADR-024) ---------------------
+
+
+def _semicolcheias(bpm: float, quantas: int) -> list[float]:
+    passo = 60.0 / bpm / 4
+    return [i * passo for i in range(quantas)]
+
+
+def test_colisao_alta_desfaz_a_dobra() -> None:
+    """O caso medido: 64 semicolcheias a 170 BPM, dobradas para 85, colapsam em 33."""
+    onsets = _semicolcheias(170.0, 64)
+
+    assert desdobrar(onsets, 85.0) == pytest.approx(170.0)
+
+
+def test_grade_que_nao_colide_fica_como_esta() -> None:
+    """Colisão baixa não é prova de nada: na dúvida, o número estimado manda."""
+    onsets = [i * 60.0 / 120.0 for i in range(16)]  # semínimas a 120
+
+    assert desdobrar(onsets, 120.0) == 120.0
+
+
+def test_o_desdobramento_nao_foge_da_faixa_musical() -> None:
+    """Dobrar até não colidir mais levaria a andamento que instrumento nenhum toca."""
+    denso = [i * 0.005 for i in range(200)]  # 200 Hz de ataques: colide em tudo
+
+    assert desdobrar(denso, 90.0) <= 90.0 * 4
+
+
+def test_material_curto_nao_autoriza_desdobrar() -> None:
+    """Em 4 notas, uma colisão é 25% — a taxa é ruído, não sinal."""
+    assert desdobrar([0.0, 0.0, 1.0, 2.0], 90.0) == 90.0
+
+
+def test_desdobrar_salva_as_notas_que_a_dobra_descartava() -> None:
+    """Regressão de ponta: é o descarte que motivou o ADR-024, não a taxa."""
+    notas = [
+        NoteEvent(pitch=36 + i % 5, onset_s=t, offset_s=t + 0.05,
+                  instrument="electric_bass")
+        for i, t in enumerate(_semicolcheias(170.0, 64))
+    ]
+
+    assert len(monofonizar(notas, 85.0)[0]) == 33
+    assert len(monofonizar(notas, desdobrar([n.onset_s for n in notas], 85.0))[0]) == 64

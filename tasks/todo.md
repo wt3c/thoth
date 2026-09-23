@@ -250,3 +250,126 @@ global. O `.claude/` deste repositório é versionado aqui e não entra no insta
       `adapters/export/gp5.py` tratavam o BPM como obrigatório (ADR-019/021) e
       `domain/ports.py` chamava a separação de opcional (ADR-010). Achado pela
       revisão do Codex sobre o `AGENTS.md`.
+
+## Fase 8 — Análise conjunta Claude + Codex (2026-09-23)
+
+Revisão de projeto inteiro feita em paralelo por Claude Opus 5 e Codex `gpt-5.6-sol`,
+com os achados cruzados e verificados um a um contra o código. Ordem de execução
+abaixo é por impacto, com dependência declarada onde existe.
+
+**Decisão do usuário nesta rodada:** executar tudo, inclusive os itens de pesquisa
+(B2/B3/B7/B9), cada um com ADR e medição antes do código. A modelagem de A1 foi
+decidida na conversa: **decompor no exportador**, não partir o evento no pipeline.
+
+### Defeitos com correção definida
+
+- [x] **A1 — nota que cruza a barra é truncada, em GP5 e MusicXML.** (ADR-022)
+      `eventos()` devolve a duração real; o GP5 fatia nas barras e liga com
+      `NoteType.tie`, o MusicXML não precisou mudar — o `makeNotation` já ligava.
+      Censo do acervo: em Is It A Crime, 26,3% das notas saíam encurtadas e só
+      74,2% da duração soava. Verificado ponta a ponta nessa música: 778 ataques
+      para 778 notas de entrada, 215 compassos e nenhum fora de 4/4.
+- [x] **B6 — portão de quantização ponta a ponta.** (ADR-023)
+      `tests/integration/test_quantizacao_ponta_a_ponta.py`: referência sintética em
+      código (não em `cache/`, que é gitignorado) → rítmica → GP5 → releitura →
+      `avaliar`. 2,9 s, na suíte padrão. Conferido: com o `rhythm.py` antigo, 3 dos 5
+      testes reprovam.
+- [x] **A2 — dobrar o andamento para 70–160 descarta metade das notas.** (ADR-024)
+      `desdobrar()` em `tempo.py`, chamada entre transcrever e `ajustar`, só no caminho
+      estimado. Critério: colisão na grade acima de 10%, no máximo duas dobras. Medido:
+      colisão de 0,0–2,8% no BPM certo contra 20–37% na grade pela metade.
+      `Resultado.desdobrado` + linha na CLI. Limite declarado: música sem semicolcheia
+      (0,0–4,5%) não é resgatável — é limite do sinal.
+- [x] **A11 — `--bpm 0` colapsa a música em uma nota.** (ADR-025) `BPM_MINIMO/MAXIMO`
+      (20–300) em `tempo.py`, uma fonte para CLI, API e pipeline; `transcrever` valida
+      antes do download. `AFINACOES` na CLI com `typer.BadParameter` — nome fora do
+      catálogo não vira mais a afinação padrão calado (a chave virou nome no ADR-028).
+- [x] **A3 — piso do portão da separação era 0,682 e o ADR-010 mediu 0,968.**
+      (ADR-010, emenda 2026-09-23) `COM_SEPARACAO_NOTA_F1 = 0.968`, exato — o F1 é
+      discreto (~0,03 por nota em 16). O piso antigo fica com mensagem própria:
+      abaixo de 0,682 é o ADR desmentido, não regressão. Medido 2x: 0,968, margem
+      +0,000, `ref=16 est=15`.
+- [x] **A4 — cache do Demucs não pertencia ao modelo** que o produziu. (ADR-026)
+      `separate` procura em `out_dir / self.model`; os dois modelos convivem no mesmo
+      cache. Medido: stem de `mdx_extra` passava por `htdemucs_ft`.
+- [x] **A5 — nenhuma escrita de cache era atômica.** (ADR-026) `thoth/arquivos.py`
+      com `escrita_atomica` e `diretorio_atomico`, vizinhos do destino (o `/tmp` desta
+      estação é outro ponto de montagem). Quatro sítios: notas, WAV local, WAV do
+      YouTube, stems. Três testes vermelhos antes de verdes.
+- [x] **A7 — `stderr` dos subprocessos era descartado** nos 6 pontos. (ADR-026)
+      `thoth/processos.py` com `rodar` e `ErroDeProcesso`; cada módulo mantém o próprio
+      tipo de erro na fronteira. `FileNotFoundError` continua passando direto.
+- [x] **A6 — jobs concorrentes dividem arquivos**; dict `jobs` sem limite. ADR-027: execução serializada por `threading.Lock`, `status` nasce `na fila`, histórico com teto de 50 descartando os concluídos mais antigos — e nunca o que ainda não terminou. Teste de concorrência com threads reais, verificado vermelho (o segundo job entrava no pipeline com o primeiro dentro).
+- [x] **A9 — `pipeline.py` instancia adapters**; `AudioSource` não é injetável.
+      `transcrever(source=...)` como os outros quatro estágios: `source or resolver_fonte(ref)`.
+      Sem ele, todo teste do pipeline arrastava ffmpeg ou rede.
+- [x] **A10/B4 — `PADRAO` e `TUNING_BASS_DROP_D` existem e não têm porta de entrada.**
+      (ADR-028) Catálogos nomeados: `AFINACOES` (`4`/`5`/`drop-d`) em `models.py` e
+      `DIGITACOES` (`iniciante`/`experiente`) em `fretboard.py`. `--afinacao`/`--digitacao`
+      na CLI, campos no `Pedido`, dois `<select>` na página; `--cordas` sai (drop D tem
+      quatro cordas — contar cordas não a nomeia). O JS perdeu o `Number()`, e o
+      formulário ganhou teste de navegador que o dirige: `-m navegador` 3 passed.
+- [x] **A8 — `octave_check` ignora `offset_s`** e analisa 0,6 s fixos. (ADR-029)
+      `janela_s` virou teto: a janela é `min(teto, offset - onset)`. Teste vermelho
+      antes: nota de 0,3 s seguida de 30,9 Hz forte passava calada.
+- [x] **A12 — `octave_check` lê o stem inteiro na memória.** (ADR-029) `setpos` +
+      `readframes` por nota, arquivo aberto uma vez. Medido com `tracemalloc` em 30 s
+      de WAV: pico de 26,5 MB → menos de 2 MB.
+- [x] **B5 — nenhuma métrica de offset.** (ADR-023) `nota_offset_f1` e
+      `duracao_ratio` em `Scores`, informativas e fora de qualquer piso. Medido: com o
+      corte na barra ativo, as duas métricas antigas dão 1,000 com 3 de 13 notas
+      encurtadas.
+- [x] **B8 — oitava é diagnóstico, não sugestão.** (ADR-030) `pitch + 12` deixou de
+      ser afirmado: a mesma razão é medida para a candidata e a sugestão só sai quando
+      ela explica melhor — senão `suggested_pitch` é `None`. A comparação é entre as
+      duas razões, não um segundo corte pelo `limiar` (calibrado só na original). O
+      gatilho não mudou, então os portões com modelo real seguem valendo. Exposto na
+      CLI, no `_resumo` e na página; `inf` vira `null` (`Infinity` quebra o
+      `JSON.parse`). `-m navegador` 4 passed.
+
+### Pesquisa — ADR e medição antes do código
+
+- [x] **B9 — grafia sempre com sustenido.** (ADR-031) `services/tonalidade.py`:
+      estimativa via music21 com **margem contra a melhor interpretação de sinal
+      oposto** (o sinal é o que muda a grafia; relativas escrevem igual), teto 0,05.
+      Medido no acervo: 3 de 7 músicas são tom bemol (~476 notas mal escritas) e uma
+      é empate exato — o único caso recusado pela margem. Armadura errada imprime
+      mais acidente que armadura nenhuma (11 contra 9 em 12 notas), então abaixo da
+      margem nada muda. `--tom`/campo na página/`Pedido.tom`; exportadores com
+      `armadura`. `-m navegador` 5 passed.
+- [x] **B7 — digitação otimiza posição, não técnica.** (ADR-032) O estado do
+      Viterbi virou `(corda, traste, mão)`: o deslocamento é cobrado contra o
+      último traste **pisado**, e mão ainda não posicionada não paga nada. O
+      `3 → 0 → 15` do enunciado não reproduz — a emissão limita o braço ao traste
+      ≤10, e o pior salto escondido medido é 8. No acervo (7924 notas): experiente
+      27 → 8 saltos acima de 4 trastes (os 8 restantes são genuínos, lidos um a um),
+      iniciante 19 → 17 (o `acima_da_janela` já prendia a mão). Posição muda em
+      0,28% das notas; custo de tempo abaixo do ruído. Sem peso novo em `Custos`.
+      A leitura ampla de "técnica" (articulação, dinâmica) é o B3.
+- [x] **B3 — nada de dinâmica nem articulação.** (ADR-033) **Resultado negativo:
+      pesquisa feita, nenhum código.** As três hipóteses foram medidas e as três
+      falham. Articulação é impossível: `offset_s` é preenchimento — provado contra
+      fixture de duração conhecida (notas de 0,45 s com 0,10 s de silêncio voltaram
+      contíguas) e 83%–99,7% de lacuna zero no acervo. Dinâmica não existe na saída
+      do modelo (velocidade 120 contra 40 descartada) e, do áudio, é IQR de 2,4–5,6 dB
+      sem rótulo para calibrar corte. Deslize: o discriminador dispara igual ou mais
+      no controle (pares com silêncio, que não podem ser deslize). Reabre com
+      tablatura de referência (Camada 3, ADR-007). O achado sobre `offset_s` foi
+      para `NoteEvent.duration_s`, `tonalidade.py` e uma emenda ao ADR-022.
+- [x] **B2 — representação rítmica estreita.** ADR-034. **Resultado negativo:
+      pesquisa feita, nenhum código.** A premissa do item caiu: a semicolcheia ganha
+      da tercina e das duas grades de swing nas sete músicas (10,4–30,8 ms contra
+      27,2–58,6 e 23,9–88,4), e a fusa quase não melhora (0,1–2,9 ms em quatro) — o
+      resíduo é jitter de ataque do transcritor, não erro de quantização, então
+      **grade mais fina não reabre o item**. Tercina some contra controle interno em
+      seis das sete. Andamento variável é real em 1 de 7 (degrau 103,0 → ~105), e a
+      medida barata acusaria primeiro a música errada: limiar de n=1, reprovado no
+      mesmo piso do ADR-033.
+
+### Verificado e descartado
+
+- A suíte **não** trava: `-n auto` 174 passed em 16,1 s, `-n 0` 174 passed em 29,3 s.
+  O travamento que o Codex relatou é do sandbox dele.
+- MusicXML com `Bass8vb` e sem `<transpose>` **não** é defeito: o round-trip devolve
+  C2 / MIDI 36, correto, e a posição na pauta é a usual do baixo.
+- `astype(np.float64)` em `_ler_mono` **não** é redundante — o buffer vem `<i2`.

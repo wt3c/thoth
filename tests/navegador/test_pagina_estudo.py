@@ -21,8 +21,17 @@ import pytest
 from tests.navegador.cdp import CHROMIUM, avaliar
 from thoth.adapters.export.gp5 import Gp5Exporter
 from thoth.api.app import WEB_PADRAO, criar_app
-from thoth.domain.models import TUNING_BASS_4, AudioAsset, NoteEvent, TabNote
+from thoth.domain.models import (
+    TUNING_BASS_4,
+    TUNING_BASS_DROP_D,
+    AudioAsset,
+    NoteEvent,
+    TabNote,
+)
+from thoth.services.fretboard import PADRAO
+from thoth.services.octave_check import OctaveWarning
 from thoth.services.pipeline import Resultado
+from thoth.services.tonalidade import tom_de_texto
 
 pytestmark = [
     pytest.mark.navegador,
@@ -35,9 +44,17 @@ pytestmark = [
 
 BPM = 90
 
+#: O que o executor recebeu, para conferir o que o formulário mandou. Limpo pela
+#: fixture a cada teste.
+RECEBIDOS: list[dict[str, object]] = []
 
-def _partitura_real(out_dir: Path, **_: object) -> Resultado:
+#: O que o executor vai devolver como aviso de oitava. O teste enche antes de postar.
+AVISOS: list[OctaveWarning] = []
+
+
+def _partitura_real(out_dir: Path, **kw: object) -> Resultado:
     """Executor de mentira, artefato de verdade: o alphaTab precisa de um GP5 legítimo."""
+    RECEBIDOS.append(kw)
     out_dir.mkdir(parents=True, exist_ok=True)
     notas = [
         TabNote(
@@ -60,13 +77,17 @@ def _partitura_real(out_dir: Path, **_: object) -> Resultado:
         rotulos={"electric_bass": len(notas)},
         descartadas=[],
         fora_do_braco=[],
-        avisos_de_oitava=[],
+        avisos_de_oitava=list(AVISOS),
+        tonalidade=tom_de_texto(str(kw["tom"])) if kw.get("tom") else None,
     )
 
 
 @pytest.fixture
 def servidor(tmp_path: Path) -> Iterator[str]:
     import uvicorn
+
+    RECEBIDOS.clear()
+    AVISOS.clear()
 
     with socket.socket() as s:
         s.bind(("127.0.0.1", 0))
@@ -125,3 +146,76 @@ def test_job_inexistente_nao_deixa_a_pagina_girando(servidor: str) -> None:
         espera_s=6,
     )
     assert "não encontrado" in estado["estado"]
+
+
+def test_o_formulario_manda_afinacao_e_digitacao_por_nome(servidor: str) -> None:
+    """O único caminho que exercita o JS do formulário (ADR-028).
+
+    O teste acima posta o job por HTTP e passa por cima da página: um `Number()`
+    sobre "drop-d" viraria `NaN`, o servidor devolveria 422 e a suíte inteira
+    continuaria verde.
+    """
+    estado = avaliar(
+        f"{servidor}/",
+        """(async () => {
+             document.getElementById('ref').value = 'x.wav';
+             document.getElementById('afinacao').value = 'drop-d';
+             document.getElementById('digitacao').value = 'experiente';
+             document.getElementById('enviar').click();
+             for (let i = 0; i < 100; i++) {
+               const jobs = await (await fetch('/jobs')).json();
+               if (jobs.length && jobs[0].status !== 'na fila') return jobs[0];
+               await new Promise(r => setTimeout(r, 100));
+             }
+             return {status: 'nenhum job criado'};
+           })()""",
+        espera_s=6,
+    )
+
+    assert estado["status"] == "pronto", estado
+    assert RECEBIDOS and RECEBIDOS[0]["tuning"] == TUNING_BASS_DROP_D
+    assert RECEBIDOS[0]["assigner"].custos is PADRAO
+
+
+def test_a_pagina_mostra_a_alternativa_do_aviso_de_oitava(servidor: str) -> None:
+    """O número sozinho não diz o que conferir, e `sugestao` pode ser `null` (ADR-030)."""
+    nota = NoteEvent(pitch=23, onset_s=1.25, offset_s=1.8, instrument="electric_bass")
+    AVISOS.extend([OctaveWarning(nota, 35, 0.12, 3.0), OctaveWarning(nota, None, 0.33, 0.12)])
+
+    ident = httpx.post(
+        f"{servidor}/jobs", json={"ref": "x.wav", "bpm": BPM}, timeout=10
+    ).json()["id"]
+    estado = avaliar(
+        f"{servidor}/?job={ident}",
+        "({texto: document.getElementById('estado').innerText})",
+        espera_s=10,
+    )
+
+    assert "23@1.25s → 35" in estado["texto"], estado
+    assert "sem alternativa" in estado["texto"], estado
+
+
+def test_o_formulario_manda_o_tom_e_a_pagina_relata_a_grafia(servidor: str) -> None:
+    """Campo de tom e relato da grafia — o único caminho que exercita os dois (ADR-031)."""
+    estado = avaliar(
+        f"{servidor}/",
+        """(async () => {
+             document.getElementById('ref').value = 'x.wav';
+             document.getElementById('tom').value = 'f menor';
+             document.getElementById('enviar').click();
+             for (let i = 0; i < 100; i++) {
+               const jobs = await (await fetch('/jobs')).json();
+               if (jobs.length && jobs[0].status === 'pronto') {
+                 await new Promise(r => setTimeout(r, 300));
+                 return {tom: jobs[0].tom, texto: document.getElementById('estado').innerText};
+               }
+               await new Promise(r => setTimeout(r, 100));
+             }
+             return {tom: null, texto: 'nenhum job pronto'};
+           })()""",
+        espera_s=8,
+    )
+
+    assert RECEBIDOS and RECEBIDOS[0]["tom"] == "f menor"
+    assert estado["tom"] == {"nome": "f minor", "armadura": -4, "margem": None}
+    assert "f minor" in estado["texto"], estado

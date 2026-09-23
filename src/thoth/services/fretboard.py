@@ -9,6 +9,10 @@ frase tem. O custo se divide em dois:
 - **transição** — quanto custa *chegar* nela vindo da anterior (deslocar a mão,
   atravessar cordas).
 
+A posição da mão faz parte do estado, não da nota (ADR-032): corda solta não
+move a mão nem a apaga, então o deslocamento da nota seguinte é medido contra o
+último traste **pisado**, não contra o traste 0 que acabou de soar.
+
 O "modo iniciante" do ADR-006 não é um modo à parte: é outro peso. Ele compra
 tocabilidade (primeira posição, cordas soltas) pagando em deslocamento — o
 oposto do que um baixista experiente escolheria.
@@ -17,11 +21,14 @@ oposto do que um baixista experiente escolheria.
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from itertools import pairwise
 from typing import TYPE_CHECKING
 
 from thoth.domain.models import NoteEvent, TabNote
 from thoth.domain.ports import FretAssigner
+
+#: Estado do Viterbi: corda, traste e a posição da mão — o último traste pisado,
+#: `None` enquanto a mão ainda não foi colocada no braço (ADR-032).
+_Estado = tuple[int, int, int | None]
 
 
 class AlturaImpossivelError(ValueError):
@@ -64,6 +71,11 @@ PADRAO = Custos(traste_alto=0.3, corda_solta=1.0, deslocamento=0.6, troca_corda=
 INICIANTE = Custos(traste_alto=1.2, corda_solta=3.0, deslocamento=1.5, troca_corda=0.3,
                    acima_da_janela=2.0)
 
+#: Os dois perfis com porta de entrada, por nome (ADR-028). **`INICIANTE` é o
+#: default** do `ViterbiFretAssigner`, apesar de `PADRAO` se chamar assim: o
+#: ADR-006 escolheu quem está aprendendo. `PADRAO` é o perfil do experiente.
+DIGITACOES: dict[str, Custos] = {"iniciante": INICIANTE, "experiente": PADRAO}
+
 
 def _posicoes(pitch: int, tuning: tuple[int, ...], max_fret: int) -> list[tuple[int, int]]:
     return [
@@ -94,14 +106,16 @@ class ViterbiFretAssigner:
         custo += self.custos.acima_da_janela * max(0, fret - PRIMEIRA_POSICAO)
         return custo - (self.custos.corda_solta if fret == 0 else 0.0)
 
-    def _transicao(self, de: tuple[int, int], para: tuple[int, int]) -> float:
-        corda_a, traste_a = de
+    def _transicao(self, de: _Estado, para: tuple[int, int]) -> float:
+        corda_a, _, mao = de
         corda_b, traste_b = para
         custo = self.custos.troca_corda * abs(corda_b - corda_a)
         # Corda solta não move a mão: ela fica onde estava, e a nota seguinte
-        # parte dali. Cobrar deslocamento contra o traste 0 inventaria um salto.
-        if traste_a and traste_b:
-            custo += self.custos.deslocamento * abs(traste_b - traste_a)
+        # parte dali (ADR-032). Mão `None` é mão ainda não posicionada — antes
+        # do primeiro traste pisado há o tempo do mundo para colocá-la, e cobrar
+        # a distância contra a pestana inventaria um salto que não existe.
+        if traste_b and mao is not None:
+            custo += self.custos.deslocamento * abs(traste_b - mao)
         return custo
 
     def assign(
@@ -121,7 +135,7 @@ class ViterbiFretAssigner:
         # vizinhas no tempo. O `FretAssigner` não exige entrada ordenada.
         notes = sorted(notes, key=lambda n: (n.onset_s, n.pitch))
 
-        estados: list[list[tuple[int, int]]] = []
+        opcoes_por_nota: list[list[tuple[int, int]]] = []
         for nota in notes:
             opcoes = _posicoes(nota.pitch, tuning, max_fret)
             if not opcoes:
@@ -129,24 +143,32 @@ class ViterbiFretAssigner:
                     f"pitch {nota.pitch} em {nota.onset_s:.2f}s não cabe na afinação "
                     f"{tuning} até o traste {max_fret}"
                 )
-            estados.append(opcoes)
+            opcoes_por_nota.append(opcoes)
 
-        # Viterbi: melhor custo até cada estado, com ponteiro para a origem.
-        custo = [self._emissao(f) for _, f in estados[0]]
+        # Viterbi: melhor custo até cada estado, com ponteiro para a origem. O
+        # estado carrega a posição da mão, e é ela que faz o número de estados
+        # não explodir ao longo da linha: nota pisada colapsa a mão no próprio
+        # traste, então as mãos só ramificam dentro de uma corrida de cordas
+        # soltas consecutivas — no máximo tantas quantas a última nota pisada
+        # tinha opções (ADR-032).
+        estados: list[list[_Estado]] = [
+            [(corda, fret, fret or None) for corda, fret in opcoes_por_nota[0]]
+        ]
+        custo = [self._emissao(f) for _, f, _ in estados[0]]
         origem: list[list[int]] = []
-        for anterior, atual in pairwise(estados):
-            melhor: list[float] = []
-            de_onde: list[int] = []
-            for posicao in atual:
-                alcances = [
-                    c + self._transicao(p, posicao)
-                    for c, p in zip(custo, anterior, strict=True)
-                ]
-                i = min(range(len(alcances)), key=alcances.__getitem__)
-                melhor.append(alcances[i] + self._emissao(posicao[1]))
-                de_onde.append(i)
-            custo = melhor
-            origem.append(de_onde)
+        for opcoes in opcoes_por_nota[1:]:
+            melhor: dict[_Estado, tuple[float, int]] = {}
+            for posicao in opcoes:
+                corda_b, traste_b = posicao
+                for i, anterior in enumerate(estados[-1]):
+                    chegada = custo[i] + self._transicao(anterior, posicao)
+                    chegada += self._emissao(traste_b)
+                    chave = (corda_b, traste_b, traste_b or anterior[2])
+                    if chave not in melhor or chegada < melhor[chave][0]:
+                        melhor[chave] = (chegada, i)
+            estados.append(list(melhor))
+            custo = [melhor[k][0] for k in estados[-1]]
+            origem.append([melhor[k][1] for k in estados[-1]])
 
         i = min(range(len(custo)), key=custo.__getitem__)
         caminho = [i]
@@ -156,8 +178,8 @@ class ViterbiFretAssigner:
         caminho.reverse()
 
         return [
-            TabNote(event=nota, string=opcoes[i][0], fret=opcoes[i][1])
-            for nota, opcoes, i in zip(notes, estados, caminho, strict=True)
+            TabNote(event=nota, string=passo[i][0], fret=passo[i][1])
+            for nota, passo, i in zip(notes, estados, caminho, strict=True)
         ]
 
 

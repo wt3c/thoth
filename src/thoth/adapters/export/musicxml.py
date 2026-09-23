@@ -17,7 +17,17 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import TYPE_CHECKING
 
-from music21 import articulations, clef, instrument, meter, note, stream, tempo
+from music21 import (
+    articulations,
+    clef,
+    instrument,
+    key,
+    metadata,
+    meter,
+    note,
+    stream,
+    tempo,
+)
 
 from thoth.domain.models import TabNote
 from thoth.domain.ports import Exporter
@@ -31,6 +41,11 @@ class MusicXmlExporter:
 
     bpm: float = 120
     titulo: str = "Thoth"
+    """Título impresso na partitura. O default é marca d'água de quem não informou:
+    quem transcreve uma música tem o nome dela, e o pipeline passa o do `AudioAsset`."""
+    armadura: int | None = None
+    """Armadura estimada, ou `None` — que é o que a partitura tinha até o ADR-031.
+    Armadura errada é pior que armadura nenhuma, então quem estima decide antes."""
 
     def export(self, notes: list[TabNote], out: Path, tuning: tuple[int, ...]) -> Path:
         if not notes:
@@ -40,11 +55,13 @@ class MusicXmlExporter:
         parte.insert(0, instrument.ElectricBass())
         parte.insert(0, clef.Bass8vbClef())
         parte.insert(0, meter.TimeSignature("4/4"))
+        if self.armadura is not None:
+            parte.insert(0, key.KeySignature(self.armadura))
         parte.insert(0, tempo.MetronomeMark(number=round(self.bpm)))
 
         for inicio, duracao, tab in eventos(notes, self.bpm):
             n = note.Note(tab.event.pitch, quarterLength=duracao / PPQ)
-            n.lyric = nome_da_nota(tab.event.pitch)
+            n.lyric = nome_da_nota(tab.event.pitch, bemois=(self.armadura or 0) < 0)
             n.articulations = [
                 # MusicXML numera as cordas como o GP: 1 = mais aguda.
                 articulations.StringIndication(len(tuning) - tab.string),
@@ -54,7 +71,9 @@ class MusicXmlExporter:
 
         score = stream.Score()
         score.insert(0, parte)
-        score.metadata = None
+        # Sem `Metadata` explícita o music21 imprime a partitura anônima. Era o que
+        # acontecia: o nome da música chegava ao nome do arquivo e não ao papel.
+        score.insert(0, metadata.Metadata(title=self.titulo))
         pronto = score.makeNotation()
 
         out.parent.mkdir(parents=True, exist_ok=True)

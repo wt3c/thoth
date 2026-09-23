@@ -13,6 +13,7 @@ import subprocess
 from pathlib import Path
 from urllib.parse import parse_qs, urlparse
 
+from thoth.arquivos import escrita_atomica
 from thoth.domain.models import AudioAsset
 
 SAMPLE_RATE = 44_100
@@ -54,9 +55,13 @@ class YtDlpSource:
         if wav.exists() and meta.exists():
             dados = json.loads(meta.read_text())
         else:
+            # Atômicos (ADR-026): download interrompido deixava WAV pela metade
+            # que o teste de cache — `existe?` — aceitaria na próxima execução.
             destino.mkdir(parents=True, exist_ok=True)
-            dados = self._baixar(ref, wav)
-            meta.write_text(json.dumps(dados, ensure_ascii=False))
+            with escrita_atomica(wav) as parcial:
+                dados = self._baixar(ref, parcial)
+            with escrita_atomica(meta) as parcial:
+                parcial.write_text(json.dumps(dados, ensure_ascii=False))
 
         return AudioAsset(
             wav=wav,

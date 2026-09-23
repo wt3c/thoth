@@ -17,7 +17,6 @@ Decisões da Fase 0 embutidas aqui:
 from __future__ import annotations
 
 import json
-import subprocess
 import tempfile
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -25,6 +24,7 @@ from typing import TYPE_CHECKING
 
 from thoth.domain.models import NoteEvent
 from thoth.domain.ports import Transcriber
+from thoth.processos import rodar
 
 #: Duração atribuída a nota cujo evento `end` não veio (truncamento no fim do áudio).
 _DURACAO_ORFA_S = 0.1
@@ -81,7 +81,7 @@ class MuscriptorTranscriber:
     def transcribe(self, audio: Path, instrument: str | None = None) -> list[NoteEvent]:
         with tempfile.TemporaryDirectory() as tmp:
             saida = Path(tmp) / "notas.jsonl"
-            subprocess.run(self._comando(audio, saida), check=True, capture_output=True)
+            rodar(self._comando(audio, saida))
             return parse_jsonl(saida.read_text(), instrument)
 
 

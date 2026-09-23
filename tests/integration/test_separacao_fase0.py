@@ -28,11 +28,20 @@ from thoth.adapters.transcription.muscriptor import MuscriptorTranscriber
 from thoth.domain.models import NoteEvent
 from thoth.services.evaluation import Scores, avaliar, notas_do_midi
 
-#: Medido em `test_regressao_fase0.py`, `small`, sem separação. É o piso que a
-#: separação precisa pelo menos empatar: se ficar abaixo, quem está errado é o
-#: ADR-010, e o lugar de descobrir isso é aqui — não na tablatura da música real.
+#: Medido em `test_regressao_fase0.py`, `small`, sem separação. Não é piso: é a
+#: referência do que a separação compra. Se a separação cair abaixo disto, quem
+#: está errado é o ADR-010 — e o lugar de descobrir isso é aqui.
 SEM_SEPARACAO_NOTA_F1 = 0.682
 SEM_SEPARACAO_ONSET_F1 = 0.938
+#: O piso de verdade: o valor que a separação **mediu** (ADR-010, emenda de
+#: 2026-09-23). Com 0,682 no lugar, o portão passava com a separação perdendo
+#: quatro notas de dezesseis e não dizia nada.
+#:
+#: Exato, sem folga, porque o F1 aqui é discreto: 16 notas de referência fazem a
+#: menor diferença possível valer ~0,03. Não existe flutuação menor que isso para
+#: uma folga absorver — o que houver é nota ganha ou perdida, e é para saber disso
+#: que o portão existe.
+COM_SEPARACAO_NOTA_F1 = 0.968
 
 pytestmark = [
     pytest.mark.slow,
@@ -57,11 +66,17 @@ def test_separar_antes_de_transcrever_nao_piora_o_misto(tmp_path: Path) -> None:
     com: Scores = avaliar(referencia, _transcrever(stem))
 
     print(f"\nmisto com separação: onset {com.onset_f1} nota {com.note_f1} "
-          f"(sem separação: onset {SEM_SEPARACAO_ONSET_F1} nota {SEM_SEPARACAO_NOTA_F1}) "
-          f"ref={com.n_ref} est={com.n_est}")
+          f"(piso {COM_SEPARACAO_NOTA_F1}; sem separação: onset {SEM_SEPARACAO_ONSET_F1} "
+          f"nota {SEM_SEPARACAO_NOTA_F1}) ref={com.n_ref} est={com.n_est} "
+          f"margem={com.note_f1 - COM_SEPARACAO_NOTA_F1:+.3f}")
 
     assert com.note_f1 >= SEM_SEPARACAO_NOTA_F1, (
         f"separar piorou o misto: {com.note_f1} < {SEM_SEPARACAO_NOTA_F1} — "
         "o ADR-010 precisa ser reaberto, não o piso afrouxado"
+    )
+    assert com.note_f1 >= COM_SEPARACAO_NOTA_F1, (
+        f"a separação regrediu: {com.note_f1} < {COM_SEPARACAO_NOTA_F1} medido no "
+        "ADR-010. Ainda é melhor que não separar, e é justamente por isso que o "
+        "piso de 0,682 deixava passar"
     )
     assert com.onset_f1 >= SEM_SEPARACAO_ONSET_F1

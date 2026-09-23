@@ -43,3 +43,27 @@ def test_uma_linha_por_nota(tmp_path: Path) -> None:
 def test_arquivo_ausente_e_erro_claro(tmp_path: Path) -> None:
     with pytest.raises(FileNotFoundError):
         ler(tmp_path / "nao-existe.jsonl")
+
+
+def test_falha_no_meio_da_escrita_nao_estraga_o_cache_anterior(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Disco cheio no meio do `write_text` trunca o arquivo, e truncado é o pior
+    estado possível: o cache aceita, e as notas do fim somem sem aviso (ADR-026)."""
+    destino = tmp_path / "notas.jsonl"
+    gravar([NoteEvent(pitch=40, onset_s=0.0, offset_s=0.5, instrument="electric_bass")], destino)
+    antes = destino.read_text()
+
+    def morre_no_meio(self: Path, texto: str, *args: object, **kwargs: object) -> int:
+        self.write_bytes(texto[: len(texto) // 2].encode())
+        raise OSError("disco cheio")
+
+    monkeypatch.setattr(Path, "write_text", morre_no_meio)
+    with pytest.raises(OSError, match="disco cheio"):
+        gravar(
+            [NoteEvent(pitch=45, onset_s=1.0, offset_s=1.5, instrument="electric_bass")], destino
+        )
+    monkeypatch.undo()
+
+    assert destino.read_text() == antes
+    assert list(tmp_path.iterdir()) == [destino]

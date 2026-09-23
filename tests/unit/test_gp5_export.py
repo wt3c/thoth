@@ -124,7 +124,7 @@ def test_notas_simultaneas_sao_recusadas(tmp_path: Path) -> None:
 
 def test_escreve_o_nome_da_nota_no_beat(tmp_path: Path) -> None:
     """O nome viaja como texto do beat: é o que o Guitar Pro e o alphaTab mostram."""
-    song = _exportar(_tabs([28, 34, 36]), tmp_path)
+    song = _exportar(_tabs([28, 34, 36]), tmp_path, bpm=BPM)
 
     textos = [
         beat.text
@@ -137,7 +137,7 @@ def test_escreve_o_nome_da_nota_no_beat(tmp_path: Path) -> None:
 
 def test_pausa_nao_recebe_texto(tmp_path: Path) -> None:
     """Texto em pausa apareceria como rótulo solto no meio do compasso."""
-    song = _exportar(_tabs([28], passo=SEMINIMA * 4), tmp_path)
+    song = _exportar(_tabs([28], passo=SEMINIMA * 4), tmp_path, bpm=BPM)
 
     assert all(
         beat.text is None
@@ -155,3 +155,100 @@ def test_cada_nota_ocupa_um_beat_proprio(tmp_path: Path) -> None:
     beats = song.tracks[0].measures[0].voices[0].beats
     assert [len(beat.notes) for beat in beats] == [1, 1, 1, 1]
     assert all(beat.status is gp.BeatStatus.normal for beat in beats)
+
+
+# --- Ligadura através da barra (ADR-022) -------------------------------------
+
+
+def _atravessando_a_barra(tmp_path: Path) -> gp.Song:
+    """Uma nota no 'quatro e', sustentada 1,5 semínima: entra no compasso seguinte."""
+    nota = NoteEvent(pitch=36, onset_s=SEMINIMA * 3.5, offset_s=SEMINIMA * 5.0,
+                     instrument="electric_bass")
+    tabs = ViterbiFretAssigner().assign([nota], TUNING_BASS_4)
+    return _exportar(tabs, tmp_path, bpm=BPM)
+
+
+def test_nota_atravessa_a_barra_como_ligadura(tmp_path: Path) -> None:
+    """Cortar na barra trocava sustentação por ataque curto — o groove muda."""
+    song = _atravessando_a_barra(tmp_path)
+    medidas = song.tracks[0].measures
+
+    assert len(medidas) == 2
+    tipos = [
+        nota.type
+        for medida in medidas
+        for beat in medida.voices[0].beats
+        for nota in beat.notes
+    ]
+    assert tipos == [gp.NoteType.normal, gp.NoteType.tie]
+
+
+def test_a_ligadura_preserva_a_duracao_somada(tmp_path: Path) -> None:
+    """A soma é o que o leitor toca: 1,5 semínima, não a maior figura que coube."""
+    song = _atravessando_a_barra(tmp_path)
+
+    tocado = sum(
+        beat.duration.time
+        for medida in song.tracks[0].measures
+        for beat in medida.voices[0].beats
+        if beat.notes
+    )
+    assert tocado == gp.Duration.quarterTime * 3 // 2
+
+
+def test_cada_compasso_continua_fechando_em_quatro_tempos(tmp_path: Path) -> None:
+    """Ligadura que estoura o compasso produz arquivo que o leitor realinha sozinho."""
+    song = _atravessando_a_barra(tmp_path)
+
+    for medida in song.tracks[0].measures:
+        assert sum(beat.duration.time for beat in medida.voices[0].beats) == (
+            gp.Duration.quarterTime * 4
+        )
+
+
+def test_nota_longa_dentro_do_compasso_liga_em_vez_de_virar_pausa(tmp_path: Path) -> None:
+    """Meia semínima sobrando virava pausa: a nota soava mais curta do que é."""
+    nota = NoteEvent(pitch=36, onset_s=0.0, offset_s=SEMINIMA * 3.5,
+                     instrument="electric_bass")
+    song = _exportar(ViterbiFretAssigner().assign([nota], TUNING_BASS_4), tmp_path, bpm=BPM)
+
+    beats = song.tracks[0].measures[0].voices[0].beats
+    com_nota = [beat for beat in beats if beat.notes]
+    assert [nota.type for beat in com_nota for nota in beat.notes] == [
+        gp.NoteType.normal,
+        gp.NoteType.tie,
+    ]
+    assert sum(beat.duration.time for beat in com_nota) == gp.Duration.quarterTime * 7 // 2
+
+
+def test_a_ligadura_nao_repete_o_nome_da_nota(tmp_path: Path) -> None:
+    """Nome repetido na continuação se lê como outro ataque — é o oposto de ligar."""
+    song = _atravessando_a_barra(tmp_path)
+
+    textos = [
+        beat.text
+        for medida in song.tracks[0].measures
+        for beat in medida.voices[0].beats
+        if beat.notes
+    ]
+    assert textos == ["C", None]
+
+
+def test_em_tom_bemol_o_texto_do_beat_sai_bemol(tmp_path: Path) -> None:
+    """A armadura não existe no GP5 do Thoth; o nome do beat é onde o tom aparece."""
+    song = _exportar(_tabs([28, 34, 36]), tmp_path, bpm=BPM, armadura=-4)
+
+    textos = [
+        beat.text
+        for medida in song.tracks[0].measures
+        for beat in medida.voices[0].beats
+        if beat.notes
+    ]
+    assert textos == ["E", "Bb", "C"]
+
+
+def test_o_titulo_da_musica_vai_no_arquivo(tmp_path: Path) -> None:
+    """O GP5 já tinha o campo; quem não o preenchia era o pipeline."""
+    song = _exportar(_tabs([36, 38]), tmp_path, titulo="Smooth Operator")
+
+    assert song.title == "Smooth Operator"

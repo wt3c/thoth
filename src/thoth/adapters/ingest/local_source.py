@@ -4,10 +4,11 @@ from __future__ import annotations
 
 import hashlib
 import json
-import subprocess
 from pathlib import Path
 
+from thoth.arquivos import escrita_atomica
 from thoth.domain.models import AudioAsset
+from thoth.processos import rodar
 
 SAMPLE_RATE = 44_100
 CHANNELS = 2
@@ -24,13 +25,10 @@ def _hash_do_conteudo(arquivo: Path) -> str:
 
 
 def _duracao_s(arquivo: Path) -> float:
-    saida = subprocess.run(
+    saida = rodar(
         ["ffprobe", "-v", "error", "-show_entries", "format=duration",
-         "-of", "json", str(arquivo)],
-        check=True,
-        capture_output=True,
-        text=True,
-    ).stdout
+         "-of", "json", str(arquivo)]
+    )
     return float(json.loads(saida)["format"]["duration"])
 
 
@@ -46,13 +44,14 @@ class LocalFileSource:
         destino = cache_dir / source_id / "mix.wav"
 
         if not destino.exists():
-            destino.parent.mkdir(parents=True, exist_ok=True)
-            subprocess.run(
-                ["ffmpeg", "-y", "-i", str(origem),
-                 "-ar", str(SAMPLE_RATE), "-ac", str(CHANNELS),
-                 "-loglevel", "error", str(destino)],
-                check=True,
-            )
+            # Atômico (ADR-026): o teste de cache é `existe?`, então WAV truncado
+            # por conversão interrompida seria reaproveitado para sempre.
+            with escrita_atomica(destino) as parcial:
+                rodar(
+                    ["ffmpeg", "-y", "-i", str(origem),
+                     "-ar", str(SAMPLE_RATE), "-ac", str(CHANNELS),
+                     "-loglevel", "error", str(parcial)]
+                )
 
         return AudioAsset(
             wav=destino,

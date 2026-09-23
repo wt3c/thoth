@@ -19,7 +19,6 @@ Duas escolhas que parecem detalhe e não são:
 
 from __future__ import annotations
 
-import subprocess
 import tempfile
 from pathlib import Path
 
@@ -28,6 +27,7 @@ import pretty_midi
 import soundfile as sf
 
 from thoth.domain.models import NoteEvent
+from thoth.processos import ErroDeProcesso, rodar
 
 BAIXO_GM = 33  # Electric Bass (finger)
 SOUNDFONT = Path("/usr/share/soundfonts/FluidR3_GM.sf2")
@@ -55,13 +55,14 @@ def _renderizar(mid: Path, destino: Path) -> Path:
     if not SOUNDFONT.exists():
         raise AuralizacaoError(f"soundfont ausente: {SOUNDFONT}")
     try:
-        subprocess.run(
+        rodar(
             ["fluidsynth", "-ni", "-q", "-F", str(destino), "-r", str(TAXA),
-             str(SOUNDFONT), str(mid)],
-            check=True, capture_output=True,
+             str(SOUNDFONT), str(mid)]
         )
     except FileNotFoundError as erro:  # pragma: no cover — depende do SO
         raise AuralizacaoError("fluidsynth não encontrado") from erro
+    except ErroDeProcesso as erro:
+        raise AuralizacaoError(str(erro)) from erro
     return destino
 
 
@@ -149,9 +150,11 @@ def auralizar(original: Path, notas: list[NoteEvent], destino: Path) -> Path:
             f"aresample={TAXA},apad,volume={g_dir:.6f}[dir];"
             "[esq][dir]join=inputs=2:channel_layout=stereo[saida]"
         )
-        subprocess.run(
-            ["ffmpeg", "-y", "-loglevel", "error", "-i", str(original), "-i", str(rendido),
-             "-filter_complex", filtro, "-map", "[saida]", "-shortest", str(destino)],
-            check=True,
-        )
+        try:
+            rodar(
+                ["ffmpeg", "-y", "-loglevel", "error", "-i", str(original), "-i", str(rendido),
+                 "-filter_complex", filtro, "-map", "[saida]", "-shortest", str(destino)]
+            )
+        except ErroDeProcesso as erro:
+            raise AuralizacaoError(str(erro)) from erro
     return destino

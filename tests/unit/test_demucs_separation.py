@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import subprocess
 import wave
 from pathlib import Path
 
@@ -10,6 +9,7 @@ import pytest
 
 from tests.sintetico import SOUNDFONT, renderizar
 from thoth.adapters.separation import DemucsSeparator, localizar_stems
+from thoth.processos import ErroDeProcesso
 
 
 def _toca(caminho: Path) -> Path:
@@ -57,7 +57,7 @@ def test_separar_reaproveita_stem_existente(tmp_path: Path) -> None:
 
 
 def test_separar_propaga_falha_do_demucs(tmp_path: Path) -> None:
-    with pytest.raises(subprocess.CalledProcessError):
+    with pytest.raises(ErroDeProcesso):
         DemucsSeparator(binary=("false",)).separate(Path("a.wav"), tmp_path)
 
 
@@ -73,3 +73,48 @@ def test_stem_real_sai_em_pcm_16_bits(tmp_path: Path) -> None:
     with wave.open(str(stems["bass"])) as f:
         assert f.getsampwidth() == 2
         assert f.getframerate() == 44100
+
+
+def test_stem_de_outro_modelo_nao_conta_como_cache(tmp_path: Path) -> None:
+    """O modelo está no caminho e a varredura o ignorava: `mdx_extra` passava por
+    `htdemucs_ft`, e a diferença entre os dois é justamente o que o ADR-010 mede."""
+    _toca(tmp_path / "mdx_extra" / "x" / "bass.wav")
+    # `true` não separa nada: se o stem alheio fosse aceito, ninguém notaria.
+    with pytest.raises(FileNotFoundError, match=r"bass\.wav"):
+        DemucsSeparator(binary=("true",)).separate(Path("a.wav"), tmp_path)
+
+
+def test_cada_modelo_tem_o_proprio_cache(tmp_path: Path) -> None:
+    """Trocar de modelo não pode exigir apagar o cache na mão."""
+    _toca(tmp_path / "htdemucs_ft" / "x" / "bass.wav")
+    _toca(tmp_path / "mdx_extra" / "x" / "bass.wav")
+
+    for modelo in ("htdemucs_ft", "mdx_extra"):
+        achado = DemucsSeparator(model=modelo, binary=("false",)).separate(Path("a.wav"), tmp_path)
+        assert achado["bass"].parent.parent.name == modelo
+
+
+def test_demucs_morto_no_meio_nao_deixa_stem_pela_metade(tmp_path: Path) -> None:
+    """O demucs escreve `no_bass.wav` antes de `bass.wav`: morrer entre os dois
+    deixava meio stem no cache, e `--two-stems` nunca mais seria refeito inteiro."""
+    # `$8` é o `-o` do comando montado por `_comando`; `$0` é o nome do programa.
+    finge = ("sh", "-c", 'mkdir -p "$8/htdemucs_ft/x" && : > "$8/htdemucs_ft/x/no_bass.wav"'
+             " && exit 3", "demucs")
+
+    with pytest.raises(ErroDeProcesso):
+        DemucsSeparator(binary=finge).separate(Path("a.wav"), tmp_path)
+
+    assert list(tmp_path.rglob("*.wav")) == []
+
+
+def test_o_stem_fica_no_lugar_documentado(tmp_path: Path) -> None:
+    """A promoção do diretório provisório não pode aninhar o modelo duas vezes:
+    `<out>/<modelo>/<nome>/bass.wav` é o caminho que o docstring promete."""
+    # Imita o demucs: escreve sob `<-o>/<modelo>/<nome do arquivo>/`. `$8` é o `-o`.
+    finge = ("sh", "-c", 'mkdir -p "$8/htdemucs_ft/a" && : > "$8/htdemucs_ft/a/bass.wav"'
+             ' && : > "$8/htdemucs_ft/a/no_bass.wav"', "demucs")
+
+    achado = DemucsSeparator(binary=finge).separate(Path("a.wav"), tmp_path)
+
+    assert achado["bass"] == tmp_path / "htdemucs_ft" / "a" / "bass.wav"
+    assert sorted(achado) == ["bass", "no_bass"]

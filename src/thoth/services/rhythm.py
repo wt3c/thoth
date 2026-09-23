@@ -92,7 +92,12 @@ def monofonizar(
 
 
 def eventos(notes: Sequence[TabNote], bpm: float) -> list[tuple[int, int, TabNote]]:
-    """`(início, duração, nota)` em ticks, sem sobreposição e sem cruzar a barra.
+    """`(início, duração, nota)` em ticks, sem sobreposição.
+
+    A duração sai **inteira**, ainda que atravesse a barra: quem decide como
+    representar a continuação é o exportador, com ligadura (ADR-022). Cortar
+    aqui trocava legato por ataque curto seguido de pausa, e o exportador nunca
+    chegava a ver o que deveria ligar.
 
     Recusa notas simultâneas: a tablatura é monofônica (ADR-012) e empilhá-las
     produziria posição impossível de tocar.
@@ -108,8 +113,9 @@ def eventos(notes: Sequence[TabNote], bpm: float) -> list[tuple[int, int, TabNot
 
     saida = []
     for i, (inicio, tab) in enumerate(zip(inicios, ordenadas, strict=True)):
-        proxima = inicios[i + 1] if i + 1 < len(inicios) else COMPASSO * (inicio // COMPASSO + 1)
-        ate_a_barra = COMPASSO * (inicio // COMPASSO + 1)
-        fim = min(para_ticks(tab.event.offset_s, bpm), proxima, ate_a_barra)
+        # A última nota não tem quem a corte: vale a duração que ela tem mesmo.
+        fim = para_ticks(tab.event.offset_s, bpm)
+        if i + 1 < len(inicios):
+            fim = min(fim, inicios[i + 1])
         saida.append((inicio, max(GRADE, fim - inicio), tab))
     return saida

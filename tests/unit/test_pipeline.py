@@ -8,13 +8,13 @@ caminho completo com os dois de verdade está marcado `slow` no fim do arquivo.
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 
 import pytest
 
 from tests.sintetico import SOUNDFONT, renderizar
-from thoth.domain.models import TUNING_BASS_5, NoteEvent
+from thoth.domain.models import TUNING_BASS_5, AudioAsset, NoteEvent
 from thoth.services.cache_notas import ler
 from thoth.services.pipeline import ROTULOS_DE_BAIXO, transcrever
 
@@ -62,6 +62,25 @@ def test_gera_os_dois_artefatos_nomeados_pelo_titulo(tmp_path: Path) -> None:
     assert set(resultado.artefatos) == {"gp5", "musicxml"}
     for caminho in resultado.artefatos.values():
         assert caminho.exists() and caminho.stem == resultado.asset.title
+
+
+@requer_soundfont
+def test_o_titulo_da_musica_entra_dentro_da_partitura(tmp_path: Path) -> None:
+    """Nome de arquivo certo escondeu isto: dentro saía "Thoth" nas duas.
+
+    O `asset.title` já alimentava `nome_de_arquivo`; faltava chegar aos
+    exportadores, que ficavam no título default.
+    """
+    import guitarpro as gp
+    from music21 import converter
+
+    resultado = _rodar(tmp_path, (_nota(36, 0.0), _nota(38, 0.7)))
+    titulo = resultado.asset.title
+
+    assert gp.parse(str(resultado.artefatos["gp5"])).title == titulo
+    xml = resultado.artefatos["musicxml"]
+    assert f"<work-title>{titulo}</work-title>" in xml.read_text()
+    assert converter.parse(str(xml)).metadata.bestTitle == titulo
 
 
 @requer_soundfont
@@ -133,3 +152,109 @@ def test_guarda_as_notas_no_cache_da_fonte(tmp_path: Path) -> None:
     # auralização precisa comparar com o original.
     assert [n.pitch for n in guardadas] == [36, 38]
     assert len(guardadas) == resultado.notas
+
+
+# --- Desdobrar a faixa musical (ADR-024) --------------------------------------
+
+
+def _semicolcheias_rapidas(bpm: float, quantas: int = 16) -> tuple[NoteEvent, ...]:
+    """Ataques na semicolcheia de `bpm`: colidem em qualquer grade mais lenta."""
+    passo = 60.0 / bpm / 4
+    return tuple(_nota(36 + i % 5, i * passo) for i in range(quantas))
+
+
+@requer_soundfont
+def test_bpm_informado_nao_e_desdobrado(tmp_path: Path) -> None:
+    """ADR-019: o número que você deu manda, mesmo colidindo. Só a fase é ajustada."""
+    resultado = _rodar(tmp_path, _semicolcheias_rapidas(360.0))
+
+    assert resultado.desdobrado is False
+    assert resultado.bpm == 90
+
+
+@requer_soundfont
+def test_andamento_estimado_e_desdobrado_quando_as_notas_colidem(tmp_path: Path) -> None:
+    """A fixture pulsa a 90; as notas, a 360. A grade de 90 colapsaria os ataques."""
+    wav, _ = renderizar("escala", tmp_path)
+    resultado = transcrever(
+        str(wav), tmp_path / "out", bpm=None, cache_dir=tmp_path / "cache",
+        separator=SeparadorFalso(), transcriber=TranscritorFalso(_semicolcheias_rapidas(360.0)),
+    )
+
+    assert resultado.desdobrado is True
+    # O estimador lê 89 ou 90 neste render; o que importa é que ficou perto de 90.
+    assert resultado.andamento is not None
+    assert resultado.andamento.bpm == pytest.approx(90, abs=2)
+    assert resultado.bpm >= 180
+    # O que motivou o ADR-024: nenhuma nota perdida para colisão na grade.
+    assert resultado.notas == 16
+
+
+# --- BPM fora de faixa não chega à grade (ADR-025) ---------------------------
+
+
+@pytest.mark.parametrize("bpm", [0, -120, 5, 1000])
+def test_bpm_fora_de_faixa_e_erro_antes_de_qualquer_processamento(
+    bpm: int, tmp_path: Path
+) -> None:
+    """A CLI valida, mas quem usa o pipeline como biblioteca também merece o erro."""
+    with pytest.raises(ValueError, match="BPM"):
+        transcrever("x.mp3", tmp_path, bpm=bpm)
+
+
+@dataclass(frozen=True, slots=True)
+class FonteFalsa:
+    """Áudio já em disco, sem ffmpeg nem yt-dlp: a ingestão tem teste próprio."""
+
+    wav: Path
+
+    def fetch(self, ref: str, cache_dir: Path) -> AudioAsset:
+        self.vistos.append((ref, cache_dir))
+        return AudioAsset(wav=self.wav, source_id="fonte-falsa", title="Título Injetado")
+
+    #: `frozen` não impede mutar o conteúdo de uma lista; é onde o espião anota.
+    vistos: list[tuple[str, Path]] = field(default_factory=list)
+
+
+@requer_soundfont
+def test_a_fonte_de_audio_entra_injetada_como_os_outros_estagios(tmp_path: Path) -> None:
+    """Sem isto, todo teste do pipeline passava obrigatoriamente pela ingestão real."""
+    wav, _ = renderizar("escala", tmp_path)
+    fonte = FonteFalsa(wav)
+
+    resultado = transcrever(
+        "nem caminho nem URL",
+        tmp_path / "out",
+        bpm=90,
+        cache_dir=tmp_path / "cache",
+        source=fonte,
+        separator=SeparadorFalso(),
+        transcriber=TranscritorFalso((_nota(36, 0.0), _nota(38, 0.7))),
+    )
+
+    assert fonte.vistos == [("nem caminho nem URL", tmp_path / "cache")]
+    assert resultado.asset.title == "Título Injetado"
+    assert resultado.artefatos["gp5"].stem == "Título Injetado"
+
+
+@requer_soundfont
+def test_o_tom_informado_chega_a_armadura_da_partitura(tmp_path: Path) -> None:
+    """Tom informado manda, como o `--bpm` manda sobre o andamento (ADR-019/031)."""
+    from music21 import converter, key
+
+    resultado = _rodar(tmp_path, (_nota(34, 0.0), _nota(36, 0.7)), tom="f menor")
+
+    assert resultado.tonalidade is not None
+    assert resultado.tonalidade.armadura == -4 and resultado.tonalidade.margem is None
+    lido = converter.parse(str(resultado.artefatos["musicxml"]))
+    assert [k.sharps for k in lido.recurse().getElementsByClass(key.KeySignature)] == [-4]
+    assert "Bb" in [n.lyric for n in lido.recurse().notes]
+
+
+@requer_soundfont
+def test_sem_tom_informado_o_pipeline_estima_e_relata(tmp_path: Path) -> None:
+    """Estimar em silêncio é que não pode: o tom volta no `Resultado`."""
+    resultado = _rodar(tmp_path, tuple(_nota(p, i * 0.7) for i, p in enumerate([29, 32, 34, 36])))
+
+    assert resultado.tonalidade is not None
+    assert resultado.tonalidade.margem is not None, "estimativa passa pela margem"

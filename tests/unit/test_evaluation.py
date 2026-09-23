@@ -23,7 +23,7 @@ REFERENCIA = [_nota(36, 0.0), _nota(38, 0.5), _nota(40, 1.0), _nota(41, 1.5)]
 
 
 def test_identico_pontua_um() -> None:
-    assert avaliar(REFERENCIA, list(REFERENCIA)) == Scores(1.0, 1.0, 4, 4)
+    assert avaliar(REFERENCIA, list(REFERENCIA)) == Scores(1.0, 1.0, 4, 4, 1.0, 1.0)
 
 
 def test_desvio_dentro_da_tolerancia_ainda_acerta() -> None:
@@ -44,7 +44,7 @@ def test_oitava_errada_mantem_onset_e_derruba_nota() -> None:
 
 
 def test_estimativa_vazia_pontua_zero_sem_estourar() -> None:
-    assert avaliar(REFERENCIA, []) == Scores(0.0, 0.0, 4, 0)
+    assert avaliar(REFERENCIA, []) == Scores(0.0, 0.0, 4, 0, 0.0, None)
 
 
 def test_nota_de_duracao_nula_nao_quebra_o_avaliador() -> None:
@@ -73,3 +73,39 @@ def test_notas_do_midi_le_apenas_o_baixo(tmp_path) -> None:
     notas = notas_do_midi(caminho)
 
     assert [n.pitch for n in notas] == [31, 36]  # ordenado por onset, sem o piano
+
+
+# --- Duração: a régua que faltava (ADR-023) ----------------------------------
+
+
+def test_identico_acerta_a_duracao_tambem() -> None:
+    resultado = avaliar(REFERENCIA, list(REFERENCIA))
+    assert resultado.nota_offset_f1 == 1.0
+    assert resultado.duracao_ratio == 1.0
+
+
+def test_duracao_pela_metade_passa_nas_duas_metricas_antigas() -> None:
+    """Exatamente o defeito que o ADR-022 corrigiu: invisível para onset e nota."""
+    curtas = [_nota(n.pitch, n.onset_s, dur=0.2) for n in REFERENCIA]
+    resultado = avaliar(REFERENCIA, curtas)
+
+    assert resultado.onset_f1 == 1.0
+    assert resultado.note_f1 == 1.0
+    assert resultado.nota_offset_f1 == 0.0
+    assert resultado.duracao_ratio == 0.5
+
+
+def test_duracao_dentro_da_tolerancia_de_offset_ainda_acerta() -> None:
+    """`offset_ratio=0.2` é o padrão do mir_eval: 10% a mais continua a mesma nota."""
+    longas = [_nota(n.pitch, n.onset_s, dur=0.44) for n in REFERENCIA]
+    resultado = avaliar(REFERENCIA, longas)
+
+    assert resultado.nota_offset_f1 == 1.0
+    assert resultado.duracao_ratio == 1.1
+
+
+def test_sem_nota_casada_a_duracao_nao_tem_o_que_medir() -> None:
+    """`None`, não zero: zero se leria como 'todas as durações saíram nulas'."""
+    assert avaliar(REFERENCIA, []).duracao_ratio is None
+    deslocada = [_nota(n.pitch, n.onset_s + 0.09) for n in REFERENCIA]
+    assert avaliar(REFERENCIA, deslocada).duracao_ratio is None

@@ -16,6 +16,11 @@ notas erradas conhecidas e sinaliza 11 de 127 notas concordantes (8,7%), das
 quais 6 estão em `pitch <= 28` — registro em que a fundamental é fisicamente
 fraca, então lá o alarme é esperado.
 
+A oitava acima é **ranqueada, não afirmada** (ADR-030): a mesma razão é medida para
+`pitch + 12`, e a sugestão só sai quando ela explica o áudio melhor que a altura
+transcrita. Quando nenhuma das duas se sustenta, o aviso sai sem alternativa — que é
+a informação honesta, e não um palpite com cara de correção.
+
 Isto **sinaliza para conferência**, não corrige: gravação com corte de graves
 pode atenuar uma fundamental legítima, e o próprio B0 de um baixo real irradia
 pouco em 30,9 Hz. A saída é uma lista curta para a Camada 3 conferir contra
@@ -38,26 +43,34 @@ _LARGURA = 2 ** (1 / 24)
 
 @dataclass(frozen=True, slots=True)
 class OctaveWarning:
-    """Nota cuja fundamental não aparece no áudio, com a oitava sugerida."""
+    """Nota cuja fundamental não aparece no áudio, com a alternativa ranqueada."""
 
     event: NoteEvent
-    suggested_pitch: int
+    suggested_pitch: int | None
+    """`pitch + 12` quando a oitava acima explica o áudio melhor; `None` quando nenhuma
+    das duas se sustenta — aí o aviso é diagnóstico puro (ADR-030)."""
     fundamental_ratio: float
     """Energia em `f0` dividida pela do 2º harmônico. Quanto menor, mais suspeita."""
+    suggested_ratio: float
+    """A mesma conta para `pitch + 12`, cuja fundamental é o 2º harmônico desta nota."""
 
 
 def _frequencia(pitch: int) -> float:
     return 440.0 * 2 ** ((pitch - 69) / 12)
 
 
-def _ler_mono(wav: Path) -> tuple[np.ndarray, int]:
-    with wave.open(str(wav)) as w:
-        if w.getsampwidth() != 2:
-            raise ValueError(f"esperado WAV PCM 16 bits, veio {w.getsampwidth() * 8} bits")
-        quadros = np.frombuffer(w.readframes(w.getnframes()), dtype="<i2")
-        canais, taxa = w.getnchannels(), w.getframerate()
-    amostras = quadros.reshape(-1, canais).mean(axis=1) if canais > 1 else quadros
-    return amostras.astype(np.float64) / 32768.0, taxa
+def _trecho_mono(w: wave.Wave_read, inicio: int, quadros: int) -> np.ndarray:
+    """Só os quadros pedidos, em mono, `float64` em -1..1.
+
+    Lê por posição em vez do arquivo inteiro: um stem de 16 min em `float64` são
+    centenas de MB para analisar meio segundo de cada nota (ADR-029).
+    """
+    w.setpos(inicio)
+    # `astype` não é redundante: o buffer vem `<i2` e a média inteira truncaria.
+    amostras = np.frombuffer(w.readframes(quadros), dtype="<i2")
+    canais = w.getnchannels()
+    misturado = amostras.reshape(-1, canais).mean(axis=1) if canais > 1 else amostras
+    return misturado.astype(np.float64) / 32768.0
 
 
 def _pico_na_banda(espectro: np.ndarray, frequencias: np.ndarray, f: float) -> float:
@@ -74,29 +87,46 @@ def verificar_oitavas(
 ) -> list[OctaveWarning]:
     """Devolve as notas cuja fundamental não se sustenta acima do piso de ruído.
 
-    `janela_s` de 0,6 s dá ~1,7 Hz de resolução — o suficiente para separar
-    30,9 Hz de 61,7 Hz, as duas hipóteses do caso medido na Fase 0. `limiar` é a
-    razão `f0 / 2·f0` abaixo da qual a nota é suspeita; ver o módulo para a
-    calibração.
+    `janela_s` é o **teto** da janela: a análise para no `offset_s` da nota, para
+    não medir o vizinho (ADR-029). O teto de 0,6 s dá ~1,7 Hz de resolução — o
+    suficiente para separar 30,9 Hz de 61,7 Hz, as duas hipóteses do caso medido
+    na Fase 0; nota de 0,2 s dá 5 Hz, que ainda separa as duas. Abaixo de 50 ms a
+    função não opina. `limiar` é a razão `f0 / 2·f0` abaixo da qual a nota é
+    suspeita; ver o módulo para a calibração.
     """
     if not notes:
         return []
 
-    sinal, taxa = _ler_mono(wav)
     avisos = []
-    for nota in notes:
-        inicio = int(nota.onset_s * taxa)
-        trecho = sinal[inicio : inicio + int(janela_s * taxa)]
-        if len(trecho) < taxa // 20:  # menos de 50 ms: não dá resolução, não opina
-            continue
+    with wave.open(str(wav)) as w:
+        if w.getsampwidth() != 2:
+            raise ValueError(f"esperado WAV PCM 16 bits, veio {w.getsampwidth() * 8} bits")
+        taxa, total = w.getframerate(), w.getnframes()
+        for nota in notes:
+            inicio = int(nota.onset_s * taxa)
+            # A janela para no fim da nota: 0,6 s fixos invadiam a nota seguinte, e a
+            # fundamental do vizinho fazia a nota errada passar por certa (ADR-029).
+            duracao = min(janela_s, max(0.0, nota.offset_s - nota.onset_s))
+            quadros = min(int(duracao * taxa), max(0, total - inicio))
+            if quadros < taxa // 20:  # menos de 50 ms: não dá resolução, não opina
+                continue
 
-        espectro = np.abs(np.fft.rfft(trecho * np.hanning(len(trecho))))
-        frequencias = np.fft.rfftfreq(len(trecho), 1 / taxa)
-        f0 = _frequencia(nota.pitch)
-        fundamental = _pico_na_banda(espectro, frequencias, f0)
-        segundo_harmonico = _pico_na_banda(espectro, frequencias, f0 * 2)
+            trecho = _trecho_mono(w, inicio, quadros)
+            espectro = np.abs(np.fft.rfft(trecho * np.hanning(len(trecho))))
+            frequencias = np.fft.rfftfreq(len(trecho), 1 / taxa)
+            f0 = _frequencia(nota.pitch)
+            fundamental = _pico_na_banda(espectro, frequencias, f0)
+            segundo_harmonico = _pico_na_banda(espectro, frequencias, f0 * 2)
+            quarto_harmonico = _pico_na_banda(espectro, frequencias, f0 * 4)
 
-        razao = fundamental / segundo_harmonico if segundo_harmonico else float("inf")
-        if razao < limiar:
-            avisos.append(OctaveWarning(nota, nota.pitch + 12, razao))
+            razao = fundamental / segundo_harmonico if segundo_harmonico else float("inf")
+            if razao >= limiar:
+                continue
+            # A mesma conta uma oitava acima: a fundamental de `pitch + 12` é o 2º
+            # harmônico desta nota, e o 2º harmônico dela é o 4º desta. Ranquear em
+            # vez de afirmar — e comparar as duas razões, não passar `limiar` de novo
+            # numa população para a qual ele não foi calibrado (ADR-030).
+            candidata = segundo_harmonico / quarto_harmonico if quarto_harmonico else float("inf")
+            melhor = nota.pitch + 12 if candidata > razao else None
+            avisos.append(OctaveWarning(nota, melhor, razao, candidata))
     return avisos

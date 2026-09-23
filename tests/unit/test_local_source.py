@@ -74,3 +74,22 @@ def test_duracao_detectada(mp3_de_teste: Path, tmp_path: Path) -> None:
 def test_arquivo_inexistente_falha_claro(tmp_path: Path) -> None:
     with pytest.raises(FileNotFoundError, match="não encontrado"):
         LocalFileSource().fetch(str(tmp_path / "nao_existe.mp3"), tmp_path / "cache")
+
+
+def test_ffmpeg_morto_no_meio_nao_deixa_mix_pela_metade(
+    mp3_de_teste: Path, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """WAV truncado no cache é aceito para sempre — nada reconverte o que existe."""
+    from thoth.adapters.ingest import local_source
+
+    def morre_depois_de_criar(comando: list[str], **kwargs: object) -> str:
+        Path(comando[-1]).write_bytes(b"RIFF pela metade")
+        raise RuntimeError("ffmpeg morreu")
+
+    monkeypatch.setattr(local_source, "rodar", morre_depois_de_criar)
+    with pytest.raises(RuntimeError, match="ffmpeg morreu"):
+        LocalFileSource().fetch(str(mp3_de_teste), tmp_path)
+    monkeypatch.undo()
+
+    restos = list(tmp_path.rglob("*.wav"))
+    assert restos == [], f"sobrou no cache: {restos}"

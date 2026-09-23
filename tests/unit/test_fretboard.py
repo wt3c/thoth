@@ -22,6 +22,7 @@ from thoth.services.fretboard import (
     PADRAO,
     PRIMEIRA_POSICAO,
     AlturaImpossivelError,
+    Custos,
     ViterbiFretAssigner,
 )
 
@@ -167,3 +168,31 @@ def test_entrada_fora_de_ordem_e_posicionada_pelo_tempo() -> None:
     tabs = ViterbiFretAssigner().assign(fora_de_ordem, TUNING_BASS_4)
 
     assert [t.event.pitch for t in tabs] == [36, 48]
+
+
+def test_a_corda_solta_nao_apaga_a_posicao_da_mao() -> None:
+    """ADR-032: a mão fica onde estava; a nota depois da solta parte dali.
+
+    Perfil experiente, onde o teleporte disparava: o `acima_da_janela` do
+    iniciante já prende a mão no grave e esconde o defeito.
+
+    G3 (52) só é barato no traste 9; depois da corda solta, E2 (40) cabe no
+    traste 2 (longe da mão) ou no 7 (do lado dela). Antes do ADR-032 a solta
+    zerava a conta e o 2 saía de graça.
+    """
+    assert _posicoes([52, 28, 40], custos=PADRAO) == [(3, 9), (0, 0), (1, 7)]
+
+
+def test_a_primeira_nota_solta_nao_ancora_a_mao_na_pestana() -> None:
+    """Mão ainda não posicionada não paga deslocamento — nem contra o traste 0.
+
+    Pesos escolhidos para isolar o termo: sem `traste_alto`, só o deslocamento
+    ordena as opções. Ancorar a mão na pestana na abertura da linha jogaria E2
+    (40) para o traste 2; com a mão indefinida, ela vai para onde a troca de
+    corda é de graça.
+    """
+    so_deslocamento = Custos(
+        traste_alto=0.0, corda_solta=1.0, deslocamento=1.0, troca_corda=0.5,
+        acima_da_janela=0.0,
+    )
+    assert _posicoes([28, 40], custos=so_deslocamento) == [(0, 0), (0, 12)]

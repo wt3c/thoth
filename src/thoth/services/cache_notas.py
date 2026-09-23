@@ -14,26 +14,31 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
+from thoth.arquivos import escrita_atomica
 from thoth.domain.models import NoteEvent
 
 
 def gravar(notas: list[NoteEvent], destino: Path) -> Path:
-    """Grava as notas, criando o diretório se ele ainda não existir."""
-    destino.parent.mkdir(parents=True, exist_ok=True)
-    destino.write_text(
-        "".join(
-            json.dumps(
-                {
-                    "pitch": n.pitch,
-                    "onset_s": n.onset_s,
-                    "offset_s": n.offset_s,
-                    "instrument": n.instrument,
-                }
+    """Grava as notas, criando o diretório se ele ainda não existir.
+
+    Escrita atômica (ADR-026): JSONL truncado no meio é aceito pela leitura sem
+    reclamar, e as notas do fim simplesmente não existem mais.
+    """
+    with escrita_atomica(destino) as parcial:
+        parcial.write_text(
+            "".join(
+                json.dumps(
+                    {
+                        "pitch": n.pitch,
+                        "onset_s": n.onset_s,
+                        "offset_s": n.offset_s,
+                        "instrument": n.instrument,
+                    }
+                )
+                + "\n"
+                for n in notas
             )
-            + "\n"
-            for n in notas
         )
-    )
     return destino
 
 

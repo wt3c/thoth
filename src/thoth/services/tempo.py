@@ -16,10 +16,18 @@ import librosa
 import numpy as np
 import numpy.typing as npt
 
+from thoth.services.rhythm import para_ticks
+
 # Faixa musical usual. Serve para desfazer o erro de dobro/metade, que é o modo
 # de falha clássico de todo estimador de andamento.
 _MIN, _MAX = 70.0, 160.0
+#: Faixa do que se aceita como andamento *informado*, larga de propósito: fora dela
+#: não há música, há erro de digitação. É mais ampla que a faixa musical acima, que
+#: serve para desfazer dobro/metade de uma estimativa, não para recusar um pedido.
+BPM_MINIMO, BPM_MAXIMO = 20, 300
 _TOLERANCIA = 0.05
+# Abaixo disto a taxa de colisão é ruído: numa música de 4 notas, uma colisão é 25%.
+_MINIMO_DE_NOTAS = 8
 
 
 @dataclass(frozen=True, slots=True)
@@ -40,6 +48,49 @@ def dobrar_para_faixa(bpm: float) -> float:
     while bpm >= _MAX:
         bpm /= 2
     return bpm
+
+
+# Acima disto a grade é grosseira demais para o material. Medido nas sete músicas do
+# acervo: no BPM certo a colisão fica entre 0,0 e 2,8%; na grade pela metade, de 20 a 37%
+# nos casos em que há semicolcheia. 10% está longe dos dois lados.
+_LIMIAR_DE_COLISAO = 0.10
+# Teto do desdobramento. Sem ele, gravação com ataques muito densos (trêmolo, ruído
+# de transcrição) seria dobrada até um andamento que instrumento nenhum toca.
+_DOBRAS_MAXIMAS = 2
+
+
+def colisao_na_grade(onsets: Sequence[float], bpm: float) -> float:
+    """Fração dos ataques que caem no mesmo tick de semicolcheia que outro.
+
+    É a medida de "a grade é grosseira demais para este material". Vale num
+    sentido só: colisão alta prova grade grossa; colisão baixa não prova nada —
+    música sem semicolcheia não colide nem num andamento errado pela metade.
+    """
+    ticks = [para_ticks(t, bpm) for t in onsets]
+    return (len(ticks) - len(set(ticks))) / len(ticks)
+
+
+def desdobrar(onsets: Sequence[float], bpm: float) -> float:
+    """Desfaz a dobra de `dobrar_para_faixa` quando as notas mostram que ela errou.
+
+    `dobrar_para_faixa` decide antes de existir nota alguma — o andamento é
+    estimado do mix, e a transcrição só vem depois da separação. Uma música a 170
+    BPM sai dobrada para 85, e aí a semicolcheia da grade tem o dobro da duração:
+    ataques distintos caem no mesmo tick e `monofonizar` os descarta. Medido: 64
+    notas viram 33.
+
+    Dobrar de volta é assimétrico de propósito. Grade mais fina nunca colide
+    mais, então "menos colisão" escolheria sempre o candidato mais rápido; o que
+    autoriza dobrar é a colisão estar **alta**, não o dobro estar melhor
+    (ADR-024).
+    """
+    if bpm <= 0 or len(onsets) < _MINIMO_DE_NOTAS:
+        return float(bpm)
+    for _ in range(_DOBRAS_MAXIMAS):
+        if colisao_na_grade(onsets, bpm) <= _LIMIAR_DE_COLISAO:
+            break
+        bpm *= 2
+    return float(bpm)
 
 
 def _primeiro(valor: npt.ArrayLike) -> float:
@@ -67,7 +118,6 @@ def estimar_andamento(wav: Path) -> Andamento:
 # notas transcritas refinam o andamento, não o escolhem — transcrição ruim
 # arrastaria o resultado para o dobro ou a metade se a busca fosse livre.
 _FAIXA = 0.03
-_MINIMO_DE_NOTAS = 8
 _PASSOS_BPM = 400
 _PASSOS_FASE = 120
 

@@ -11,20 +11,25 @@ dependências e quebra com `ModuleNotFoundError: numpy` sem ele.
 
 from __future__ import annotations
 
-import subprocess
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import TYPE_CHECKING
 
+from thoth.arquivos import diretorio_atomico
 from thoth.domain.ports import Separator
+from thoth.processos import rodar
 
 
 def localizar_stems(out_dir: Path) -> dict[str, Path]:
-    """Acha os stems por varredura, não reconstruindo o caminho.
+    """Acha os stems por varredura sob `out_dir`, não reconstruindo o caminho.
 
     O demucs aninha a saída em `<out>/<modelo>/<nome do arquivo>/`, e o nome do
-    arquivo aqui é o `source_id` — um SHA-256. Procurar é mais barato e mais
-    honesto do que remontar essa convenção.
+    arquivo aqui é o `source_id` — um SHA-256. Procurar o arquivo é mais barato e
+    mais honesto do que remontar essa convenção.
+
+    **Quem chama decide o escopo.** `separate` passa `<out>/<modelo>`, porque
+    stem de outro modelo não é cache deste (ADR-026): a diferença entre dois
+    separadores é exatamente o que o ADR-010 mede.
     """
     encontrados = {
         caminho.stem: caminho
@@ -57,11 +62,27 @@ class DemucsSeparator:
     def separate(self, audio: Path, out_dir: Path) -> dict[str, Path]:
         """Separa, ou devolve o que já está separado — a conta é de ~88s por 30s."""
         out_dir.mkdir(parents=True, exist_ok=True)
+        # O demucs já escreve sob `<out>/<modelo>/`; procurar aí em vez de em
+        # `<out>` é o que faz o cache pertencer ao modelo que o produziu.
+        meu = out_dir / self.model
         try:
-            return localizar_stems(out_dir)
+            return localizar_stems(meu)
         except FileNotFoundError:
-            subprocess.run(self._comando(audio, out_dir), check=True, capture_output=True)
-        return localizar_stems(out_dir)
+            pass
+        # Atômico (ADR-026): o demucs escreve `no_bass.wav` antes de `bass.wav`, e
+        # morrer entre os dois deixava meio stem de pé no cache.
+        with diretorio_atomico(meu) as parcial:
+            rodar(self._comando(audio, parcial))
+            # O demucs aninha por modelo. O diretório promovido é o de dentro, para
+            # que o resultado não fique em `<out>/<modelo>/<modelo>/`.
+            # Ausente quando o demucs termina sem produzir nada: quem reclama disso
+            # com mensagem boa é `localizar_stems`, logo abaixo.
+            produzido = parcial / self.model
+            if produzido.is_dir():
+                for item in produzido.iterdir():
+                    item.rename(parcial / item.name)
+                produzido.rmdir()
+        return localizar_stems(meu)
 
 
 if TYPE_CHECKING:  # pragma: no cover — trava a assinatura contra o Protocol

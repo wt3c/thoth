@@ -9,7 +9,7 @@ from __future__ import annotations
 from pathlib import Path
 
 import pytest
-from music21 import articulations, clef, converter, note, tempo
+from music21 import articulations, clef, converter, key, note, tempo
 
 from thoth.adapters.export.musicxml import MusicXmlExporter
 from thoth.domain.models import TUNING_BASS_4, NoteEvent, TabNote
@@ -120,3 +120,72 @@ def test_escreve_o_nome_da_nota_sob_a_pauta(tmp_path: Path) -> None:
 
     lidos = [n.lyric for n in partitura.recurse().notes]
     assert lidos == ["E", "A#", "C"]
+
+
+# --- Ligadura através da barra (ADR-022) -------------------------------------
+
+
+def _atravessando_a_barra(tmp_path: Path):  # type: ignore[no-untyped-def]
+    """Uma nota no 'quatro e', sustentada 1,5 semínima: entra no compasso seguinte."""
+    nota = NoteEvent(pitch=36, onset_s=SEMINIMA * 3.5, offset_s=SEMINIMA * 5.0,
+                     instrument="electric_bass")
+    return _exportar(ViterbiFretAssigner().assign([nota], TUNING_BASS_4), tmp_path)
+
+
+def test_nota_atravessa_a_barra_como_ligadura(tmp_path: Path) -> None:
+    """Cortar na barra trocava sustentação por ataque curto — o groove muda."""
+    lido = _atravessando_a_barra(tmp_path)
+
+    notas = list(lido.flatten().notes)
+    assert len(notas) == 2
+    assert [n.tie.type for n in notas] == ["start", "stop"]
+
+
+def test_a_ligadura_preserva_a_duracao_somada(tmp_path: Path) -> None:
+    """A soma é o que o leitor toca: 1,5 semínima, não o que coube no compasso."""
+    lido = _atravessando_a_barra(tmp_path)
+
+    assert sum(n.quarterLength for n in lido.flatten().notes) == 1.5
+
+
+def test_a_ligadura_nao_repete_o_nome_da_nota(tmp_path: Path) -> None:
+    """Nome repetido na continuação se lê como outro ataque — é o oposto de ligar."""
+    lido = _atravessando_a_barra(tmp_path)
+
+    assert [n.lyric for n in lido.flatten().notes] == ["C", None]
+
+
+def test_a_armadura_estimada_e_escrita_na_partitura(tmp_path: Path) -> None:
+    """Quatro bemóis na pauta, e o nome sob a nota concorda com eles (ADR-031)."""
+    alvo = MusicXmlExporter(bpm=BPM, armadura=-4).export(
+        _tabs([28, 34, 36]), tmp_path / "bemol.musicxml", TUNING_BASS_4
+    )
+    lido = converter.parse(str(alvo))
+
+    assert [k.sharps for k in lido.recurse().getElementsByClass(key.KeySignature)] == [-4]
+    assert [n.lyric for n in lido.recurse().notes] == ["E", "Bb", "C"]
+
+
+def test_sem_tom_confiavel_a_partitura_sai_como_sempre(tmp_path: Path) -> None:
+    """Armadura errada imprime mais bequadro do que armadura nenhuma (ADR-031)."""
+    lido = _exportar(_tabs([28, 34, 36]), tmp_path)
+
+    assert list(lido.recurse().getElementsByClass(key.KeySignature)) == []
+    assert [n.lyric for n in lido.recurse().notes] == ["E", "A#", "C"]
+
+
+def test_o_titulo_da_musica_vai_no_arquivo(tmp_path: Path) -> None:
+    """Partitura sem título é folha anônima: o nome do arquivo não se lê no papel.
+
+    Sem `Metadata` o music21 imprimia `Music21 Fragment` — o placeholder da
+    biblioteca, que é o que o MuseScore mostrava.
+
+    Afirmo o XML cru porque é o que os leitores abrem: na volta pelo music21 10.5
+    o `<work-title>` não reaparece em `metadata.title`, e sim em `bestTitle`.
+    """
+    alvo = MusicXmlExporter(bpm=BPM, titulo="Smooth Operator").export(
+        _tabs([36, 38]), tmp_path / "tab.musicxml", TUNING_BASS_4
+    )
+
+    assert "<work-title>Smooth Operator</work-title>" in alvo.read_text()
+    assert converter.parse(str(alvo)).metadata.bestTitle == "Smooth Operator"

@@ -6,15 +6,20 @@ Demucs e MuScriptor reais. O caminho com o pipeline de verdade está no fim, `sl
 
 from __future__ import annotations
 
+import threading
+from dataclasses import replace
 from pathlib import Path
 
 import pytest
 from fastapi.testclient import TestClient
 
 from tests.sintetico import SOUNDFONT, renderizar
-from thoth.api.app import criar_app
-from thoth.domain.models import AudioAsset, NoteEvent
+from thoth.api.app import LIMITE_DE_JOBS, Job, Pedido, criar_app, descartar_antigos
+from thoth.domain.models import TUNING_BASS_DROP_D, AudioAsset, NoteEvent
+from thoth.services.fretboard import PADRAO
+from thoth.services.octave_check import OctaveWarning
 from thoth.services.pipeline import Resultado
+from thoth.services.tonalidade import Tonalidade
 
 
 def _resultado_falso(out_dir: Path, **_: object) -> Resultado:
@@ -58,8 +63,12 @@ def test_job_roda_e_relata_o_que_o_pipeline_descartou(tmp_path: Path) -> None:
     assert job["formatos"] == ["gp5"]
 
 
-def test_bpm_e_cordas_chegam_ao_pipeline(tmp_path: Path) -> None:
-    """BPM errado produz leitura errada (ADR-013): não pode se perder no caminho."""
+def test_bpm_afinacao_e_digitacao_chegam_ao_pipeline(tmp_path: Path) -> None:
+    """BPM errado produz leitura errada (ADR-013): não pode se perder no caminho.
+
+    Drop D é o caso que a contagem de cordas não conseguia pedir (ADR-028): tem
+    quatro cordas como a afinação padrão, e nenhuma delas afinada igual.
+    """
     recebido: dict[str, object] = {}
 
     def espiao(ref: str, out_dir: Path, **kw: object) -> Resultado:
@@ -67,10 +76,21 @@ def test_bpm_e_cordas_chegam_ao_pipeline(tmp_path: Path) -> None:
         return _resultado_falso(out_dir)
 
     cliente = _cliente(tmp_path, espiao)
-    cliente.post("/jobs", json={"ref": "x.mp3", "bpm": 72, "cordas": 5})
+    resposta = cliente.post(
+        "/jobs",
+        json={"ref": "x.mp3", "bpm": 72, "afinacao": "drop-d", "digitacao": "experiente"},
+    )
 
+    assert resposta.status_code == 202, resposta.text
     assert recebido["bpm"] == 72
-    assert recebido["tuning"] == (23, 28, 33, 38, 43)
+    assert recebido["tuning"] == TUNING_BASS_DROP_D
+    assert recebido["assigner"].custos is PADRAO  # type: ignore[union-attr]
+
+
+def test_afinacao_desconhecida_e_recusada_na_entrada(tmp_path: Path) -> None:
+    resposta = _cliente(tmp_path).post("/jobs", json={"ref": "x.mp3", "afinacao": "6"})
+
+    assert resposta.status_code == 422
 
 
 def test_artefato_volta_com_os_bytes_do_arquivo(tmp_path: Path) -> None:
@@ -153,3 +173,118 @@ def test_fonte_musical_sai_com_mime_de_fonte(tmp_path: Path) -> None:
     resposta = _cliente(tmp_path).get("/vendor/alphatab/font/Bravura.woff2")
 
     assert resposta.headers["content-type"] == "font/woff2"
+
+
+def test_um_job_espera_o_outro_em_vez_de_dividir_os_arquivos(tmp_path: Path) -> None:
+    """Dois pipelines ao mesmo tempo escrevem no mesmo lugar (ADR-027).
+
+    O cache de separação encena em `<modelo>.parcial` e o exportador nomeia pelo
+    título (ADR-017): o segundo job apagaria o encenado do primeiro debaixo dele.
+    """
+    liberar, dentro_de_a, dentro_de_b = (threading.Event() for _ in range(3))
+
+    def executar(ref: str, out_dir: Path, **kw: object) -> Resultado:
+        (dentro_de_a if ref == "a.mp3" else dentro_de_b).set()
+        assert liberar.wait(10), "o teste travou esperando liberação"
+        return _resultado_falso(out_dir)
+
+    cliente = _cliente(tmp_path, executar)
+    jobs = [
+        threading.Thread(target=cliente.post, args=("/jobs",), kwargs={"json": {"ref": ref}})
+        for ref in ("a.mp3", "b.mp3")
+    ]
+    jobs[0].start()
+    assert dentro_de_a.wait(10), "o primeiro job não chegou a rodar"
+    jobs[1].start()
+
+    assert not dentro_de_b.wait(0.5), "o segundo job entrou no pipeline com o primeiro dentro"
+    b = next(j for j in cliente.get("/jobs").json() if j["ref"] == "b.mp3")
+    assert b["status"] == "na fila"
+
+    liberar.set()
+    for job in jobs:
+        job.join(10)
+    assert [j["status"] for j in cliente.get("/jobs").json()] == ["pronto", "pronto"]
+
+
+def test_o_historico_de_jobs_para_de_crescer(tmp_path: Path) -> None:
+    """Processo de longa vida com dict sem teto é vazamento de memória (ADR-027)."""
+    cliente = _cliente(tmp_path)
+
+    ids = [
+        cliente.post("/jobs", json={"ref": f"{i}.mp3"}).json()["id"]
+        for i in range(LIMITE_DE_JOBS + 5)
+    ]
+
+    lista = cliente.get("/jobs").json()
+    assert [j["id"] for j in lista] == ids[5:], "deviam sobrar os mais novos"
+    assert cliente.get(f"/jobs/{ids[0]}").status_code == 404
+
+
+def test_job_que_ainda_nao_terminou_nunca_e_descartado() -> None:
+    """Descartar o que está rodando perderia o resultado de minutos de CPU."""
+    pedido = Pedido(ref="x.mp3")
+    jobs = {
+        "vivo": Job(id="vivo", pedido=pedido, status="rodando"),
+        "fila": Job(id="fila", pedido=pedido, status="na fila"),
+        **{f"velho{i}": Job(id=f"velho{i}", pedido=pedido, status="pronto") for i in range(3)},
+    }
+
+    descartar_antigos(jobs, limite=3)
+
+    assert list(jobs) == ["vivo", "fila", "velho2"]
+
+
+def test_o_aviso_de_oitava_sai_com_a_alternativa_e_a_razao(tmp_path: Path) -> None:
+    """Pitch e instante não dizem o que conferir; a alternativa ranqueada diz (ADR-030).
+
+    A razão da candidata é `inf` quando não há 4º harmônico no trecho — comum em
+    material esparso. `Infinity` é JSON inválido: `JSON.parse` da página recusa o
+    corpo inteiro, e nada que use `.json()` do Python percebe, porque o `json` da
+    biblioteca padrão aceita.
+    """
+    nota = NoteEvent(pitch=23, onset_s=1.25, offset_s=1.8, instrument="electric_bass")
+
+    def executar(ref: str, out_dir: Path, **kw: object) -> Resultado:
+        return replace(
+            _resultado_falso(out_dir, **kw),
+            avisos_de_oitava=[
+                OctaveWarning(nota, 35, 0.12, float("inf")),
+                OctaveWarning(nota, None, 0.33, 0.12),
+            ],
+        )
+
+    cliente = _cliente(tmp_path, executar)
+    ident = cliente.post("/jobs", json={"ref": "x.mp3", "bpm": 90}).json()["id"]
+    resposta = cliente.get(f"/jobs/{ident}")
+
+    assert "Infinity" not in resposta.text, "corpo que o JSON.parse da página recusa"
+    primeiro, segundo = resposta.json()["avisos_de_oitava"]
+    assert primeiro == {"pitch": 23, "onset_s": 1.25, "sugestao": 35, "razao": 0.12,
+                        "razao_sugerida": None}
+    assert segundo["sugestao"] is None and segundo["razao_sugerida"] == 0.12
+
+
+def test_o_tom_chega_ao_pipeline_e_volta_no_resumo(tmp_path: Path) -> None:
+    """Tom informado manda (ADR-031); o `_resumo` diz qual foi e com que margem."""
+    recebido: dict[str, object] = {}
+
+    def executar(ref: str, out_dir: Path, **kw: object) -> Resultado:
+        recebido.update(kw)
+        return replace(
+            _resultado_falso(out_dir, **kw), tonalidade=Tonalidade("f minor", -4, None)
+        )
+
+    cliente = _cliente(tmp_path, executar)
+    criado = cliente.post("/jobs", json={"ref": "x.mp3", "bpm": 90, "tom": "f menor"})
+    assert criado.status_code == 202, criado.text
+
+    job = cliente.get(f"/jobs/{criado.json()['id']}").json()
+    assert recebido["tom"] == "f menor"
+    assert job["tom"] == {"nome": "f minor", "armadura": -4, "margem": None}
+
+
+def test_tom_ilegivel_e_recusado_na_entrada(tmp_path: Path) -> None:
+    resposta = _cliente(tmp_path).post("/jobs", json={"ref": "x.mp3", "tom": "H menor"})
+
+    assert resposta.status_code == 422, resposta.text

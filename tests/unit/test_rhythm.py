@@ -5,7 +5,7 @@ from __future__ import annotations
 import pytest
 
 from thoth.domain.models import NoteEvent, TabNote
-from thoth.services.rhythm import alinhar, eventos, monofonizar
+from thoth.services.rhythm import PPQ, alinhar, eventos, monofonizar
 
 
 def _nota(pitch: int, onset: float) -> NoteEvent:
@@ -88,3 +88,34 @@ def test_deduplicar_e_exportar_tem_que_ser_a_mesma_grade() -> None:
 
     assert len(mantidas) == 1 and len(descartadas) == 1
     eventos([TabNote(event=n, string=0, fret=0) for n in mantidas], bpm=120)
+
+
+# --- Sustentação através da barra (ADR-022) ----------------------------------
+
+
+def test_nota_sustentada_mantem_a_duracao_real_atraves_da_barra() -> None:
+    """Cortar na barra trocava legato por ataque curto: 1,5 semínima virava 0,5.
+
+    Quem decide como representar a continuação é o exportador — aqui a duração
+    sai inteira, porque nenhum dos dois formatos consegue ligar o que não recebeu.
+    """
+    nota = NoteEvent(pitch=36, onset_s=3.5 * 0.5, offset_s=5.0 * 0.5,
+                     instrument="electric_bass")
+
+    (inicio, duracao, _), = eventos([TabNote(event=nota, string=0, fret=8)], bpm=120)
+
+    assert inicio == PPQ * 7 // 2
+    assert duracao == PPQ * 3 // 2
+
+
+def test_a_nota_seguinte_ainda_corta_a_anterior() -> None:
+    """Soltar a barra não pode soltar a monofonia: sobreposição é tab impossível."""
+    notas = [
+        NoteEvent(pitch=36, onset_s=0.0, offset_s=2.0, instrument="electric_bass"),
+        NoteEvent(pitch=38, onset_s=0.5, offset_s=1.0, instrument="electric_bass"),
+    ]
+    tabs = [TabNote(event=n, string=0, fret=0) for n in notas]
+
+    (_, primeira, _), _ = eventos(tabs, bpm=120)
+
+    assert primeira == PPQ  # cortada na segunda, não em 2 s

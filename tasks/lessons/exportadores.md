@@ -17,3 +17,30 @@ fecha o compasso —, não só o conjunto de notas.
 **Como isolar defeito em biblioteca binária de terceiro:** reproduzir com a biblioteca
 pura, sem nada do projeto. Se 4 beats escritos voltam como 1, o problema não está nos
 dados do projeto; aí sim vale ler o escritor e o leitor lado a lado.
+
+## Teste que afirma o invólucro não diz nada sobre o conteúdo
+
+As sete partituras do acervo saíram com o título errado por meses. No GP5 liam
+`Thoth`, o default do exportador; no MusicXML, `Music21 Fragment` — o placeholder da
+própria biblioteca, porque `score.metadata = None` descartava a metadata e o music21
+imprimia o dele. Quem abrisse no MuseScore via o nome da biblioteca, não o da música.
+
+O `asset.title` existia e estava correto: alimentava `nome_de_arquivo`. Faltava um
+argumento em `pipeline.py`, onde os dois exportadores eram construídos com `bpm` e
+`armadura` e ficavam no `titulo` default.
+
+**O que deixou passar:** havia teste, e ele se chamava
+`test_gera_os_dois_artefatos_nomeados_pelo_titulo`. Ele afirmava
+`caminho.stem == resultado.asset.title` — o **nome do arquivo**. E o nome do arquivo
+sempre esteve certo, porque vinha do caminho que funcionava. O teste verificava o
+invólucro e nunca abriu o que estava dentro.
+
+Mesma família do antipadrão do `Beat.status` acima: asserção que passa por acidente
+porque mede o lado certo do defeito. Exportador entrega **arquivo**; o teste dele
+abre o arquivo e lê o campo, sempre.
+
+**Armadilha de leitor ao testar isto:** o music21 10.5 grava o título em
+`<work-title>` e `<movement-title>`, mas na releitura não o devolve em
+`metadata.title` (fica `None`) — aparece em `movementName`/`bestTitle`. Um teste
+escrito contra `metadata.title` falha com o arquivo correto. Afirmar o XML cru é o
+que mais se aproxima do que MuseScore e TuxGuitar leem.

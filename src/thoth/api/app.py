@@ -15,7 +15,9 @@ diagnóstico para quem pediu, não defeito do servidor.
 
 from __future__ import annotations
 
+import math
 import mimetypes
+import threading
 import uuid
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -24,11 +26,16 @@ from typing import Any, Protocol
 from fastapi import BackgroundTasks, FastAPI, HTTPException
 from fastapi.responses import FileResponse, PlainTextResponse
 from fastapi.staticfiles import StaticFiles
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
-from thoth.domain.models import TUNING_BASS_4, TUNING_BASS_5
+from thoth.domain.models import AFINACOES
+from thoth.domain.ports import FretAssigner
 from thoth.services import pipeline
+from thoth.services.fretboard import DIGITACOES, ViterbiFretAssigner
+from thoth.services.octave_check import OctaveWarning
 from thoth.services.pipeline import Resultado
+from thoth.services.tempo import BPM_MAXIMO, BPM_MINIMO
+from thoth.services.tonalidade import Tonalidade, tom_de_texto
 
 #: Raiz do `web/`, servida como está — a UI não passa por build.
 WEB_PADRAO = Path(__file__).resolve().parents[3] / "web"
@@ -50,24 +57,104 @@ class Executor(Protocol):
         bpm: int | None,
         tuning: tuple[int, ...],
         cache_dir: Path,
+        tom: str | None,
+        assigner: FretAssigner,
     ) -> Resultado: ...
 
 
 class Pedido(BaseModel):
-    """`bpm` vazio faz o Thoth estimar do áudio (ADR-019); `cordas` escolhe a afinação."""
+    """`bpm` vazio faz o Thoth estimar do áudio (ADR-019); os outros dois são nomes.
+
+    Afinação e digitação vêm por **nome**, não por contagem de cordas: drop D tem
+    quatro, como a padrão, e nenhuma corda afinada igual (ADR-028).
+    """
 
     ref: str = Field(..., description="Caminho do áudio ou URL do YouTube.")
-    bpm: int | None = Field(None, ge=20, le=300)
-    cordas: int = Field(4, ge=4, le=5)
+    bpm: int | None = Field(None, ge=BPM_MINIMO, le=BPM_MAXIMO)
+    tom: str | None = Field(
+        None, description="Tom, p.ex. 'Bb maior'. Vazio: estimado das notas (ADR-031)."
+    )
+    afinacao: str = Field("4", description=f"Uma de: {', '.join(AFINACOES)}.")
+    digitacao: str = Field("iniciante", description=f"Uma de: {', '.join(DIGITACOES)}.")
+
+    @field_validator("tom")
+    @classmethod
+    def _tom_legivel(cls, valor: str | None) -> str | None:
+        if valor:
+            tom_de_texto(valor)  # levanta ValueError, que o Pydantic vira 422
+        return valor
+
+    @field_validator("afinacao")
+    @classmethod
+    def _afinacao_conhecida(cls, valor: str) -> str:
+        if valor not in AFINACOES:
+            raise ValueError(f"{valor!r} não existe; há {', '.join(AFINACOES)}")
+        return valor
+
+    @field_validator("digitacao")
+    @classmethod
+    def _digitacao_conhecida(cls, valor: str) -> str:
+        if valor not in DIGITACOES:
+            raise ValueError(f"{valor!r} não existe; há {', '.join(DIGITACOES)}")
+        return valor
 
 
 @dataclass(slots=True)
 class Job:
     id: str
     pedido: Pedido
-    status: str = "rodando"  # rodando | pronto | erro
+    status: str = "na fila"  # na fila | rodando | pronto | erro
     resultado: Resultado | None = None
     erro: str | None = None
+
+
+#: Quantos jobs o histórico guarda. Não há paginação nem banco: o teto é o que
+#: impede o processo de longa vida de crescer para sempre (ADR-027).
+LIMITE_DE_JOBS = 50
+#: Estados em que o job já não tem nada acontecendo — os únicos descartáveis.
+TERMINADOS = frozenset({"pronto", "erro"})
+
+
+def descartar_antigos(jobs: dict[str, Job], limite: int = LIMITE_DE_JOBS) -> None:
+    """Joga fora os jobs concluídos mais antigos até caber no limite.
+
+    Job que ainda está na fila ou rodando **nunca** é descartado, mesmo que seja o
+    mais antigo: quem o pediu ainda espera minutos de CPU por ele. Só sobrar coisa
+    inacabada é o caso em que o histórico passa do teto de propósito.
+    """
+    for ident, job in list(jobs.items()):  # dict preserva a ordem de inserção
+        if len(jobs) <= limite:
+            return
+        if job.status in TERMINADOS:
+            del jobs[ident]
+
+
+def _finito(razao: float) -> float | None:
+    """`inf` vira `null`: `Infinity` é JSON inválido e o `JSON.parse` da página
+    recusa o corpo inteiro por causa dele (ADR-030)."""
+    return round(razao, 3) if math.isfinite(razao) else None
+
+
+def _oitava(aviso: OctaveWarning) -> dict[str, Any]:
+    """Altura e instante não dizem o que conferir — a alternativa ranqueada diz."""
+    return {
+        "pitch": aviso.event.pitch,
+        "onset_s": round(aviso.event.onset_s, 2),
+        "sugestao": aviso.suggested_pitch,
+        "razao": _finito(aviso.fundamental_ratio),
+        "razao_sugerida": _finito(aviso.suggested_ratio),
+    }
+
+
+def _tom(tonalidade: Tonalidade | None) -> dict[str, Any] | None:
+    """`margem` nula é tom informado — não passou por ranqueamento nenhum."""
+    if tonalidade is None:
+        return None
+    return {
+        "nome": tonalidade.nome,
+        "armadura": tonalidade.armadura,
+        "margem": round(tonalidade.margem, 3) if tonalidade.margem is not None else None,
+    }
 
 
 def _resumo(job: Job) -> dict[str, Any]:
@@ -83,14 +170,8 @@ def _resumo(job: Job) -> dict[str, Any]:
         "rotulos": r.rotulos if r else None,
         "descartadas": len(r.descartadas) if r else None,
         "fora_do_braco": len(r.fora_do_braco) if r else None,
-        "avisos_de_oitava": (
-            [
-                {"pitch": a.event.pitch, "onset_s": round(a.event.onset_s, 2)}
-                for a in r.avisos_de_oitava
-            ]
-            if r
-            else None
-        ),
+        "avisos_de_oitava": [_oitava(a) for a in r.avisos_de_oitava] if r else None,
+        "tom": _tom(r.tonalidade) if r else None,
         "formatos": sorted(r.artefatos) if r else [],
         "bpm_estimado": bool(r and r.andamento),
         "bpm_confiavel": bool(r and r.andamento and r.andamento.confiavel),
@@ -103,6 +184,9 @@ class _Estado:
     cache_dir: Path
     executar: Executor
     jobs: dict[str, Job] = field(default_factory=dict)
+    #: Serializa a execução (ADR-027). Dois pipelines simultâneos escrevem no
+    #: mesmo diretório encenado do cache e no mesmo artefato nomeado pelo título.
+    trava: threading.Lock = field(default_factory=threading.Lock)
 
 
 def criar_app(
@@ -116,17 +200,22 @@ def criar_app(
     app = FastAPI(title="Thoth", summary="Áudio → tablatura de contrabaixo.")
 
     def _rodar(job: Job) -> None:
-        try:
-            job.resultado = estado.executar(
-                job.pedido.ref,
-                estado.out_dir,
-                bpm=job.pedido.bpm,
-                tuning=TUNING_BASS_5 if job.pedido.cordas == 5 else TUNING_BASS_4,
-                cache_dir=estado.cache_dir,
-            )
-            job.status = "pronto"
-        except Exception as erro:  # vira estado do job, não 500 do servidor
-            job.status, job.erro = "erro", str(erro)
+        # Um por vez (ADR-027): esperar na fila é o que o pedido seguinte faz aqui.
+        with estado.trava:
+            job.status = "rodando"
+            try:
+                job.resultado = estado.executar(
+                    job.pedido.ref,
+                    estado.out_dir,
+                    bpm=job.pedido.bpm,
+                    tuning=AFINACOES[job.pedido.afinacao],
+                    cache_dir=estado.cache_dir,
+                    tom=job.pedido.tom,
+                    assigner=ViterbiFretAssigner(custos=DIGITACOES[job.pedido.digitacao]),
+                )
+                job.status = "pronto"
+            except Exception as erro:  # vira estado do job, não 500 do servidor
+                job.status, job.erro = "erro", str(erro)
 
     def _buscar(ident: str) -> Job:
         if (job := estado.jobs.get(ident)) is None:
@@ -137,6 +226,7 @@ def criar_app(
     def criar(pedido: Pedido, tarefas: BackgroundTasks) -> dict[str, Any]:
         job = Job(id=uuid.uuid4().hex[:12], pedido=pedido)
         estado.jobs[job.id] = job
+        descartar_antigos(estado.jobs)
         tarefas.add_task(_rodar, job)
         return _resumo(job)
 

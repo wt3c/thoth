@@ -25,3 +25,17 @@ def test_nomeia_a_classe_de_altura(pitch: int, nome: str) -> None:
 def test_ignora_a_oitava() -> None:
     assert len({nome_da_nota(p) for p in range(24, 36)}) == 12
     assert all(nome_da_nota(p) == nome_da_nota(p + 12) for p in range(24, 60))
+
+
+@pytest.mark.parametrize(
+    ("pitch", "nome"),
+    [(34, "Bb"), (35, "B"), (32, "Ab"), (30, "Gb"), (29, "F"), (37, "Db")],
+)
+def test_em_tom_bemol_o_acidente_e_bemol(pitch: int, nome: str) -> None:
+    """Fá menor escrito com G# é o defeito que o ADR-031 corrige."""
+    assert nome_da_nota(pitch, bemois=True) == nome
+
+
+def test_bemol_tambem_ignora_a_oitava() -> None:
+    """A mesma invariante do modo de sempre: doze nomes, um por classe."""
+    assert len({nome_da_nota(p, bemois=True) for p in range(24, 36)}) == 12
