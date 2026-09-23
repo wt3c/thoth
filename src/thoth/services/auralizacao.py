@@ -12,6 +12,9 @@ Duas escolhas que parecem detalhe e não são:
 - **Mesmo comprimento do original.** O canal da transcrição é esticado com
   silêncio até o fim: truncar esconderia justamente o trecho final, onde o erro
   de andamento mais acumula.
+- **Mesma energia nos dois canais.** Sem isso a comparação vira teste de volume:
+  a transcrição saía até 23 dB abaixo do original, e a música de baixo mais alto
+  na mixagem soava "melhor transcrita" por ser mais audível.
 """
 
 from __future__ import annotations
@@ -20,7 +23,9 @@ import subprocess
 import tempfile
 from pathlib import Path
 
+import numpy as np
 import pretty_midi
+import soundfile as sf
 
 from thoth.domain.models import NoteEvent
 
@@ -60,6 +65,68 @@ def _renderizar(mid: Path, destino: Path) -> Path:
     return destino
 
 
+def _duracao(caminho: Path) -> float:
+    info = sf.info(str(caminho))
+    return float(info.frames) / float(info.samplerate)
+
+
+def _para_mono(canais: int) -> str:
+    """Média dos canais escrita à mão — a mesma conta que `_energia` faz.
+
+    `aformat=channel_layouts=stereo` parece inócuo numa entrada mono e não é: o
+    upmix do ffmpeg preserva energia dividindo cada canal por √2, e esses 3 dB
+    somem do canal do original sem aparecer em lugar nenhum (medido: 0,0884 →
+    0,0625). Sem ele, `pan` sozinho tem ganho unitário e coincide com a medição.
+    """
+    pesos = "+".join(f"{1 / canais:.6f}*c{c}" for c in range(canais))
+    return f"pan=mono|c0={pesos}"
+
+
+def _energia(caminho: Path, janela_s: float) -> tuple[float, float]:
+    """RMS e pico do arquivo reduzido a mono, dentro da janela que vai ser escrita.
+
+    A janela é a duração do original, que é o que o `-shortest` deixa passar.
+    Medir o arquivo inteiro contaria a cauda do soundfont — quatro segundos onde
+    saem dois — e o ganho sairia alto na mesma proporção. Pelo mesmo motivo a
+    média divide pela janela, não pelo que foi lido: o silêncio que o `apad`
+    completa entra no canal e puxa a energia dele para baixo.
+
+    Em blocos porque o original é a música inteira: 12 minutos em float64 não
+    precisam caber na memória só para se medir a média de um quadrado.
+    """
+    info = sf.info(str(caminho))
+    alvo = round(janela_s * float(info.samplerate))
+    if alvo <= 0:
+        return 0.0, 0.0
+    soma, pico = 0.0, 0.0
+    for bloco in sf.blocks(
+        str(caminho), blocksize=1 << 20, dtype="float64", always_2d=True, frames=alvo
+    ):
+        mono = bloco.mean(axis=1)
+        soma += float((mono**2).sum())
+        pico = max(pico, float(np.abs(mono).max(initial=0.0)))
+    return (soma / alvo) ** 0.5, pico
+
+
+def _ganhos(original: Path, rendido: Path) -> tuple[float, float]:
+    """Fatores para os dois canais: mesma energia, sem estourar.
+
+    A transcrição sobe até a energia do original — e não o contrário, que deixaria
+    tudo no volume baixíssimo do soundfont. Se subir fizer o pico passar de 1, os
+    **dois** canais descem na mesma proporção: o que precisa ser preservado é a
+    razão entre eles, não o nível absoluto.
+    """
+    janela = _duracao(original)
+    rms_esq, pico_esq = _energia(original, janela)
+    rms_dir, pico_dir = _energia(rendido, janela)
+    if not rms_dir or not rms_esq:
+        return 1.0, 1.0
+    ganho = rms_esq / rms_dir
+    pico = max(pico_esq, pico_dir * ganho)
+    escala = 0.99 / pico if pico > 0.99 else 1.0
+    return escala, ganho * escala
+
+
 def auralizar(original: Path, notas: list[NoteEvent], destino: Path) -> Path:
     """WAV estéreo: original à esquerda, transcrição à direita.
 
@@ -73,10 +140,13 @@ def auralizar(original: Path, notas: list[NoteEvent], destino: Path) -> Path:
     destino.parent.mkdir(parents=True, exist_ok=True)
     with tempfile.TemporaryDirectory() as tmp:
         rendido = _renderizar(_midi(notas, Path(tmp) / "notas.mid"), Path(tmp) / "notas.wav")
+        g_esq, g_dir = _ganhos(original, rendido)
         # `apad` + `shortest` iguala o canal curto ao longo sem cortar nenhum dos dois.
         filtro = (
-            f"[0:a]pan=mono|c0=.5*c0+.5*c1,aresample={TAXA}[esq];"
-            f"[1:a]pan=mono|c0=c0,aresample={TAXA},apad[dir];"
+            f"[0:a]{_para_mono(sf.info(str(original)).channels)},"
+            f"aresample={TAXA},volume={g_esq:.6f}[esq];"
+            f"[1:a]{_para_mono(sf.info(str(rendido)).channels)},"
+            f"aresample={TAXA},apad,volume={g_dir:.6f}[dir];"
             "[esq][dir]join=inputs=2:channel_layout=stereo[saida]"
         )
         subprocess.run(

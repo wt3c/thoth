@@ -113,8 +113,7 @@ nem `python` direto.
 - **Decisão arquitetural → ADR** em `tasks/decisions.md` (já em ADR-021). Emenda de
   ADR existente é seção `### Emenda (data)`, não reescrita do original.
 - **Correção do usuário durante a tarefa → `tasks/lessons/<domínio>.md`.** Existem
-  `exportadores.md`, `navegador.md` e `workflow.md`; `audio.md` está previsto no
-  `tasks/lessons/README.md` e ainda não foi criado.
+  `audio.md`, `exportadores.md`, `navegador.md` e `workflow.md`.
 - **Plano e estado → `tasks/todo.md`.** Fases marcadas; o que está `[ ]` é o que falta.
 - Leia `tasks/decisions.md` antes de mudar comportamento do pipeline: quase toda
   escolha não óbvia (separar sempre, transcrever o stem inteiro, filtrar por conjunto

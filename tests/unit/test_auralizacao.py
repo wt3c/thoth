@@ -85,3 +85,53 @@ def test_sem_notas_e_erro(original: Path, tmp_path: Path) -> None:
     """Auralizar o nada produziria um arquivo mudo que parece um problema de áudio."""
     with pytest.raises(ValueError, match="sem notas"):
         auralizar(original, [], tmp_path / "aural.wav")
+
+
+@requer_ferramentas
+def test_canais_saem_com_a_mesma_energia(original: Path, tmp_path: Path) -> None:
+    """Sem isto, a comparação vira teste de volume: o canal alto sempre 'soa melhor'.
+
+    O que enviesou a escuta das sete do acervo — a transcrição saía até 23 dB
+    abaixo do original, e a música de baixo mais alto na mixagem ganhava por isso.
+    """
+    saida = auralizar(original, NOTAS, tmp_path / "aural.wav")
+    audio, _ = sf.read(str(saida))
+
+    rms = [float(np.sqrt((audio[:, c] ** 2).mean())) for c in (0, 1)]
+    assert rms[0] == pytest.approx(rms[1], rel=0.15), f"canais desiguais: {rms}"
+
+
+@pytest.fixture
+def original_estereo(tmp_path: Path) -> Path:
+    """Estéreo de verdade, com os dois lados diferentes: é o caso das músicas."""
+    alvo = tmp_path / "original_estereo.wav"
+    subprocess.run(
+        ["ffmpeg", "-y", "-loglevel", "error",
+         "-f", "lavfi", "-i", "sine=frequency=440:duration=2",
+         "-f", "lavfi", "-i", "sine=frequency=660:duration=2",
+         "-filter_complex", "[0:a][1:a]join=inputs=2:channel_layout=stereo[s]",
+         "-map", "[s]", "-ar", "44100", str(alvo)],
+        check=True,
+    )
+    return alvo
+
+
+@requer_ferramentas
+def test_canais_saem_com_a_mesma_energia_com_original_estereo(
+    original_estereo: Path, tmp_path: Path
+) -> None:
+    """A igualação tem que valer nos dois formatos: o downmix muda, a energia não."""
+    saida = auralizar(original_estereo, NOTAS, tmp_path / "aural.wav")
+    audio, _ = sf.read(str(saida))
+
+    rms = [float(np.sqrt((audio[:, c] ** 2).mean())) for c in (0, 1)]
+    assert rms[0] == pytest.approx(rms[1], rel=0.15), f"canais desiguais: {rms}"
+
+
+@requer_ferramentas
+def test_nao_estoura_ao_igualar(original: Path, tmp_path: Path) -> None:
+    """Igualar subindo o canal fraco é o caminho óbvio e é o que clipa."""
+    saida = auralizar(original, NOTAS, tmp_path / "aural.wav")
+    audio, _ = sf.read(str(saida))
+
+    assert np.abs(audio).max() <= 1.0

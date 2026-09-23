@@ -62,7 +62,7 @@ strict = true
 # Bibliotecas de áudio/MIR sem stubs nem py.typed. O override nomeia o módulo
 # IMPORTADO — nomear quem importa não tem efeito.
 [[tool.mypy.overrides]]
-module = ["pretty_midi.*", "mir_eval.*", "guitarpro.*"]
+module = ["pretty_midi.*", "mir_eval.*", "guitarpro.*", "soundfile.*"]
 ignore_missing_imports = true
 
 # O music21 tem `py.typed`, mas seus construtores não são anotados. Exigir

@@ -35,6 +35,6 @@ class FretAssigner(Protocol):
 
 
 class Exporter(Protocol):
-    """Notas posicionadas → arquivo (GP5, MusicXML, MIDI)."""
+    """Notas posicionadas → arquivo de partitura. Hoje GP5 e MusicXML."""
 
     def export(self, notes: list[TabNote], out: Path, tuning: tuple[int, ...]) -> Path: ...
