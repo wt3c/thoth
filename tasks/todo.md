@@ -226,3 +226,27 @@ resultado aparecia com as mudanças em `git stash`).
   beats (`_lidas`), o que sobrevive à fusão. `test_cada_nota_ocupa_um_beat_proprio`
   agora afirma a estrutura, e `test_silencio_vira_pausa_e_nao_desloca_a_nota` passou
   a cobrar o ataque em ticks em vez da sequência de beats que o bug produzia.
+
+## Fase 7 — Configuração de agentes (2026-09-23)
+
+Contrato de projeto para os agentes que trabalham neste repositório. `AGENTS.md` é o
+canônico (o Codex só lê esse); `CLAUDE.md` importa com `@AGENTS.md` e acrescenta a
+cauda que só o Claude Code entende — o `@import` é resolução exclusiva do Claude, e
+inverter a direção faria o Codex ler um ponteiro vazio **sem erro visível**.
+
+- [x] `AGENTS.md` — só os *deltas* que um agente novo erraria: pt-BR no código, teto
+      do Python, o que `pytest` **não** roda por padrão, repositório público
+- [x] `CLAUDE.md` — `@AGENTS.md` + skills e fluxo `tasks/`
+- [x] `.claude/settings.json` — allowlist estreita, nada específico da estação
+      (o repositório é público); o que for local vai em `.claude/settings.local.json`,
+      agora no `.gitignore`
+- [x] `.claude/commands/portao.md` — os três comandos do portão de entrega
+- [x] Revisão do `AGENTS.md` pelo Codex contra o repositório
+
+**Suposição declarada:** `install.py` (`~/workspace/claude-md`) gerencia o `~/.claude`
+global. O `.claude/` deste repositório é versionado aqui e não entra no instalador.
+
+- [x] Três docstrings realinhados aos ADRs (2026-09-23): `services/rhythm.py` e
+      `adapters/export/gp5.py` tratavam o BPM como obrigatório (ADR-019/021) e
+      `domain/ports.py` chamava a separação de opcional (ADR-010). Achado pela
+      revisão do Codex sobre o `AGENTS.md`.

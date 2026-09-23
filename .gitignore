@@ -232,3 +232,6 @@ out/
 # IDE
 .idea/
 web/vendor/
+
+# Ajuste de estação: fora do repositório público.
+.claude/settings.local.json
