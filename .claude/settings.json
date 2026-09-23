@@ -17,8 +17,7 @@
       "Bash(yt-dlp --version)"
     ],
     "deny": [
-      "Read(./audio/**)",
-      "Bash(git push:*)"
+      "Read(./audio/**)"
     ]
   }
 }
