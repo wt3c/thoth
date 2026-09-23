@@ -21,7 +21,7 @@ class Transcriber(Protocol):
 
 
 class Separator(Protocol):
-    """Mix → stems por instrumento. Opcional: só entra se o spike provar ganho."""
+    """Mix → stems por instrumento. Etapa fixa antes de transcrever (ADR-010)."""
 
     def separate(self, audio: Path, out_dir: Path) -> dict[str, Path]: ...
 

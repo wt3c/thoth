@@ -1,10 +1,17 @@
 """Segundos → tempo musical. O que os dois exportadores precisam compartilhar.
 
-**O andamento é entrada, não estimativa.** O Thoth ainda não estima tempo (o
-checkpoint do Beat This! está inacessível — C2 no `todo.md`), e nenhum formato de
-partitura guarda segundos: todos guardam compassos, tempos e figuras. Sem BPM não
-há arquivo, então ele é parâmetro explícito em vez de palpite silencioso — um BPM
-errado não quebra nada, produz uma leitura errada, que é pior.
+**O andamento chega pronto aqui.** Nenhum formato de partitura guarda segundos:
+todos guardam compassos, tempos e figuras, então sem BPM não há arquivo. Quem o
+resolve é `services/tempo.py` — informado por você, ele manda; ausente, é estimado
+do mix e anunciado (ADR-019). Nos dois casos `ajustar` acerta a fase da grade
+contra as notas transcritas antes de `alinhar`, e só refina o andamento junto
+quando ele foi estimado — o BPM que você informou manda, a âncora ninguém
+informou (ADR-021). Grade precisa ancorada no lugar errado erra mais que grade
+grosseira alinhada por acaso: as duas contas são uma só.
+
+O BPM que chega a `para_ticks` é fracionário de propósito. O arquivo guarda o
+inteiro, porque GP5 e MusicXML só têm campo inteiro; quantizar no inteiro é o bug
+que o ADR-021 corrige — 0,46% de erro vira segundos de deriva no fim da música.
 """
 
 from __future__ import annotations

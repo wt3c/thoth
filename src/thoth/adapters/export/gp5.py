@@ -1,14 +1,15 @@
 """Notas posicionadas → arquivo GP5, via PyGuitarPro.
 
-**O andamento é entrada, não estimativa.** O Thoth ainda não estima tempo (o
-checkpoint do Beat This! está inacessível — ver C2 no `todo.md`), e o GP5 não
-guarda segundos: ele guarda compassos, tempos e figuras. Sem BPM não há como
-escrever o arquivo, então ele é parâmetro explícito em vez de um palpite
-silencioso que sairia como tablatura errada.
+**O andamento chega decidido de fora.** O GP5 não guarda segundos: guarda
+compassos, tempos e figuras. O `--bpm` que você informar manda; sem ele, o
+pipeline estima do mix e avisa em vez de palpitar em silêncio (ADR-019). O que
+chega aqui já passou pelo refino conjunto de andamento e fase (ADR-021).
 
 Limitações assumidas desta primeira versão, todas visíveis na leitura:
 
-- compasso fixo 4/4 e grade de semicolcheia;
+- compasso fixo 4/4, grade de semicolcheia e um único andamento para a música
+  inteira — o campo de BPM do arquivo é inteiro, então ele sai arredondado
+  enquanto a quantização usa o fracionário (ADR-021);
 - sem ligaduras: uma nota mais longa que a maior figura representável vira a
   figura mais longa que couber, e o resto vira pausa. O *ataque* — que é o que
   se lê numa tablatura — fica exato;
