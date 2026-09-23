@@ -413,3 +413,16 @@ inteira e o music21 dá uma cópia a cada pauta na leitura. Ancorada em `parts[0
 
 Os sete artefatos em `out/` são anteriores a isto: ainda de uma pauta. Reexportar
 é rodar o pipeline de novo nas sete.
+
+## Fase 10 — o áudio junto da partitura (ADR-036)
+
+> Origem: pedido direto — "quero os arquivos wav, gp5 e musicxml na mesma pasta".
+> Mix e baixo isolado; sem `.mscz`, que o MuseScore não precisa desde o ADR-035.
+
+- [x] Teste primeiro: nomes, mesma pasta dos exportadores, bytes iguais à origem,
+      e não-symlink. No `slow` real, mix e baixo diferentes entre si — asserção que
+      o dublê não permite, porque lá o stem é o próprio mix.
+- [x] `transcrever` copia os dois para `out_dir` e os devolve em `artefatos`.
+- [x] ADR-036 em `tasks/decisions.md`.
+- [x] Oito músicas já processadas preenchidas sem reprocessar, e os sete `.mscz`
+      apagados.

@@ -18,6 +18,7 @@ Três restrições medidas, embutidas aqui porque é aqui que elas se aplicam:
 
 from __future__ import annotations
 
+import shutil
 from collections import Counter
 from dataclasses import dataclass
 from pathlib import Path
@@ -84,7 +85,11 @@ def transcrever(
     assigner: FretAssigner | None = None,
     exporters: dict[str, Exporter] | None = None,
 ) -> Resultado:
-    """Caminho ou URL → `.gp5` e `.musicxml` em `out_dir`, nomeados pelo título (ADR-017).
+    """Caminho ou URL → partitura e áudio em `out_dir`, nomeados pelo título (ADR-017).
+
+    Saem quatro arquivos: `.gp5`, `.musicxml`, `.mix.wav` e `.baixo.wav`. Os dois
+    áudios são cópias do cache, que é nomeado por hash da fonte — sem elas a pasta
+    de saída não tem nada que se possa ouvir ao lado da partitura (ADR-036).
 
     `bpm` informado manda sempre. Sem ele, o andamento é estimado do mix e vem
     relatado no `Resultado` (ADR-019) — estimar em silêncio é que não pode.
@@ -167,10 +172,15 @@ def transcrever(
     }
 
     out_dir.mkdir(parents=True, exist_ok=True)
+    nome = nome_de_arquivo(asset)
     artefatos = {
-        formato: exportador.export(tabs, out_dir / f"{nome_de_arquivo(asset)}.{formato}", tuning)
+        formato: exportador.export(tabs, out_dir / f"{nome}.{formato}", tuning)
         for formato, exportador in exporters.items()
     }
+    # Cópia, e não atalho para o cache: a pasta de saída é o que você abre e move,
+    # e ela não pode depender de um diretório nomeado por hash continuar existindo.
+    for chave, origem in (("mix", asset.wav), ("baixo", stem)):
+        artefatos[chave] = Path(shutil.copy2(origem, out_dir / f"{nome}.{chave}.wav"))
     return Resultado(
         bpm=andamento_fino,
         tonalidade=tonalidade,

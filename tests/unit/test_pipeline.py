@@ -59,9 +59,29 @@ requer_soundfont = pytest.mark.skipif(not SOUNDFONT.exists(), reason="soundfont 
 def test_gera_os_dois_artefatos_nomeados_pelo_titulo(tmp_path: Path) -> None:
     resultado = _rodar(tmp_path, (_nota(36, 0.0), _nota(38, 0.7)))
 
-    assert set(resultado.artefatos) == {"gp5", "musicxml"}
-    for caminho in resultado.artefatos.values():
+    assert {"gp5", "musicxml"} <= set(resultado.artefatos)
+    for formato in ("gp5", "musicxml"):
+        caminho = resultado.artefatos[formato]
         assert caminho.exists() and caminho.stem == resultado.asset.title
+
+
+@requer_soundfont
+def test_o_mix_e_o_baixo_acompanham_a_partitura(tmp_path: Path) -> None:
+    """Partitura sem o áudio ao lado obriga a procurar a música em outro lugar.
+
+    Os dois vinham do cache, que é nomeado por hash da fonte: quem abrisse a pasta
+    de saída via `.gp5` e `.musicxml` e mais nada que se pudesse ouvir (ADR-036).
+    """
+    resultado = _rodar(tmp_path, (_nota(36, 0.0), _nota(38, 0.7)))
+    titulo = resultado.asset.title
+
+    audios = {k: resultado.artefatos[k] for k in ("mix", "baixo")}
+    assert [c.name for c in audios.values()] == [f"{titulo}.mix.wav", f"{titulo}.baixo.wav"]
+    assert all(c.parent == resultado.artefatos["gp5"].parent for c in audios.values())
+    # Cópia, não atalho: a pasta de saída tem que sobreviver à limpeza do cache.
+    assert audios["mix"].read_bytes() == resultado.asset.wav.read_bytes()
+    assert audios["baixo"].read_bytes() == resultado.stem.read_bytes()
+    assert not any(c.is_symlink() for c in audios.values())
 
 
 @requer_soundfont
@@ -140,6 +160,11 @@ def test_caminho_completo_com_demucs_e_muscriptor_reais(tmp_path: Path) -> None:
 
     assert resultado.notas > 10  # a escala tem 15 notas
     assert all(c.exists() for c in resultado.artefatos.values())
+    # Com o Demucs real o stem é outro arquivo, e não o próprio mix como no dublê:
+    # é aqui que se vê que são dois áudios distintos, e não a mesma cópia duas vezes.
+    assert (
+        resultado.artefatos["mix"].read_bytes() != resultado.artefatos["baixo"].read_bytes()
+    )
 
 
 @requer_soundfont

@@ -1691,3 +1691,46 @@ não beneficia nenhum outro leitor de MusicXML.
   em tamanho fixo, e há teste com `TUNING_BASS_5` cobrindo isso.
 - Um teste `slow` roda o `mscore` de verdade e afirma a digitação importada, não só a
   existência da pauta (Regra 3 — o round-trip pelo music21 não prova o leitor).
+
+---
+
+## ADR-036 — o áudio sai junto da partitura
+
+**Data:** 2026-09-23
+**Status:** aceito
+
+### Contexto
+
+`out/` saía com `.gp5` e `.musicxml` e mais nada que se pudesse ouvir. O mix e o
+stem de baixo existiam — mas no `cache/`, em diretórios nomeados por hash da fonte
+(`cache/yt_g81jzIwyDjg/mix.wav`, `cache/stems/<id>/htdemucs_ft/mix/bass.wav`).
+Quem abrisse a pasta de saída para estudar tinha a partitura e precisava caçar a
+música em outro lugar.
+
+### Decisão
+
+`transcrever` copia dois áudios para `out_dir`, nomeados pelo título como os
+demais artefatos (ADR-017): `<título>.mix.wav` e `<título>.baixo.wav`. Os dois
+entram no `Resultado.artefatos`, então a API os lista em `formatos` e os serve
+pelo mesmo endpoint dos outros.
+
+- **Cópia, não link simbólico.** A pasta de saída é o que se abre e se move; ela
+  não pode depender de um diretório nomeado por hash continuar existindo. Há teste
+  afirmando que não é symlink e que os bytes batem com a origem.
+- **Mix e baixo, não os quatro stems.** O `no_bass.wav` existe e sairia de graça,
+  mas não foi pedido; o `.aural.wav` continua sendo produzido só pelo comando
+  `auralizar`, que é opt-in.
+- **Cópia incondicional, sem guarda por tamanho.** Rodar de novo reescreve ~90 MB
+  por música. São segundos contra os quinze minutos do pipeline: a guarda não se
+  paga e abriria a chance de manter arquivo velho.
+
+### Consequência
+
+- `out/` cresce ~90 MB por música. Continua fora do git (ADR-005) — áudio nunca
+  entra neste repositório, que é público.
+- O teste `slow` do caminho completo ganhou a asserção que só ele pode fazer: com
+  o Demucs real, mix e baixo são arquivos **diferentes**. No dublê da suíte rápida
+  o separador devolve o próprio áudio como stem, então lá os dois são iguais por
+  construção e a asserção não diria nada.
+- Os `.mscz` que eu gerava à mão para ver as duas pautas no MuseScore não têm mais
+  função desde o ADR-035, e os sete que estavam em `out/` foram apagados a pedido.
