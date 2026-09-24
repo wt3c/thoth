@@ -10,6 +10,7 @@ import os
 import re
 import shutil
 import subprocess
+from concurrent.futures import ProcessPoolExecutor
 from itertools import pairwise
 from pathlib import Path
 from xml.etree import ElementTree
@@ -27,8 +28,9 @@ SEMINIMA = 60.0 / BPM
 
 def _tabs(pitches: list[int], passo: float = SEMINIMA) -> list[TabNote]:
     notas = [
-        NoteEvent(pitch=p, onset_s=i * passo, offset_s=i * passo + passo * 0.9,
-                  instrument="electric_bass")
+        NoteEvent(
+            pitch=p, onset_s=i * passo, offset_s=i * passo + passo * 0.9, instrument="electric_bass"
+        )
         for i, p in enumerate(pitches)
     ]
     return ViterbiFretAssigner().assign(notas, TUNING_BASS_4)
@@ -79,10 +81,10 @@ def test_corda_e_traste_acompanham_cada_nota(tmp_path: Path) -> None:
 
     lidas = [
         (
-            next(a.number for a in n.articulations
-                 if isinstance(a, articulations.StringIndication)),
-            next(a.number for a in n.articulations
-                 if isinstance(a, articulations.FretIndication)),
+            next(
+                a.number for a in n.articulations if isinstance(a, articulations.StringIndication)
+            ),
+            next(a.number for a in n.articulations if isinstance(a, articulations.FretIndication)),
         )
         for n in lido.flatten().notes
     ]
@@ -94,10 +96,10 @@ def test_duracoes_seguem_a_grade(tmp_path: Path) -> None:
     """Semínima, colcheia e semicolcheia — a grade não pode arredondar para zero."""
     notas = [
         NoteEvent(pitch=36, onset_s=0.0, offset_s=SEMINIMA, instrument="electric_bass"),
-        NoteEvent(pitch=38, onset_s=SEMINIMA, offset_s=SEMINIMA * 1.5,
-                  instrument="electric_bass"),
-        NoteEvent(pitch=40, onset_s=SEMINIMA * 1.5, offset_s=SEMINIMA * 1.75,
-                  instrument="electric_bass"),
+        NoteEvent(pitch=38, onset_s=SEMINIMA, offset_s=SEMINIMA * 1.5, instrument="electric_bass"),
+        NoteEvent(
+            pitch=40, onset_s=SEMINIMA * 1.5, offset_s=SEMINIMA * 1.75, instrument="electric_bass"
+        ),
     ]
     lido = _exportar(ViterbiFretAssigner().assign(notas, TUNING_BASS_4), tmp_path)
 
@@ -107,8 +109,9 @@ def test_duracoes_seguem_a_grade(tmp_path: Path) -> None:
 def test_silencio_vira_pausa(tmp_path: Path) -> None:
     notas = [
         NoteEvent(pitch=36, onset_s=0.0, offset_s=SEMINIMA, instrument="electric_bass"),
-        NoteEvent(pitch=36, onset_s=SEMINIMA * 3, offset_s=SEMINIMA * 4,
-                  instrument="electric_bass"),
+        NoteEvent(
+            pitch=36, onset_s=SEMINIMA * 3, offset_s=SEMINIMA * 4, instrument="electric_bass"
+        ),
     ]
     lido = _exportar(ViterbiFretAssigner().assign(notas, TUNING_BASS_4), tmp_path)
 
@@ -145,8 +148,9 @@ def test_escreve_o_nome_da_nota_sob_a_pauta(tmp_path: Path) -> None:
 
 def _atravessando_a_barra(tmp_path: Path):  # type: ignore[no-untyped-def]
     """Uma nota no 'quatro e', sustentada 1,5 semínima: entra no compasso seguinte."""
-    nota = NoteEvent(pitch=36, onset_s=SEMINIMA * 3.5, offset_s=SEMINIMA * 5.0,
-                     instrument="electric_bass")
+    nota = NoteEvent(
+        pitch=36, onset_s=SEMINIMA * 3.5, offset_s=SEMINIMA * 5.0, instrument="electric_bass"
+    )
     return _exportar(ViterbiFretAssigner().assign([nota], TUNING_BASS_4), tmp_path)
 
 
@@ -207,9 +211,7 @@ def test_o_titulo_da_musica_vai_no_arquivo(tmp_path: Path) -> None:
 # --- Pauta de tablatura (ADR-035) --------------------------------------------
 
 
-requer_musescore = pytest.mark.skipif(
-    shutil.which("mscore") is None, reason="mscore ausente"
-)
+requer_musescore = pytest.mark.skipif(shutil.which("mscore") is None, reason="mscore ausente")
 
 
 def test_o_arquivo_traz_partitura_e_tablatura(tmp_path: Path) -> None:
@@ -292,9 +294,7 @@ def test_o_musescore_monta_a_tablatura_com_a_nossa_digitacao(tmp_path: Path) -> 
     # O MuseScore guarda a afinação em `StringData`, do grave para o agudo.
     cordas = re.search(r"<StringData>.*?</StringData>", mscx, re.S)
     assert cordas is not None
-    assert re.findall(r"<string>(\d+)</string>", cordas.group()) == [
-        str(v) for v in TUNING_BASS_4
-    ]
+    assert re.findall(r"<string>(\d+)</string>", cordas.group()) == [str(v) for v in TUNING_BASS_4]
     # E as cordas dele são 0 no topo, ao contrário das nossas.
     corpo = mscx[mscx.index('<Staff id="2"') :]
     lidos = re.findall(r"<fret>(\d+)</fret>\s*<string>(\d+)</string>", corpo)
@@ -354,13 +354,15 @@ def _beams_mal_formados(arquivo: Path) -> list[str]:
                 valor = (beam.text or "").strip()
                 if valor == "begin":
                     if abertos.get(chave):
-                        achados.append(f"c.{numero} pauta {pauta}: begin no nível "
-                                       f"{chave[2]} com um já aberto")
+                        achados.append(
+                            f"c.{numero} pauta {pauta}: begin no nível {chave[2]} com um já aberto"
+                        )
                     abertos[chave] = True
                 elif valor in ("continue", "end"):
                     if not abertos.get(chave):
-                        achados.append(f"c.{numero} pauta {pauta}: {valor!r} "
-                                       f"no nível {chave[2]} sem begin")
+                        achados.append(
+                            f"c.{numero} pauta {pauta}: {valor!r} no nível {chave[2]} sem begin"
+                        )
                     abertos[chave] = valor == "continue"
         achados += [
             f"c.{numero} pauta {p}: begin no nível {n} sem end"
@@ -379,10 +381,10 @@ def _com_buracos(tmp_path: Path) -> Path:
     cruza a fronteira de semínima — é só o buraco.
     """
     notas = [
-        NoteEvent(pitch=36, onset_s=0.0, offset_s=SEMINIMA * 0.25,
-                  instrument="electric_bass"),
-        NoteEvent(pitch=38, onset_s=SEMINIMA * 2.5, offset_s=SEMINIMA * 2.75,
-                  instrument="electric_bass"),
+        NoteEvent(pitch=36, onset_s=0.0, offset_s=SEMINIMA * 0.25, instrument="electric_bass"),
+        NoteEvent(
+            pitch=38, onset_s=SEMINIMA * 2.5, offset_s=SEMINIMA * 2.75, instrument="electric_bass"
+        ),
     ]
     return _arquivo(ViterbiFretAssigner().assign(notas, TUNING_BASS_4), tmp_path)
 
@@ -402,24 +404,122 @@ def test_semicolcheia_isolada_nao_sai_beameada(tmp_path: Path) -> None:
     assert "<beam" not in xml
 
 
-@pytest.mark.xfail(
-    strict=True,
-    reason="Fase 12 (B): music21 10.5 erra o beam quando a nota cruza o tempo",
-)
-def test_beam_travessa_o_tempo_e_defeito_do_music21(tmp_path: Path) -> None:
-    """Colcheia, mínima, colcheia pontuada, colcheia pontuada — contíguas.
-
-    Sem pausa nenhuma, e o music21 10.5 escreve dois `end` no nível 1, calado.
-    Marcado `xfail(strict=True)` de propósito: é defeito aberto (Fase 12 (B)), e
-    `strict` faz o teste ficar vermelho no dia em que a correção entrar — um xfail
-    que passa em silêncio viraria defeito esquecido.
-    """
-    limites = [0.0, 0.5, 2.5, 3.25, 4.0]
+def _contiguas(limites: list[float], destino: Path) -> Path:
+    """Notas encostadas umas nas outras, com fronteiras em semínimas."""
     notas = [
-        NoteEvent(pitch=36 + i, onset_s=inicio * SEMINIMA, offset_s=fim * SEMINIMA,
-                  instrument="electric_bass")
+        NoteEvent(
+            pitch=36 + i % 12,
+            onset_s=inicio * SEMINIMA,
+            offset_s=fim * SEMINIMA,
+            instrument="electric_bass",
+        )
         for i, (inicio, fim) in enumerate(pairwise(limites))
     ]
-    arquivo = _arquivo(ViterbiFretAssigner().assign(notas, TUNING_BASS_4), tmp_path)
+    return _arquivo(ViterbiFretAssigner().assign(notas, TUNING_BASS_4), destino)
+
+
+def _beams_da_pauta_1(arquivo: Path) -> list[list[tuple[str, str]]]:
+    """(nível, valor) de cada nota da partitura, na ordem — o que o leitor desenha."""
+    raiz = ElementTree.parse(arquivo).getroot()
+    return [
+        [(b.get("number", "1"), (b.text or "").strip()) for b in nota.findall("beam")]
+        for nota in raiz.iter("note")
+        if nota.findtext("staff", "1") == "1" and nota.find("rest") is None
+    ]
+
+
+def test_beam_travessa_o_tempo_fecha_a_gramatica(tmp_path: Path) -> None:
+    """Colcheia, mínima, colcheia pontuada, colcheia pontuada — contíguas.
+
+    Era a forma (B) da Fase 12: sem pausa nenhuma, o music21 10.5 escreve dois
+    `end` no nível 1, calado. Ficou `xfail(strict=True)` até a correção (ADR-039).
+    """
+    arquivo = _contiguas([0.0, 0.5, 2.5, 3.25, 4.0], tmp_path)
 
     assert _beams_mal_formados(arquivo) == []
+
+
+def test_beam_refeito_comeca_onde_comeca_a_primeira_nota_do_tempo(tmp_path: Path) -> None:
+    """(5, 1, 1, 1, 2, 3, 3) semicolcheias — achado pelo Codex na revisão.
+
+    O tempo 2 começa com a semínima ligada da nota anterior, e as três
+    semicolcheias dele começam em 1,25. O `getBeams` supõe que a lista começa
+    no `measureStartOffset`; passado o início do tempo, o nível 2 sai
+    `start, stop, stop`.
+    """
+    arquivo = _contiguas([0.0, 1.25, 1.5, 1.75, 2.0, 2.5, 3.25, 4.0], tmp_path)
+
+    assert _beams_mal_formados(arquivo) == []
+
+
+def test_beam_que_o_music21_acerta_fica_como_esta(tmp_path: Path) -> None:
+    """Colcheia e colcheia pontuada atravessando o tempo, no mesmo grupo.
+
+    É gramática válida e notação comum, e o music21 escreve assim. A correção
+    de (B) não pode trocar isto por duas bandeirolas: ela conserta o compasso
+    quebrado, não impõe outro estilo aos que já saíam certos (ADR-039).
+    """
+    arquivo = _contiguas([0.0, 0.5, 1.25, 2.25, 3.0, 4.0], tmp_path)
+
+    assert _beams_da_pauta_1(arquivo)[:2] == [[("1", "begin")], [("1", "end")]]
+
+
+def _ritmos_de_um_compasso() -> list[tuple[int, ...]]:
+    """Toda composição de 16 semicolcheias em 2 ou mais notas: 2^15 - 1 = 32767.
+
+    Cada um dos 15 pontos entre semicolcheias é fronteira de nota ou não.
+    """
+    ritmos = []
+    for mascara in range(1, 2**15):
+        ritmo, atual = [], 1
+        for ponto in range(15):
+            if mascara >> ponto & 1:
+                ritmo.append(atual)
+                atual = 1
+            else:
+                atual += 1
+        ritmos.append((*ritmo, atual))
+    return ritmos
+
+
+_LOTE = 512
+
+
+def _quebrados_no_lote(lote: list[tuple[int, ...]], destino: Path) -> list[tuple[int, ...]]:
+    """Um compasso por ritmo, em sequência, num arquivo só; devolve os quebrados."""
+    limites = [0.0]
+    for ritmo in lote:
+        for semicolcheias in ritmo:
+            limites.append(limites[-1] + semicolcheias / 4)
+    compassos = {
+        int(achado.split()[0].removeprefix("c."))
+        for achado in _beams_mal_formados(_contiguas(limites, destino))
+    }
+    return [lote[numero - 1] for numero in sorted(compassos)]
+
+
+@pytest.mark.slow
+def test_nenhum_ritmo_contiguo_de_um_compasso_quebra_a_gramatica(tmp_path: Path) -> None:
+    """Todo compasso 4/4 contíguo na grade de semicolcheia — 32767 ritmos (ADR-039).
+
+    Medido aqui: o music21 10.5 sozinho escreve 2496 quebrados; a primeira versão
+    da correção, 80 (todos com o tempo abrindo no meio, o caso do
+    `measureStartOffset`); a atual, 0. Uma varredura só até 5 notas (1940 ritmos,
+    151 quebrados) deixou esses 80 passarem — por isso não há corte aqui.
+
+    Lotes de 512 compassos por arquivo, em paralelo: um arquivo por ritmo custaria
+    ~16 min. O lote não esconde nada — o subconjunto de 2 a 5 notas dá os mesmos 151
+    quebrados, sem a correção, nas duas montagens: a correção é por compasso, e o
+    que passa de um compasso ao seguinte é só a fórmula, a mesma em todos.
+    """
+    ritmos = _ritmos_de_um_compasso()
+    lotes = [ritmos[i : i + _LOTE] for i in range(0, len(ritmos), _LOTE)]
+    with ProcessPoolExecutor() as executor:
+        resultados = executor.map(
+            _quebrados_no_lote, lotes, [tmp_path / str(i) for i in range(len(lotes))]
+        )
+        quebrados = [ritmo for lote in resultados for ritmo in lote]
+
+    print(f"{len(ritmos)} ritmos, {len(quebrados)} quebrados")
+    assert len(ritmos) == 32767
+    assert quebrados == []

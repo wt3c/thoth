@@ -14,12 +14,14 @@ music21 resolve ligaduras e pausas a partir dos offsets.
 
 from __future__ import annotations
 
+from copy import deepcopy
 from dataclasses import dataclass
 from pathlib import Path
 from typing import TYPE_CHECKING
 
 from music21 import (
     articulations,
+    beam,
     clef,
     instrument,
     key,
@@ -68,6 +70,7 @@ class MusicXmlExporter:
         # acontecia: o nome da música chegava ao nome do arquivo e não ao papel.
         score.insert(0, metadata.Metadata(title=self.titulo))
         pronto = score.makeNotation()
+        _consertar_beams(pronto)
 
         out.parent.mkdir(parents=True, exist_ok=True)
         pronto.write("musicxml", fp=str(out))
@@ -113,6 +116,74 @@ class MusicXmlExporter:
         # arquivo mal-formado (ADR-038). Com as pausas na mão, o music21 acerta.
         parte.makeRests(fillGaps=True, inPlace=True)
         return parte
+
+
+def _consertar_beams(pronto: stream.Score) -> None:
+    """Refaz, por semínima, o beaming dos compassos que o music21 escreveu quebrado.
+
+    Forma (B) do ADR-038: com nota cruzando a fronteira de tempo, o music21 10.5
+    às vezes escreve `end` sem `begin` — arquivo mal-formado, calado. Só o compasso
+    quebrado é refeito (ADR-039): nos que saem certos ele junta, por exemplo,
+    colcheia e colcheia pontuada que atravessa o tempo, e isso é notação legítima
+    que um beaming por tempo trocaria por duas bandeirolas.
+
+    O refeito é o próprio `getBeams` do music21, chamado um tempo por vez, e
+    nenhum grupo atravessa a fronteira. A nota que cruza fica no tempo em que
+    começa; sozinha nele, sai com bandeirola. O `getBeams` supõe que a lista
+    começa no `measureStartOffset`: o trecho que abre no meio do tempo (depois
+    de uma nota que veio cruzando) passa o offset da própria primeira nota, não
+    o do tempo — do contrário o nível 2 sai desalinhado.
+
+    O `makeBeams` roda aqui, e não no `write`: o exportador de MusicXML refaz os
+    beams de toda pauta que não esteja marcada como beameada, e refaria por cima
+    do conserto. Rodá-lo antes e marcar a pauta é o que faz o arquivo sair com o
+    que foi examinado.
+
+    Sem vozes: a pauta é monofônica por construção (ADR-014).
+    """
+    for pauta in pronto.parts:
+        pauta.makeBeams(inPlace=True)
+        formula: meter.TimeSignature | None = None
+        for compasso in pauta.getElementsByClass(stream.Measure):
+            # Como o `makeBeams` acha a fórmula: a do compasso, senão a última vista.
+            formula = compasso.timeSignature or formula
+            if formula is None or not _beams_quebrados(compasso):
+                continue
+            elementos = list(compasso.notesAndRests)
+            for tempo_ in range(int(formula.barDuration.quarterLength)):
+                trecho = [e for e in elementos if tempo_ <= e.offset < tempo_ + 1]
+                if not trecho:
+                    continue
+                # Cópias: o `getBeams` só lê durações, mas não mexer no `activeSite`
+                # das notas da partitura custa uma linha.
+                novos = formula.getBeams(
+                    deepcopy(trecho), measureStartOffset=trecho[0].offset
+                )
+                for elemento, beams in zip(trecho, novos, strict=True):
+                    if isinstance(elemento, note.NotRest):
+                        elemento.beams = beams or beam.Beams()
+        pauta.streamStatus.beams = True
+
+
+def _beams_quebrados(compasso: stream.Measure) -> bool:
+    """A gramática do MusicXML sobre os beams do music21, por nível.
+
+    `start` abre, `continue` e `stop` exigem aberto, `partial` (gancho) é isolado,
+    e nada fica aberto no fim do compasso. É o mesmo autômato que os testes rodam
+    sobre o XML escrito.
+    """
+    abertos: dict[int, bool] = {}
+    for nota in compasso.notes:
+        for b in nota.beams:
+            if b.type == "start":
+                if abertos.get(b.number):
+                    return True
+                abertos[b.number] = True
+            elif b.type in ("continue", "stop"):
+                if not abertos.get(b.number):
+                    return True
+                abertos[b.number] = b.type == "continue"
+    return any(abertos.values())
 
 
 def _com_afinacao(xml: str, tuning: tuple[int, ...]) -> str:
