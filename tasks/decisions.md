@@ -1826,6 +1826,13 @@ pautas (ADR-035). Movidas, e o que faltava foi preenchido.
   como uma linha `✓ <estágio>  0:00:00`. É o que se quer num log, e é o que os testes
   da CLI afirmam.
 
+### Emenda (2026-09-24) — o custo da auralização na API fica
+
+A consequência acima deixou aberto se a API deveria pedir o pipeline sem auralização.
+Fica como está: é a mesma conta da alternativa descartada — seis segundos num job de
+quinze minutos não pagam uma flag nem um segundo caminho no pipeline. Reabre se a API
+virar o caminho principal e o custo aparecer medido lá.
+
 ---
 
 ## ADR-038 — as pausas entram antes do `makeNotation`, e a gramática do beam é afirmada no XML cru
@@ -1898,3 +1905,105 @@ pontuada, sem `begin` em lugar nenhum — a pausa estava por perto, não dentro 
   13 sem nota cruzando a fronteira de semínima, contra 132 em 1535 com nota cruzando —
   compatível com "cruzar o tempo é condição necessária", mas a amostra negativa é
   pequena (13) e isso não é prova.
+
+### Emenda (2026-09-24)
+
+Os números da seção **Consequência** acima foram escritos antes da reexportação e
+ficaram velhos: sobre as **nove** músicas reexportadas (não oito) sobraram **188**
+mal-formados de forma (B), não 200 — `tasks/todo.md`, Fase 12. A forma (B) foi
+corrigida no ADR-039, e o `xfail(strict=True)` saiu junto, como previsto.
+
+---
+
+## ADR-039 — o compasso de beam quebrado é refeito por tempo; os que saem certos ficam
+
+**Data:** 2026-09-24
+**Status:** aceito — fecha a forma (B) do ADR-038
+
+### Contexto
+
+A forma (B) do ADR-038: ritmo contíguo, com nota cruzando a fronteira de semínima, e o
+music21 10.5 escreve `end` sem `begin`, calado. É a versão mais nova do PyPI; não há
+correção a montar. O ADR-038 deixou duas saídas em aberto: quebrar o grupo na fronteira
+de tempo, ou aceitar e documentar.
+
+### Decisão
+
+**`_consertar_beams`, depois do `makeNotation`, refaz só o compasso quebrado.**
+
+1. `pauta.makeBeams(inPlace=True)` explícito. O exportador de MusicXML refaz os beams
+   de toda pauta que não esteja marcada (`m21ToXml.py`, `streamStatus.beams`) — o
+   conserto feito sobre o stream do `makeNotation` era apagado no `write`. Rodar aqui e
+   marcar `pauta.streamStatus.beams = True` é o que faz o arquivo sair com o que foi
+   examinado.
+2. Cada compasso passa pelo mesmo autômato que os testes rodam sobre o XML cru
+   (`_beams_quebrados`). Se está certo, fica.
+3. Se está quebrado, é refeito **um tempo por vez** com o próprio
+   `TimeSignature.getBeams` do music21: o trecho de cada tempo são os elementos que
+   **começam** nele, e nenhum grupo atravessa a fronteira. A nota que cruza fica no
+   tempo em que começa; sozinha nele, sai com bandeirola.
+4. `measureStartOffset` é o offset da **primeira nota do trecho**, não o do tempo. O
+   `getBeams` supõe que a lista começa ali; quando o tempo abre com a cauda de uma nota
+   que veio cruzando, passar o início do tempo desalinha o nível 2. Foi o defeito que o
+   Codex achou na revisão, com `(5, 1, 1, 1, 2, 3, 3)` semicolcheias.
+
+### Medição
+
+Varredura de **todos** os compassos 4/4 contíguos na grade de semicolcheia — as
+2¹⁵ − 1 = 32767 composições de 16 semicolcheias em 2 ou mais notas, exportadas pelo
+`MusicXmlExporter` de verdade e validadas no XML cru:
+
+| versão | mal-formados |
+|--------|--------------|
+| music21 10.5 sozinho (`16a2553`) | 2496 |
+| primeira versão do conserto (`measureStartOffset` = início do tempo) | 80 |
+| esta | **0** |
+
+Os 80 intermediários são todos o caso do item 4, e passaram por uma varredura que ia só
+até 5 notas (1940 ritmos, 151 quebrados sem correção, 0 com ela): o menor tem 7. Daí a
+varredura do teste (`slow`, ~2 min em paralelo) não ter corte. Ela põe 512 compassos por
+arquivo — um por arquivo custaria ~16 min — e o lote não esconde nada: sem a correção, o
+subconjunto de 2 a 5 notas dá os mesmos 151 nas duas montagens.
+
+A conta de 1548 ritmos da Fase 12 veio de um script não versionado que não se
+reproduz; não é usada como base (`tasks/lessons/workflow.md`).
+
+Nas nove músicas, reexportadas pelo `thoth transcribe` de verdade (2026-09-24, todas
+com saída 0): **188 → 0** mal-formados. Nas oito comparáveis, **nenhum** dos 2998 pares
+(compasso, pauta) que o music21 já escrevia válidos mudou de beam, e as notas batem
+exatamente com as de antes; foram refeitos só os 94 compassos quebrados, nas duas
+pautas. A nona, *Equus*, não é
+comparável: a exportação de 2026-09-23 saiu com 4 cordas em vez das 5 de
+`tasks/corpus.md` — 2807 elementos de nota contra 3251 agora, e a diferença (444) é o
+que cai abaixo do E1 (445 elementos na nova), descartado pelo ADR-014 sem ninguém notar.
+Refeita com `--afinacao 5`: 0 mal-formados.
+
+### Alternativas descartadas
+
+- **Refazer todo compasso por tempo.** Zera os mal-formados, mas altera **1468 de 3670**
+  compassos que o music21 já escrevia válidos — entre eles colcheia + colcheia pontuada
+  que atravessa o tempo no mesmo grupo (Dance of Death, c. 14), notação comum e
+  legítima. O conserto é do defeito, não troca de estilo; há teste afirmando que esse
+  grupo continua como o music21 o escreve.
+- **Sanear só os tokens** (trocar o `end` órfão por `begin`, ou apagá-lo). Fecha a
+  gramática, mas o grupo resultante é arbitrário: o conserto passa a depender de onde o
+  music21 errou, não do ritmo.
+- **Aceitar e documentar.** O MuseScore abre o arquivo, mas desenha o grupo errado, e
+  2496 em 32767 compassos contíguos não é caso raro.
+
+### Consequência
+
+- Fora do contrato de hoje, e não coberto: fórmula com duração não inteira em semínimas
+  (7/16 — o `range` ignora o resto) e compasso com `paddingLeft` (anacruse). O
+  exportador fixa 4/4 e `_pauta` preenche o início com pausas, então nenhum dos dois
+  acontece; se a fórmula deixar de ser fixa, este é o primeiro lugar a olhar. Achados
+  da mesma revisão do Codex.
+
+### Emenda — o Demucs pregado (mesma data)
+
+`DemucsSeparator` chama `uvx --with 'numpy<2' demucs@4.1.0`. Sem versão, o `uvx`
+resolveria o release mais novo a cada cache frio, e os stems — e as medições do ADR-010
+feitas sobre eles — mudariam sem aviso. 4.1.0 é a única versão no cache do `uv` desta
+estação. **O cache de stems continua identificado só pelo modelo** (`htdemucs_ft`), não
+pela versão: um stem produzido por outra versão seria reutilizado sem rodar o 4.1.0. Hoje
+todos vieram do 4.1.0; mudar a versão pregada exige limpar `cache/stems/`.

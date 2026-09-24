@@ -3,49 +3,20 @@
 > Áudio → partitura e tablatura, foco em contrabaixo. Uso pessoal. CPU-only.
 > Decisões em `tasks/decisions.md`.
 
-## Próxima sessão — o que está aberto (fechado em 2026-09-23, 23h)
+## Próxima sessão — o que está aberto (fechado em 2026-09-24)
 
-Estado: `main` limpo em `69580ce`, portão verde (291 passed + 1 xfailed, ruff e mypy
-limpos). As nove músicas estão reexportadas em `out/` com a forma (A) de beam já
-corrigida. Nada pela metade, nada a desfazer. Um `git push origin main` ficou pendente
-dos dois últimos commits (`4c3c26b`, `69580ce`) — conferir com `git status -sb` antes.
+Estado: portão verde (295 passed na suíte padrão, ruff e mypy limpos; varredura `slow`
+de beams 32767/0). As nove músicas reexportadas em `out/` em 2026-09-24 com o conserto
+de beams: **0 mal-formados**. Conferir `git status -sb` — o push fica a pedido.
 
-Ordem sugerida: **1** é o único com investigação já paga e decisão pronta para tomar; **2**
-e **3** são baratos; do **4** em diante tudo depende de material externo ou de sessão
-manual.
+Em 2026-09-24 fecharam: a forma (B) dos beams (ADR-039 — 2496 → 0 na varredura de todos
+os 32767 compassos contíguos), README alinhado à CLI e licença MIT, `demucs@4.1.0`
+pregado, e o custo da auralização na API aceito (emenda do ADR-037). O MuseScore 4.7.4
+já está instalado (`/usr/bin/mscore`).
 
-### 1. Fase 12 (B) — 188 beams mal-formados que sobraram
+Nada do que resta é barato: tudo depende de material externo ou de sessão manual.
 
-O defeito é do music21 10.5 e não tem correção a montar (10.5.0 é o mais novo do PyPI).
-Já medido, já com ADR-038 escrito, e o `xfail(strict=True)` em
-`test_beam_travessa_o_tempo_e_defeito_do_music21` é a sentinela: **ele fica vermelho no
-dia em que isto for resolvido**, então não esquecer de tirar o marcador junto.
-
-O que falta é escolher a abordagem, e nenhuma está verificada:
-
-- quebrar o grupo na fronteira de tempo antes de escrever — candidato, sem botão no
-  music21 (conferido em `meter/base.py::getBeams` e `stream/makeNotation.py::makeBeams`),
-  o que significa pós-processar o XML ou escrever o beaming nós mesmos;
-- aceitar e documentar — o MuseScore abre e desenha; o defeito é o grupo desenhado
-  errado, não arquivo recusado.
-
-Ponto de partida frio: `tasks/decisions.md` ADR-038, e a seção **Fase 12** mais abaixo
-neste arquivo com os números e as duas saídas já descartadas por medição.
-
-### 2. README atrás do código
-
-O `AGENTS.md` já avisa: o README promete um exportador MIDI que **não existe** e não cita
-`transcribe`, `auralizar` nem `serve`. As fontes canônicas são `src/thoth/cli.py`,
-`src/thoth/services/pipeline.py` e `tasks/decisions.md`. É tarefa de uma sessão curta.
-
-### 3. Todo job da API paga a auralização
-
-Consequência registrada no ADR-037: `api/app.py:199` chama o mesmo
-`pipeline.transcrever`, então cada job da API roda fluidsynth e ffmpeg sobre a faixa
-inteira. Decidir se a API deve pedir o pipeline sem auralização (hoje não há como) ou se
-o custo fica. Decisão, não bug.
-
-### 4. Bloqueados em material ou ferramenta externa
+### 1. Bloqueados em material externo
 
 - Validar o limiar de oitava **fora do Equus** — depende do `.gp5` de *Equus*, download
   manual do UG (ADR-007). Sem referência não se sabe quanto das taxas por faixa (jorge
@@ -53,22 +24,22 @@ o custo fica. Decisão, não bug.
 - Tab clássica **humana** para conferir oitava e notas — filtrar `aiGenerated == false`
   em `/api/meta/{songId}/revisions` do Songsterr. A da SOJA é `aiGenerated: true` e não
   serve (seria circular).
-- **C2**, quantizador próprio — `cloud.cp.jku.at` inacessível daqui: ou espelho do
-  `beat_this-final0.ckpt`, ou escrever o quantizador e rodar sempre com
-  `--detect-tempo false`.
-- Aval seu para `omarchy-pkg-install musescore` (não instalado; TuxGuitar já está).
 
-### 5. Verificação manual pendente
+### 2. Verificação manual — precisa de ouvido e navegador
 
 - **Tocar e cursor** na página de estudo: o teste conta SVG, não prova que sai áudio nem
-  que o cursor anda. Precisa de sessão com navegador e ouvido.
+  que o cursor anda.
+- Passada perceptual (auralização) sobre o corpus de `tasks/corpus.md`, F1 por grupo.
 
-### 6. Aberto sem urgência
+### 3. Aberto sem urgência
 
+- `small` vs `medium` cronometrado em CPU (o lock já tem os dois pesos).
 - Ligaduras no GP5 (hoje figura + pausa: ataque exato, duração truncada — ADR-013).
-- Comparações da Fase 0 que nunca foram feitas: mix direto vs stem (condicional C1, medir
-  no Grupo B) e com vs sem `--instruments`.
 - Fase 6 inteira: sync de cursor via Spotify, Containerfile + compose, multi-instrumento.
+- Fora do contrato do ADR-039: fórmula não inteira (7/16) e anacruse no conserto de beams
+  — só importa se a fórmula deixar de ser 4/4 fixo.
+- Cache de stems identificado só pelo modelo, não pela versão do Demucs (emenda do
+  ADR-039): mudar o pin exige limpar `cache/stems/`.
 
 ## Fase 0 — Spike de viabilidade ✅ **CONCLUÍDA (2026-09-22) — veredito: SEGUIR**
 
@@ -94,8 +65,8 @@ A avaliação **não depende de saber tocar** (ADR-006).
       `misto`, nota F1 0,682 → **0,968** com separação, onset inalterado em 0,938
       (ADR-010, emenda de 2026-09-22). Separar recupera altura, não tempo
 - [ ] Repetir com `small` vs `medium`, cronometrando em CPU — **medição
-      registrada, não portão**: `models.lock.toml` só tem `muscriptor-small`, e
-      parametrizar o portão nos dois levantaria `KeyError` no setup
+      registrada, não portão**: o portão vale só para o `small` (ADR-009). O lock
+      já tem os dois pesos (corrigido em 2026-09-24; dizia que só tinha o `small`)
 
 ### Camada 2 — perceptual assistida (dispensa treino)
 - [x] Auralização: original em um canal, MIDI no outro (`thoth auralizar`,
@@ -113,9 +84,9 @@ A avaliação **não depende de saber tocar** (ADR-006).
       ler com PyGuitarPro. Download manual — o Thoth não faz scraping do UG
 
 ### Comparações a fazer
-- [ ] **mix direto** vs **stem do Demucs** → decide a condicional C1.
-      Medir no **Grupo B** (mix real); o Grupo A não discrimina separação
-- [ ] **com** vs **sem** `--instruments` → decide se vale condicionar
+- [x] **mix direto** vs **stem do Demucs** → decidido no ADR-010 (separar sempre)
+- [x] **com** vs **sem** `--instruments` → decidido no ADR-008 (sem; filtrar por
+      conjunto de rótulos)
 
 **Pronto quando:** planilha com F1 por condição + tempo em CPU + decisão
 **seguir / ajustar / abortar**.
@@ -132,13 +103,13 @@ A avaliação **não depende de saber tocar** (ADR-006).
 - [x] `cli.py` (Typer): `thoth fetch <arquivo|URL>`
 - [x] 6 testes contra **ffmpeg real** (sem mock — Regra 3); ruff + mypy strict limpos
 
-## Fase 2 — MuScriptor + ground truth ⬅️ **ATUAL**
+## Fase 2 — MuScriptor + ground truth
 
 - [x] **Verificador de oitava** (`services/octave_check.py`) — razão `f0 / 2·f0`
       por nota, limiar 0,40, 7 testes contra WAV real gerado pelo ffmpeg.
       Roda sobre o **stem**, não sobre a mix: validado nos dois, pega 12/12 no
       stem e só 6/12 na mix (bumbo e guitarra enchem a banda de 30,9 Hz).
-- [ ] Mais um dado para essa validação (2026-09-22, primeira execução da CLI
+- Mais um dado para essa validação (2026-09-22, primeira execução da CLI
       ponta a ponta): no stem do Demucs da fixture `walking` o limiar sinaliza
       **4 de 15 notas** (27%), todas G2/A2 — bem acima dos 8,7% medidos em
       material real. Fixture sintética passada pelo Demucs não é material real,
@@ -151,7 +122,7 @@ A avaliação **não depende de saber tocar** (ADR-006).
 - [x] `MuscriptorTranscriber` atrás do `Protocol Transcriber` — subprocesso via
       `uvx` (torch fora do projeto), `small` + livre + `--detect-tempo false`.
       7 testes: 6 de parsing puro + 1 contra o modelo real (`slow`).
-- [ ] **Não fatiar áudio antes de transcrever** — o rótulo do instrumento depende
+- [x] **Não fatiar áudio antes de transcrever** — o rótulo do instrumento depende
       de contexto (emenda do ADR-008): 2,9 s viram `acoustic_piano`, 8 s viram
       `electric_bass`. Vale como restrição ao montar o serviço de pipeline.
 - [x] `models.lock.toml` com SHA-256 dos pesos — `small` e `medium`, com revisão
@@ -216,10 +187,10 @@ linha permitir, verificado por propriedade — não por execução no instrument
 - [x] **C1** `DemucsSeparator` (`htdemucs_ft`) — **aprovada** e promovida a etapa
       fixa do pipeline (ADR-010). Custo conhecido: erra a oitava em 7% das notas
       no material grave e denso — mitigação na Fase 2, não motivo para reverter.
-- [ ] **C2** quantizador próprio — o Beat This! é dependência dura do MuScriptor
-      (ADR-003 corrigido), não condicional. Pendente: `cloud.cp.jku.at` inacessível
-      daqui, então ou achamos espelho do `beat_this-final0.ckpt`, ou escrevemos o
-      quantizador e rodamos sempre com `--detect-tempo false`.
+- [x] **C2** quantizador próprio — o Beat This! é dependência dura do MuScriptor
+      (ADR-003 corrigido), não condicional. Resolvido pelo segundo caminho: o
+      transcritor roda sempre com `--detect-tempo false` e a quantização é nossa
+      (`services/rhythm.py`).
 
 ## Fase 4.5 — Pipeline ponta a ponta ✅ **CONCLUÍDA (2026-09-22)**
 
@@ -246,7 +217,7 @@ Pré-requisito invisível até agora: a Fase 5 só existe se houver o que o
 **Pronto quando:** `thoth transcribe` sobre um áudio real produzir `.gp5` e
 `.musicxml` que abram, com o rótulo e os avisos de oitava no relatório.
 
-## Fase 5 — API e UI ⬅️ **ATUAL**
+## Fase 5 — API e UI
 
 - [x] FastAPI: `POST /jobs`, `GET /jobs`, `GET /jobs/{id}`,
       `GET /jobs/{id}/artifacts/{fmt}`. Jobs em memória e falha de pipeline como
@@ -273,7 +244,8 @@ Pré-requisito invisível até agora: a Fase 5 só existe se houver o que o
 
 ## Pendências para o Welington
 
-- [ ] Aval para `omarchy-pkg-install musescore` (não instalado; TuxGuitar já está)
+- [x] ~~Aval para `omarchy-pkg-install musescore`~~ — já instalado (MuseScore 4.7.4,
+      conferido em 2026-09-24)
 
 ## ✅ Resolvido — GP5 gravado perdia beats no round-trip (2026-09-22)
 
@@ -533,7 +505,7 @@ Achado que virou a Fase 12: o music21 cospe `beam: WARNING: Found a messed up be
 pair` ao gravar o MusicXML. Não foi silenciado — o aviso é sinal real, e investigar
 mostrou que ele **subnotifica** o problema. Números medidos abaixo.
 
-## Fase 12 — beams mal-formados no MusicXML (investigado, a corrigir)
+## Fase 12 — beams mal-formados no MusicXML ✅ **FECHADA (2026-09-24)**
 
 > Origem: o aviso `beam: WARNING: Found a messed up beam pair` que a Fase 11 deixou
 > anotado. Investigado em 2026-09-23. **São dois defeitos, não um**, e o aviso só
@@ -603,7 +575,9 @@ não há correção a montar.
       `begin` que fica aberto. É o teste que faltava: o round-trip pelo music21 não
       pega nada disso, porque ele relê o que escreveu.
 - [x] (A): `makeRests(fillGaps=True)` antes do `makeNotation` em `_pauta`.
-- [ ] (B): decidir a abordagem — nenhuma foi escolhida ainda. Quebrar o grupo na
+- [x] (B): refazer por tempo só o compasso quebrado — ADR-039, 2496 → 0 nos 32767
+      compassos contíguos; nas nove músicas, ver o fim desta seção. Era: decidir a
+      abordagem — nenhuma foi escolhida ainda. Quebrar o grupo na
       fronteira de tempo é o candidato, mas não está verificado que resolve, e não há
       botão para isso (conferido em `meter/base.py::getBeams` e
       `stream/makeNotation.py::makeBeams`).
@@ -661,3 +635,19 @@ estrutural acima é a que decide. Os 188 são todos (B), o defeito aberto do mus
 
 Os artefatos não entram no repositório (`out/` no `.gitignore`, ADR-005): o que fica
 versionado é a correção que os gera e esta medição.
+
+### (B) fechada — 2026-09-24 (ADR-039)
+
+Só o compasso quebrado é refeito, por tempo, com o `getBeams` do music21. Varredura de
+todos os 32767 compassos 4/4 contíguos: music21 sozinho 2496, primeira versão do
+conserto 80 (achados pelo Codex: `measureStartOffset` do tempo, não da primeira nota),
+esta **0**.
+
+Nove músicas reexportadas pelo `thoth transcribe` real, todas com saída 0: **188 → 0**.
+Nas oito comparáveis, 0 dos 2998 pares (compasso, pauta) válidos mudaram e as notas batem
+exatamente; só os 94 compassos quebrados foram refeitos.
+
+**Achado de passagem:** a reexportação de 2026-09-23 do *Equus* saiu com **4 cordas** — o
+`--afinacao 5` que `tasks/corpus.md` manda usar ficou de fora, e ~444 notas abaixo do E1
+foram descartadas (ADR-014) calado. A tabela de 2026-09-23 acima (Equus: 0) mediu esse
+arquivo. Refeito com 5 cordas: 3251 elementos de nota, 0 mal-formados.
