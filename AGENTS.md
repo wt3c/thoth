@@ -67,9 +67,8 @@ fixtures. Configuração de agente que for local vai em `.claude/settings.local.
 ### 5. Quando o docstring e o ADR discordam, o ADR prevalece
 
 O comportamento do pipeline mudou algumas vezes por medição (ADR-010, 019, 021), e
-docstring é o que fica para trás. Em 2026-09-23 três foram acertados — `rhythm.py`,
-`gp5.py` e `ports.py`, todos descrevendo BPM obrigatório e separação opcional. Ao
-tocar um módulo, confira o docstring contra o ADR da área e corrija junto.
+docstring é o que fica para trás. Ao tocar um módulo, confira o docstring contra o
+ADR da área e corrija junto.
 
 ## Arquitetura — ports e adapters
 
@@ -77,8 +76,9 @@ tocar um módulo, confira o docstring contra o ADR da área e corrija junto.
 domain/     models.py (dataclasses frozen, slots) · ports.py (Protocol)
             sem I/O, sem torch, sem dependência de ML
 adapters/   ingest · transcription · separation · export — cada um implementa um Protocol
-services/   lógica própria: fretboard (Viterbi), rhythm, tempo, octave_check,
-            evaluation, auralizacao, cache_notas, nomes, model_lock, pipeline
+services/   lógica própria: fretboard (Viterbi), rhythm, tempo, tonalidade, notas,
+            octave_check, evaluation, comparacao, tab_referencia, auralizacao,
+            cache_notas, nomes, model_lock, pipeline
 api/        FastAPI: jobs em memória, estado serializado, artefatos e página de estudo
 cli.py      fachada fina sobre services
 ```
@@ -109,7 +109,7 @@ nem `python` direto.
 - **Mock é exceção justificada.** Contrato de biblioteca binária (PyGuitarPro),
   formato de saída do MuScriptor, parsing de áudio: precisa de pelo menos um teste
   batendo no recurso real, ainda que marcado `slow`.
-- **Decisão arquitetural → ADR** em `tasks/decisions.md` (já em ADR-021). Emenda de
+- **Decisão arquitetural → ADR** em `tasks/decisions.md`. Emenda de
   ADR existente é seção `### Emenda (data)`, não reescrita do original.
 - **Correção do usuário durante a tarefa → `tasks/lessons/<domínio>.md`.** Existem
   `audio.md`, `exportadores.md`, `navegador.md` e `workflow.md`.
