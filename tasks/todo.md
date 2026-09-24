@@ -3,6 +3,73 @@
 > Áudio → partitura e tablatura, foco em contrabaixo. Uso pessoal. CPU-only.
 > Decisões em `tasks/decisions.md`.
 
+## Próxima sessão — o que está aberto (fechado em 2026-09-23, 23h)
+
+Estado: `main` limpo em `69580ce`, portão verde (291 passed + 1 xfailed, ruff e mypy
+limpos). As nove músicas estão reexportadas em `out/` com a forma (A) de beam já
+corrigida. Nada pela metade, nada a desfazer. Um `git push origin main` ficou pendente
+dos dois últimos commits (`4c3c26b`, `69580ce`) — conferir com `git status -sb` antes.
+
+Ordem sugerida: **1** é o único com investigação já paga e decisão pronta para tomar; **2**
+e **3** são baratos; do **4** em diante tudo depende de material externo ou de sessão
+manual.
+
+### 1. Fase 12 (B) — 188 beams mal-formados que sobraram
+
+O defeito é do music21 10.5 e não tem correção a montar (10.5.0 é o mais novo do PyPI).
+Já medido, já com ADR-038 escrito, e o `xfail(strict=True)` em
+`test_beam_travessa_o_tempo_e_defeito_do_music21` é a sentinela: **ele fica vermelho no
+dia em que isto for resolvido**, então não esquecer de tirar o marcador junto.
+
+O que falta é escolher a abordagem, e nenhuma está verificada:
+
+- quebrar o grupo na fronteira de tempo antes de escrever — candidato, sem botão no
+  music21 (conferido em `meter/base.py::getBeams` e `stream/makeNotation.py::makeBeams`),
+  o que significa pós-processar o XML ou escrever o beaming nós mesmos;
+- aceitar e documentar — o MuseScore abre e desenha; o defeito é o grupo desenhado
+  errado, não arquivo recusado.
+
+Ponto de partida frio: `tasks/decisions.md` ADR-038, e a seção **Fase 12** mais abaixo
+neste arquivo com os números e as duas saídas já descartadas por medição.
+
+### 2. README atrás do código
+
+O `AGENTS.md` já avisa: o README promete um exportador MIDI que **não existe** e não cita
+`transcribe`, `auralizar` nem `serve`. As fontes canônicas são `src/thoth/cli.py`,
+`src/thoth/services/pipeline.py` e `tasks/decisions.md`. É tarefa de uma sessão curta.
+
+### 3. Todo job da API paga a auralização
+
+Consequência registrada no ADR-037: `api/app.py:199` chama o mesmo
+`pipeline.transcrever`, então cada job da API roda fluidsynth e ffmpeg sobre a faixa
+inteira. Decidir se a API deve pedir o pipeline sem auralização (hoje não há como) ou se
+o custo fica. Decisão, não bug.
+
+### 4. Bloqueados em material ou ferramenta externa
+
+- Validar o limiar de oitava **fora do Equus** — depende do `.gp5` de *Equus*, download
+  manual do UG (ADR-007). Sem referência não se sabe quanto das taxas por faixa (jorge
+  1,9%, sade 12,9%, neo 15,8%) é erro real.
+- Tab clássica **humana** para conferir oitava e notas — filtrar `aiGenerated == false`
+  em `/api/meta/{songId}/revisions` do Songsterr. A da SOJA é `aiGenerated: true` e não
+  serve (seria circular).
+- **C2**, quantizador próprio — `cloud.cp.jku.at` inacessível daqui: ou espelho do
+  `beat_this-final0.ckpt`, ou escrever o quantizador e rodar sempre com
+  `--detect-tempo false`.
+- Aval seu para `omarchy-pkg-install musescore` (não instalado; TuxGuitar já está).
+
+### 5. Verificação manual pendente
+
+- **Tocar e cursor** na página de estudo: o teste conta SVG, não prova que sai áudio nem
+  que o cursor anda. Precisa de sessão com navegador e ouvido.
+
+### 6. Aberto sem urgência
+
+- Ligaduras no GP5 (hoje figura + pausa: ataque exato, duração truncada — ADR-013).
+- Comparações da Fase 0 que nunca foram feitas: mix direto vs stem (condicional C1, medir
+  no Grupo B) e com vs sem `--instruments`.
+- Fase 6 inteira: sync de cursor via Spotify, Containerfile + compose, multi-instrumento.
+
 ## Fase 0 — Spike de viabilidade ✅ **CONCLUÍDA (2026-09-22) — veredito: SEGUIR**
 
 Sem escrever código do pipeline. Medir se a qualidade justifica o projeto.
