@@ -101,7 +101,7 @@ def test_lock_do_projeto_bate_com_os_pesos_da_estacao() -> None:
     """Contra os pesos reais no cache do HuggingFace — o lock só vale se for verdade.
 
     `slow` porque hasheia 1,6 GB; roda antes de confiar em qualquer medição de
-    qualidade, já que modelo trocado invalida todo o portão de regressão.
+    qualidade, já que modelo trocado invalida todo o teste de regressão.
     """
     from thoth.services.model_lock import caminho_no_cache
 

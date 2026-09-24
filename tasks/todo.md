@@ -5,7 +5,7 @@
 
 ## Próxima sessão — o que está aberto (fechado em 2026-09-24)
 
-Estado: portão verde (295 passed na suíte padrão, ruff e mypy limpos; varredura `slow`
+Estado: verificação de entrega verde (295 passed na suíte padrão, ruff e mypy limpos; varredura `slow`
 de beams 32767/0). As nove músicas reexportadas em `out/` em 2026-09-24 com o conserto
 de beams: **0 mal-formados**. Conferir `git status -sb` — o push fica a pedido.
 
@@ -60,12 +60,12 @@ A avaliação **não depende de saber tocar** (ADR-006).
 - [x] Fixtures: 6 linhas de baixo em MIDI (`tests/sintetico.py`) → fluidsynth +
       soundfont → WAV normalizado a −1 dBFS
 - [x] **Onset F1** com `mir_eval` (`services/evaluation.py`), travado por fixture
-      como portão de regressão em `tests/integration/test_regressao_fase0.py`
+      como teste de regressão em `tests/integration/test_regressao_fase0.py`
 - [x] Medir o **pipeline completo** (com separação) contra ground truth: no
       `misto`, nota F1 0,682 → **0,968** com separação, onset inalterado em 0,938
       (ADR-010, emenda de 2026-09-22). Separar recupera altura, não tempo
 - [ ] Repetir com `small` vs `medium`, cronometrando em CPU — **medição
-      registrada, não portão**: o portão vale só para o `small` (ADR-009). O lock
+      registrada, não critério de aprovação**: o teste de regressão vale só para o `small` (ADR-009). O lock
       já tem os dois pesos (corrigido em 2026-09-24; dizia que só tinha o `small`)
 
 ### Camada 2 — perceptual assistida (dispensa treino)
@@ -137,7 +137,7 @@ A avaliação **não depende de saber tocar** (ADR-006).
       `muscriptor@0.3.0` pregado. Cobre também o avaliador, agora em
       `thoth.services.evaluation` com 8 testes contra o mir_eval real.
 - [x] ~~Travar o gate no CI~~ — **descartado** (2026-09-22, decisão do Welington):
-      projeto pessoal, sem necessidade de CI. O portão roda localmente sob
+      projeto pessoal, sem necessidade de CI. O teste de regressão roda localmente sob
       demanda: `uv run pytest -m slow`. Consequência aceita: ele só protege
       quando alguém o roda — não há nada impedindo um commit de regredir.
 - [x] `@pytest.mark.slow` para o que carrega modelo
@@ -279,7 +279,7 @@ inverter a direção faria o Codex ler um ponteiro vazio **sem erro visível**.
 - [x] `.claude/settings.json` — allowlist estreita, nada específico da estação
       (o repositório é público); o que for local vai em `.claude/settings.local.json`,
       agora no `.gitignore`
-- [x] `.claude/commands/portao.md` — os três comandos do portão de entrega
+- [x] `.claude/commands/verificacao.md` — os três comandos da verificação de entrega
 - [x] Revisão do `AGENTS.md` pelo Codex contra o repositório
 
 **Suposição declarada:** `install.py` (`~/workspace/claude-md`) gerencia o `~/.claude`
@@ -308,7 +308,7 @@ decidida na conversa: **decompor no exportador**, não partir o evento no pipeli
       Censo do acervo: em Is It A Crime, 26,3% das notas saíam encurtadas e só
       74,2% da duração soava. Verificado ponta a ponta nessa música: 778 ataques
       para 778 notas de entrada, 215 compassos e nenhum fora de 4/4.
-- [x] **B6 — portão de quantização ponta a ponta.** (ADR-023)
+- [x] **B6 — teste de quantização ponta a ponta.** (ADR-023)
       `tests/integration/test_quantizacao_ponta_a_ponta.py`: referência sintética em
       código (não em `cache/`, que é gitignorado) → rítmica → GP5 → releitura →
       `avaliar`. 2,9 s, na suíte padrão. Conferido: com o `rhythm.py` antigo, 3 dos 5
@@ -323,7 +323,7 @@ decidida na conversa: **decompor no exportador**, não partir o evento no pipeli
       (20–300) em `tempo.py`, uma fonte para CLI, API e pipeline; `transcrever` valida
       antes do download. `AFINACOES` na CLI com `typer.BadParameter` — nome fora do
       catálogo não vira mais a afinação padrão calado (a chave virou nome no ADR-028).
-- [x] **A3 — piso do portão da separação era 0,682 e o ADR-010 mediu 0,968.**
+- [x] **A3 — piso do teste da separação era 0,682 e o ADR-010 mediu 0,968.**
       (ADR-010, emenda 2026-09-23) `COM_SEPARACAO_NOTA_F1 = 0.968`, exato — o F1 é
       discreto (~0,03 por nota em 16). O piso antigo fica com mensagem própria:
       abaixo de 0,682 é o ADR desmentido, não regressão. Medido 2x: 0,968, margem
@@ -362,7 +362,7 @@ decidida na conversa: **decompor no exportador**, não partir o evento no pipeli
       ser afirmado: a mesma razão é medida para a candidata e a sugestão só sai quando
       ela explica melhor — senão `suggested_pitch` é `None`. A comparação é entre as
       duas razões, não um segundo corte pelo `limiar` (calibrado só na original). O
-      gatilho não mudou, então os portões com modelo real seguem valendo. Exposto na
+      gatilho não mudou, então os testes com modelo real seguem valendo. Exposto na
       CLI, no `_resumo` e na página; `inf` vira `null` (`Infinity` quebra o
       `JSON.parse`). `-m navegador` 4 passed.
 
@@ -442,7 +442,7 @@ Sondado antes de escrever código, com `mscore` de verdade:
 
 ### Fechada
 
-Portão: `pytest -n auto` 279 passando; `-m slow` do exportador passando com o
+Verificação de entrega: `pytest -n auto` 279 passando; `-m slow` do exportador passando com o
 `mscore` 4.7.4 instalado; `ruff` e `mypy --strict` limpos.
 
 Uma asserção fora do exportador precisou de âncora: `test_pipeline.py::
@@ -487,7 +487,7 @@ Os sete artefatos em `out/` são anteriores a isto: ainda de uma pauta. Reexport
 
 ### Fechada
 
-Portão: `pytest -n auto` 289 passando; `ruff check` e `mypy --strict` limpos.
+Verificação de entrega: `pytest -n auto` 289 passando; `ruff check` e `mypy --strict` limpos.
 
 Conferido rodando de verdade, e não só pelo teste: `thoth transcribe` numa música
 cacheada imprimiu os dez estágios com o tempo de cada um — `obtendo o áudio` 0:00,
@@ -600,7 +600,7 @@ entregue):
 Queda monotônica nas sete, nenhuma piora. Os 14 que a primeira conta ainda punha em (A)
 são (B) disfarçados: `end@1` solto numa colcheia pontuada, sem `begin` em lugar nenhum.
 
-Portão: 291 passed + 1 xfailed (era 289), ruff e mypy limpos. O `xfail(strict=True)` de
+Verificação de entrega: 291 passed + 1 xfailed (era 289), ruff e mypy limpos. O `xfail(strict=True)` de
 (B) é de propósito — fica vermelho no dia em que (B) for corrigido.
 
 O conteúdo não mudou com a correção: nos sete pares antes/depois, notas, compassos e

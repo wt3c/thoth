@@ -1,6 +1,6 @@
 """Fixtures sintéticas de baixo com ground truth conhecido.
 
-Nasceram na Fase 0 (Camada 1 do ADR-006) e viraram portão de regressão. O áudio
+Nasceram na Fase 0 (Camada 1 do ADR-006) e viraram teste de regressão. O áudio
 **não** é versionado (ADR-005): é regerado a cada execução a partir do MIDI, que
 é a própria referência.
 

@@ -91,7 +91,7 @@ cli.py      fachada fina sobre services
 - O pipeline **descarta e relata** em vez de falhar (ADR-014): nota fora do braço não
   pode custar os minutos de processamento da música inteira.
 
-## Portão de entrega
+## Verificação de entrega
 
 ```bash
 uv run pytest -n auto              # suíte padrão
@@ -122,7 +122,7 @@ nem `python` direto.
 
 **Port de fixture/baseline é cópia, nunca reescrita** (`tasks/lessons/workflow.md`). Uma
 fixture reescrita de memória levantou o F1 de 0,682 para 0,882 — o erro se disfarçou de
-melhoria. Imprima o valor medido ao lado do piso: portão que passa não diz nada sobre a
+melhoria. Imprima o valor medido ao lado do piso: teste que passa não diz nada sobre a
 margem.
 
 **`gp.Beat.status` nasce `empty` no PyGuitarPro** (`tasks/lessons/exportadores.md`). O

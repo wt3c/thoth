@@ -8,7 +8,7 @@ Duas métricas, porque uma só engana:
   ignorando a duração. O MuScriptor não é confiável em offset, e cobrar isso
   mediria o sustain do soundfont, não a transcrição.
 - **nota+offset F1** e **razão de duração** — acertou *quanto tempo* (ADR-023).
-  São **informativas, não portão**: a ressalva acima continua valendo, e é por
+  São **informativas, não critério de aprovação**: a ressalva acima continua valendo, e é por
   isso que estas duas não entram em nenhum piso de regressão. Existem porque sem
   elas não havia régua nenhuma para sustentação, e o corte de duração que o
   ADR-022 corrigiu passou invisível pelas duas primeiras — as duas pontuavam

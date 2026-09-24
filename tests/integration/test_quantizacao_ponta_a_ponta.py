@@ -1,13 +1,13 @@
 """Referência conhecida → pipeline rítmico → GP5 → releitura → `avaliar`.
 
-O portão que faltava entre a quantização e o arquivo. Os testes de unidade dos
+O teste que faltava entre a quantização e o arquivo. Os testes de unidade dos
 exportadores afirmam estrutura (quantos beats, qual o `start`); nenhum fechava o
 ciclo devolvendo o arquivo gravado a segundos e comparando com a linha de
 partida. Sem isso, ADR-021 (grade) e ADR-022 (ligadura) só tinham prova pontual.
 
 Sem modelo e sem áudio: a referência é sintética e está aqui, não em `cache/`,
-que é gitignorado (ADR-005). Cabe na suíte padrão de propósito — portão que só
-roda quando alguém lembra não é portão.
+que é gitignorado (ADR-005). Cabe na suíte padrão de propósito — teste que só
+roda quando alguém lembra não protege nada.
 """
 
 from __future__ import annotations
@@ -101,7 +101,7 @@ def _reler(song: gp.Song, cordas: tuple[int, ...]) -> list[NoteEvent]:
 @pytest.fixture(scope="module")
 def relido(tmp_path_factory: pytest.TempPathFactory) -> list[NoteEvent]:
     # Escopo de módulo: `ajustar` faz busca em 400 por 120, e as cinco afirmações
-    # olham o mesmo arquivo. Por teste, o portão custaria cinco exportações.
+    # olham o mesmo arquivo. Com escopo de função, seriam cinco exportações.
     destino = tmp_path_factory.mktemp("quantizacao")
     return _reler(_exportar(_referencia(), destino), TUNING_BASS_4)
 
@@ -127,7 +127,7 @@ def test_a_duracao_tambem_sobrevive(relido: list[NoteEvent]) -> None:
     robusta por construção: três notas ruins em treze não a deslocam. Só a
     `nota_offset_f1` cai, e apenas 7,7%.
 
-    Por isso o portão de verdade é `test_nenhuma_nota_volta_encurtada`, nota a
+    Por isso o teste de verdade é `test_nenhuma_nota_volta_encurtada`, nota a
     nota. Aqui a afirmação é que o avaliador lê o mesmo arquivo que o teste.
     """
     resultado = avaliar(_referencia(), relido)

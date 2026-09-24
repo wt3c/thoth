@@ -271,7 +271,7 @@ com as 12 notas em disputa isoladas no canal direito.
 
 **Por que isto importa além da Fase 0:** oitava errada é corda e casa erradas.
 O erro atravessa intacto até a tablatura da Fase 4 e não há etapa posterior que
-o detecte. Entra como **primeiro item do portão de regressão da Fase 1**.
+o detecte. Entra como **primeiro item do teste de regressão da Fase 1**.
 
 **Por que a escuta anterior não pegou:** o Welington ouviu o `neo_STEM` inteiro e
 disse *"as notas parecem corretas"*. Doze notas erradas de oitava, numa linha
@@ -306,7 +306,7 @@ verificador de oitava da Fase 1 nasce sem caso de teste.
    Welington estranhou a esparsidade e perguntou.
 
 Os dois falham do mesmo jeito: **artefato de avaliação entregue sem verificação
-própria**. O portão da Fase 1 precisa valer para o código de avaliação também,
+própria**. O teste da Fase 1 precisa valer para o código de avaliação também,
 não só para o pipeline — um avaliador quebrado produz decisão errada com a mesma
 facilidade com que um transcritor quebrado produz tablatura errada.
 
@@ -337,12 +337,12 @@ para baixo.
 
 **O que a Fase 0 mudou no plano:** a Fase 4 virou caminho crítico (ADR-003 —
 o motor não emite partitura), o Demucs virou etapa fixa (ADR-010), o escopo
-fechou em baixo (ADR-011) e o portão de regressão passa a cobrir o próprio
+fechou em baixo (ADR-011) e o teste de regressão passa a cobrir o próprio
 código de avaliação, não só o pipeline.
 
 ---
 
-## Adendo (2026-09-22): as fixtures viraram portão de regressão
+## Adendo (2026-09-22): as fixtures viraram teste de regressão
 
 A tabela da Camada 1 saiu do scratchpad e virou teste: `tests/sintetico.py` regera as seis
 fixtures (MIDI → fluidsynth → normalização de pico; áudio nunca versionado, ADR-005) e
@@ -360,7 +360,7 @@ Reprodução das seis, modelo `small`, condição livre — idêntica à Fase 0 
 | walking | 0,938 | 0,968 | 16 | 15 |
 | misto | 0,938 | 0,682 | 16 | 28 |
 
-O portão roda sem folga (`FOLGA = 0.0`): a renderização é byte-idêntica entre execuções
+O teste roda sem folga (`FOLGA = 0.0`): a renderização é byte-idêntica entre execuções
 (conferido por SHA-256), o transcritor está pregado em `muscriptor@0.3.0` e os pesos são
 conferidos contra `models.lock.toml` antes de medir — medir outro checkpoint torna os
 pisos sem sentido. Uma folga uniforme também seria enganosa: 0,03 absorveria uma nota
@@ -369,10 +369,10 @@ perdida em `groove16` (32 notas) e nenhuma em `graves` (10).
 **Terceiro erro meu, da mesma família dos dois anteriores.** Reescrevi a fixture `misto` de
 memória em vez de copiar o gerador: nota F1 deu 0,882 contra a baseline 0,682 — e a
 direção do erro (para melhor) é a que menos desperta suspeita. Só apareceu porque imprimi
-os valores medidos ao lado das baselines em vez de aceitar o verde do portão. Registrado
+os valores medidos ao lado das baselines em vez de aceitar o verde do teste. Registrado
 em `tasks/lessons/workflow.md`.
 
-**Aberto:** não há CI neste repositório. O portão existe e reproduz localmente, mas
+**Aberto:** não há CI neste repositório. O teste existe e reproduz localmente, mas
 "travado no CI" ainda não é verdade — falta um job que instale fluidsynth + soundfont e
-rode `-m slow`, com os dois `skipif` virando falha nesse job (portão que pula em silêncio
-é pior que portão nenhum).
+rode `-m slow`, com os dois `skipif` virando falha nesse job (teste que pula em silêncio
+é pior que teste nenhum).

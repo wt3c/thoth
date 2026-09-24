@@ -1,6 +1,6 @@
 """O que a separação compra, medido contra ground truth (Camada 1 do ADR-006).
 
-O portão do `test_regressao_fase0.py` mede o **transcritor sozinho**: renderiza a
+O teste do `test_regressao_fase0.py` mede o **transcritor sozinho**: renderiza a
 fixture e entrega o WAV direto ao MuScriptor. É a medição certa para detectar
 regressão de modelo, e é a medição errada para decidir sobre o ADR-010 — que
 manda separar antes de transcrever.
@@ -34,13 +34,13 @@ from thoth.services.evaluation import Scores, avaliar, notas_do_midi
 SEM_SEPARACAO_NOTA_F1 = 0.682
 SEM_SEPARACAO_ONSET_F1 = 0.938
 #: O piso de verdade: o valor que a separação **mediu** (ADR-010, emenda de
-#: 2026-09-23). Com 0,682 no lugar, o portão passava com a separação perdendo
+#: 2026-09-23). Com 0,682 no lugar, o teste passava com a separação perdendo
 #: quatro notas de dezesseis e não dizia nada.
 #:
 #: Exato, sem folga, porque o F1 aqui é discreto: 16 notas de referência fazem a
 #: menor diferença possível valer ~0,03. Não existe flutuação menor que isso para
 #: uma folga absorver — o que houver é nota ganha ou perdida, e é para saber disso
-#: que o portão existe.
+#: que o teste existe.
 COM_SEPARACAO_NOTA_F1 = 0.968
 
 pytestmark = [

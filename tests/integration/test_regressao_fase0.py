@@ -1,10 +1,10 @@
-"""Portão de regressão: as fixtures da Fase 0, travadas nos números medidos.
+"""Teste de regressão: as fixtures da Fase 0, travadas nos números medidos.
 
 Vale **apenas para o modelo `small`** na revisão fixada em `models.lock.toml`
 (ADR-009): os pisos abaixo são medição daquele checkpoint, não meta de
 qualidade. Trocar de modelo exige remedir, não afrouxar o piso.
 
-O portão cobre a cadeia inteira — geração da fixture, MuScriptor e o avaliador —
+O teste cobre a cadeia inteira — geração da fixture, MuScriptor e o avaliador —
 porque um avaliador quebrado produz decisão errada com a mesma facilidade com
 que um transcritor quebrado produz tablatura errada.
 """
@@ -72,7 +72,7 @@ def test_fixture_nao_regrediu(
     estimativa = [n for n in todas if n.instrument == "electric_bass"]
 
     # Sem isto, um rótulo diferente (ADR-008: o MuScriptor já chamou baixo de
-    # `acoustic_piano` em áudio curto) esvazia o filtro e o portão reporta
+    # `acoustic_piano` em áudio curto) esvazia o filtro e o teste reporta
     # colapso total de qualidade em vez do que de fato mudou.
     assert estimativa, f"{nome}: nenhuma nota electric_bass; rótulos: {
         Counter(n.instrument for n in todas)}"

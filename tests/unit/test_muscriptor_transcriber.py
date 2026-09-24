@@ -120,7 +120,7 @@ def test_transcreve_audio_real(tmp_path: Path) -> None:
 
     assert notas, "o modelo real não devolveu nenhuma nota de baixo"
     assert all(n.offset_s > n.onset_s for n in notas)
-    # Afrouxado de propósito: o critério de qualidade é o F1 do portão de
+    # Afrouxado de propósito: o critério de qualidade é o F1 do teste de
     # regressão, não este teste. Aqui só se verifica que o adapter conversa
     # com o modelo e devolve algo do registro certo.
     assert min(n.pitch for n in notas) >= 24

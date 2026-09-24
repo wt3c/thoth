@@ -325,7 +325,7 @@ Isto **não reverte** a decisão de separar sempre: o vazamento do teclado no
 `jorge` é erro de instrumento (nota que não existe), enquanto o salto de oitava é
 erro de altura numa nota real — mais barato de corrigir, e corrigível com o
 áudio original em mãos. Mas desmonta a leitura de que separar sai de graça.
-**Condiciona a Fase 1:** o portão de regressão precisa de uma verificação de
+**Condiciona a Fase 1:** o teste de regressão precisa de uma verificação de
 oitava contra o espectro da mix original, não só de métricas contra o stem.
 
 ### Emenda (2026-09-22, ground truth)
@@ -354,10 +354,10 @@ ADR, não o piso.
 ### Emenda (2026-09-23, o piso era o número errado)
 
 "Com o número sem separação como piso" estava errado, e o erro era de tipo:
-0,682 é o valor de **não separar**. O portão pedia que separar não fosse pior que
+0,682 é o valor de **não separar**. O teste pedia que separar não fosse pior que
 não separar — e a separação mede 0,968. Sobravam 0,286 de espaço livre: a
-separação podia perder **quatro notas de dezesseis** e o portão passava calado,
-exatamente o vazio que a lição de `workflow.md` descreve ("portão que passa não diz
+separação podia perder **quatro notas de dezesseis** e o teste passava calado,
+exatamente o vazio que a lição de `workflow.md` descreve ("teste que passa não diz
 nada sobre a margem").
 
 O piso agora é `COM_SEPARACAO_NOTA_F1 = 0.968`, o valor medido, **exato**. O F1 aqui
@@ -867,7 +867,7 @@ encerra o anterior — e não um limite de formato.
   Os três testes de ligadura do MusicXML foram conferidos vermelhos com o
   `rhythm.py` antigo — sem isso não passariam de tautologia escrita depois do fato.
 
-## ADR-023 — Duração passa a ser medida: métrica informativa e portão ponta a ponta
+## ADR-023 — Duração passa a ser medida: métrica informativa e teste ponta a ponta
 
 **Data:** 2026-09-23 · **Status:** aceito
 
@@ -878,7 +878,7 @@ confiável em offset, e exigir isso mediria o sustain do soundfont. A ressalva
 continua certa. O que ela não previu é que **sem régua nenhuma de duração, um defeito
 de duração nosso fica invisível**.
 
-Medido no portão novo, com o corte na barra do ADR-022 reativado e três de treze notas
+Medido no teste novo, com o corte na barra do ADR-022 reativado e três de treze notas
 encurtadas:
 
 ```
@@ -890,7 +890,7 @@ virava pausa e nenhum número do projeto se movia.
 
 ### Decisão
 
-**Duas métricas novas em `Scores`, informativas e nunca portão de regressão.**
+**Duas métricas novas em `Scores`, informativas e nunca critério de aprovação.**
 
 - `nota_offset_f1` — nota F1 cobrando a duração, `offset_ratio=0.2` (padrão do
   mir_eval e da literatura). Comparável com publicação.
@@ -904,14 +904,14 @@ número misturaria sustain do soundfont com erro de transcrição. Elas existem 
 medir mudança nossa entre duas execuções do mesmo estímulo, não para reprovar o
 modelo.
 
-**E um portão ponta a ponta na suíte padrão** (`tests/integration/test_quantizacao_ponta_a_ponta.py`):
+**E um teste ponta a ponta na suíte padrão** (`tests/integration/test_quantizacao_ponta_a_ponta.py`):
 referência sintética → `ajustar`/`alinhar`/`monofonizar` → Viterbi → GP5 → releitura
 do arquivo de volta a segundos, fundindo ligaduras → `avaliar`.
 
 - A referência é **código, não arquivo**: `cache/` e `out/` são gitignorados (ADR-005),
-  e portão que depende de artefato ausente não é portão.
+  e teste que depende de artefato ausente não protege nada.
 - Sem modelo e sem áudio, então fica **fora** dos marcadores `slow`/`network`: 2,9 s.
-  Portão que só roda quando alguém lembra não protege nada.
+  Teste que só roda quando alguém lembra não protege nada.
 - Três das treze notas atravessam a barra — 23%, a proporção medida em Is It A Crime.
   Uma travessia só não serviria: com uma, o corte na barra **passava** por todas as
   métricas, porque o erro caía exatamente em `0,2 × referência`.
@@ -920,7 +920,7 @@ do arquivo de volta a segundos, fundindo ligaduras → `avaliar`.
 
 - A afirmação que reprova a regressão é **nota a nota**
   (`test_nenhuma_nota_volta_encurtada`), não agregada. Mediana é robusta por
-  construção: é o que se quer de um resumo e o oposto do que se quer de um portão.
+  construção: é o que se quer de um resumo e o oposto do que se quer de um teste.
 - `Scores` ganhou dois campos. Nenhum consumidor constrói `Scores` posicionalmente
   fora do módulo (conferido por `grep`); os dois testes de igualdade foram acertados.
 - A régua para B3 (dinâmica e articulação) já existe quando aquele item chegar.
@@ -1103,7 +1103,7 @@ resultado delas em cache, e não tratava nem a falha nem a interrupção.
 - `local_source:50` e `auralizacao:152` mandavam o `stderr` do ffmpeg para o terminal ao
   vivo; agora ele aparece só na falha. Com `-loglevel error` nos dois, não se perde
   nada — mas é mudança de comportamento, e está registrada aqui.
-- O portão da separação foi remedido depois da mudança de layout: 0,968, o mesmo valor,
+- O teste da separação foi remedido depois da mudança de layout: 0,968, o mesmo valor,
   com o demucs real (`ref=16 est=15`).
 
 ## ADR-027 — Um job por vez, e histórico com teto
@@ -1225,7 +1225,7 @@ nenhuma — nem CLI, nem API, nem página de estudo:
   50 ms a função continua calada em vez de opinar mal.
 - O limiar de 0,40 foi calibrado com janela de 0,6 s (Fase 0). Janela menor mede a
   nota, não a vizinhança, então a razão fica mais fiel — mas a calibração não foi
-  refeita nota a nota: o que foi verificado é que os portões com modelo real continuam
+  refeita nota a nota: o que foi verificado é que os testes com modelo real continuam
   no mesmo número.
 - O custo de memória passa a ser uma janela, não a música: ~0,2 MB para 0,5 s. Medido
   no teste: pico abaixo de 2 MB onde antes eram 26,5 MB.
@@ -1271,7 +1271,7 @@ calculado.
 
 - O aviso passa a ser diagnóstico: `23@1.2s → 35 (razão 3,00 contra 0,12)` ou
   `23@1.2s → nenhuma oitava explica melhor (razão 0,33)`.
-- Os portões com modelo real não precisaram ser refeitos — o gatilho é idêntico e
+- Os testes com modelo real não precisaram ser refeitos — o gatilho é idêntico e
   nada em `tests/integration/test_separacao_fase0.py` afirma sobre a sugestão. A
   corrida `-m "slow and not network"` de antes desta mudança (12 passed em 205 s)
   continua valendo.
@@ -1402,7 +1402,7 @@ no braço. O deslocamento é cobrado contra `mão`, não contra o traste anterio
 - A leitura ampla do título do item ("digitação otimiza posição, não técnica":
   articulação, dinâmica, deslizes, pestana) **não** entra aqui — é território do B3,
   e fica registrado para não desaparecer.
-- Nenhum portão medido se move: o `COM_SEPARACAO_NOTA_F1 = 0.968` mede detecção de
+- Nenhum teste de regressão se move: o `COM_SEPARACAO_NOTA_F1 = 0.968` mede detecção de
   nota, não digitação.
 
 ## ADR-033 — dinâmica e articulação não são inferíveis desta entrada (B3)
@@ -1616,7 +1616,7 @@ Nada muda. Semicolcheia reta e andamento constante continuam como estão.
   Camada 3 do ADR-007 — que é o que tornaria a grade fina e o swing mensuráveis.
 - Quando reabrir, o conserto do degrau é **mapa de andamento com duas seções**, não
   rastreador de andamento contínuo: a série medida é um platô seguido de outro.
-- Nenhum código mudou, então o portão de entrega da tarefa anterior continua valendo.
+- Nenhum código mudou, então a verificação de entrega da tarefa anterior continua valendo.
 
 ---
 
