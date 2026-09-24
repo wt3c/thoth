@@ -11,7 +11,9 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from pathlib import Path
 
+import numpy as np
 import pytest
+import soundfile as sf
 
 from tests.sintetico import SOUNDFONT, renderizar
 from thoth.domain.models import TUNING_BASS_5, AudioAsset, NoteEvent
@@ -21,10 +23,30 @@ from thoth.services.pipeline import ROTULOS_DE_BAIXO, transcrever
 
 @dataclass(frozen=True, slots=True)
 class SeparadorFalso:
-    """Devolve o próprio áudio como stem: a separação tem teste próprio."""
+    """Devolve o próprio áudio como stem de baixo, e silêncio como playback.
+
+    A separação tem teste próprio. O `no_bass` precisa ser um arquivo **distinto**:
+    apontá-lo para a entrada faria mix, baixo e sem-baixo saírem com os mesmos
+    bytes, e o teste de cópia não distinguiria fiação correta de laço que grava o
+    mix três vezes — a armadilha que o ADR-036 já pagou.
+    """
 
     def separate(self, audio: Path, out_dir: Path) -> dict[str, Path]:
-        return {"bass": audio}
+        out_dir.mkdir(parents=True, exist_ok=True)
+        playback = out_dir / "no_bass.wav"
+        dados, taxa = sf.read(str(audio))
+        sf.write(str(playback), np.zeros_like(dados), taxa)
+        return {"bass": audio, "no_bass": playback}
+
+
+@dataclass(slots=True)
+class EtapasVistas:
+    """Dublê do `Progresso`: anota o nome de cada estágio na ordem em que chegou."""
+
+    nomes: list[str] = field(default_factory=list)
+
+    def inicia(self, etapa: str, detalhe: str = "") -> None:
+        self.nomes.append(etapa)
 
 
 @dataclass(frozen=True, slots=True)
@@ -40,16 +62,15 @@ def _nota(pitch: int, onset: float, rotulo: str = "electric_bass") -> NoteEvent:
 
 
 def _rodar(tmp_path: Path, notas: tuple[NoteEvent, ...], **kwargs: object):
+    """Os dublês são default, não imposição: `kwargs` passa por cima de qualquer um."""
     wav, _ = renderizar("escala", tmp_path)
-    return transcrever(
-        str(wav),
-        tmp_path / "out",
-        bpm=90,
-        cache_dir=tmp_path / "cache",
-        separator=SeparadorFalso(),
-        transcriber=TranscritorFalso(notas),
-        **kwargs,  # type: ignore[arg-type]
-    )
+    argumentos: dict[str, object] = {
+        "bpm": 90,
+        "cache_dir": tmp_path / "cache",
+        "separator": SeparadorFalso(),
+        "transcriber": TranscritorFalso(notas),
+    }
+    return transcrever(str(wav), tmp_path / "out", **(argumentos | kwargs))  # type: ignore[arg-type]
 
 
 requer_soundfont = pytest.mark.skipif(not SOUNDFONT.exists(), reason="soundfont ausente")
@@ -160,11 +181,10 @@ def test_caminho_completo_com_demucs_e_muscriptor_reais(tmp_path: Path) -> None:
 
     assert resultado.notas > 10  # a escala tem 15 notas
     assert all(c.exists() for c in resultado.artefatos.values())
-    # Com o Demucs real o stem é outro arquivo, e não o próprio mix como no dublê:
-    # é aqui que se vê que são dois áudios distintos, e não a mesma cópia duas vezes.
-    assert (
-        resultado.artefatos["mix"].read_bytes() != resultado.artefatos["baixo"].read_bytes()
-    )
+    # Com o Demucs real os três stems são arquivos distintos, e não o próprio mix
+    # como no dublê: é aqui que se vê que não é a mesma cópia três vezes.
+    bytes_de = {k: resultado.artefatos[k].read_bytes() for k in ("mix", "baixo", "sem-baixo")}
+    assert len({*bytes_de.values()}) == 3, "mix, baixo e playback têm que diferir"
 
 
 @requer_soundfont
@@ -288,3 +308,134 @@ def test_sem_tom_informado_o_pipeline_estima_e_relata(tmp_path: Path) -> None:
 
     assert resultado.tonalidade is not None
     assert resultado.tonalidade.margem is not None, "estimativa passa pela margem"
+
+
+# --- Uma pasta por música, e todo áudio dentro dela (ADR-037) -----------------
+
+
+@requer_soundfont
+def test_cada_musica_ganha_a_propria_pasta(tmp_path: Path) -> None:
+    """Oito músicas em `out/` plano são quarenta arquivos intercalados (ADR-037)."""
+    resultado = _rodar(tmp_path, (_nota(36, 0.0), _nota(38, 0.7)))
+    titulo = resultado.asset.title
+
+    pasta = tmp_path / "out" / titulo
+    assert pasta.is_dir()
+    assert {c.parent for c in resultado.artefatos.values()} == {pasta}
+    # O nome se repete de propósito: arquivo arrastado para fora da pasta continua
+    # dizendo de que música ele é.
+    assert all(c.name.startswith(titulo) for c in resultado.artefatos.values())
+
+
+@requer_soundfont
+def test_os_quatro_audios_saem_na_pasta_da_musica(tmp_path: Path) -> None:
+    """Mix, baixo, playback e auralização — tudo que o pipeline produz de áudio.
+
+    O playback (`no_bass`) o Demucs já entregava de graça e ficava só no cache; a
+    auralização era comando à parte, e quem transcrevia não a tinha.
+    """
+    resultado = _rodar(tmp_path, (_nota(36, 0.0), _nota(38, 0.7)))
+    titulo = resultado.asset.title
+    audios = {k: resultado.artefatos[k] for k in ("mix", "baixo", "sem-baixo", "aural")}
+
+    assert [c.name for c in audios.values()] == [
+        f"{titulo}.mix.wav",
+        f"{titulo}.baixo.wav",
+        f"{titulo}.sem-baixo.wav",
+        f"{titulo}.aural.wav",
+    ]
+    # Cópia, não atalho: a pasta de saída sobrevive à limpeza do cache.
+    assert audios["mix"].read_bytes() == resultado.asset.wav.read_bytes()
+    assert audios["baixo"].read_bytes() == resultado.stem.read_bytes()
+    assert not any(c.is_symlink() for c in audios.values())
+    # O dublê rende o playback em silêncio, então ele difere do mix. Os três
+    # distintos entre si é o que o teste `slow` com o Demucs real afirma.
+    assert audios["sem-baixo"].read_bytes() != audios["mix"].read_bytes()
+    # Auralização é estéreo por definição: original num canal, transcrição no outro.
+    assert sf.info(str(audios["aural"])).channels == 2
+
+
+@requer_soundfont
+def test_separacao_sem_playback_nao_impede_o_resto(tmp_path: Path) -> None:
+    """`no_bass` é opcional no contrato do `Separator` — falta dele não é falha."""
+
+    @dataclass(frozen=True, slots=True)
+    class SoBaixo:
+        def separate(self, audio: Path, out_dir: Path) -> dict[str, Path]:
+            return {"bass": audio}
+
+    resultado = _rodar(tmp_path, (_nota(36, 0.0), _nota(38, 0.7)), separator=SoBaixo())
+
+    assert "sem-baixo" not in resultado.artefatos
+    assert resultado.artefatos["mix"].exists()
+
+
+@requer_soundfont
+def test_auralizacao_que_falha_nao_derruba_a_corrida(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Soundfont é opcional; os minutos de CPU já gastos, não (ADR-014).
+
+    O mock aqui é do cenário de erro, não do caminho felizardo — esse roda com o
+    fluidsynth real nos testes acima (Regra 3).
+    """
+    from thoth.services import pipeline as modulo
+    from thoth.services.auralizacao import AuralizacaoError
+
+    def explodir(*args: object, **kwargs: object) -> Path:
+        raise AuralizacaoError("soundfont ausente: /nao/existe.sf2")
+
+    monkeypatch.setattr(modulo, "auralizar", explodir)
+    resultado = _rodar(tmp_path, (_nota(36, 0.0), _nota(38, 0.7)))
+
+    assert "aural" not in resultado.artefatos
+    assert resultado.falha_na_auralizacao is not None
+    assert "soundfont" in resultado.falha_na_auralizacao
+    assert resultado.artefatos["gp5"].exists(), "a partitura não pode ir embora com o áudio"
+
+
+# --- Os estágios relatados enquanto rodam (ADR-037) ---------------------------
+
+
+@requer_soundfont
+def test_relata_cada_estagio_na_ordem_em_que_roda(tmp_path: Path) -> None:
+    """O pipeline anuncia; quem desenha é a CLI. Aqui o dublê só anota a ordem."""
+    etapas = EtapasVistas()
+    _rodar(tmp_path, (_nota(36, 0.0), _nota(38, 0.7)), progresso=etapas)
+
+    assert etapas.nomes == [
+        "obtendo o áudio",
+        "separando o baixo",
+        "transcrevendo as notas",
+        "ajustando a grade rítmica",
+        "conferindo as oitavas",
+        "posicionando no braço",
+        "exportando a partitura",
+        "copiando os áudios",
+        "auralizando",
+    ]
+    # `bpm=90` informado pula a estimativa; ela tem teste próprio, porque uma lista
+    # só provaria nove dos dez estágios e passaria por completa.
+    assert "estimando o andamento" not in etapas.nomes
+
+
+@requer_soundfont
+def test_o_estagio_da_estimativa_aparece_quando_nao_ha_bpm(tmp_path: Path) -> None:
+    wav, _ = renderizar("escala", tmp_path)
+    etapas = EtapasVistas()
+
+    transcrever(
+        str(wav),
+        tmp_path / "out",
+        bpm=None,
+        cache_dir=tmp_path / "cache",
+        separator=SeparadorFalso(),
+        transcriber=TranscritorFalso((_nota(36, 0.0), _nota(38, 0.7))),
+        progresso=etapas,
+    )
+
+    assert etapas.nomes[:3] == [
+        "obtendo o áudio",
+        "estimando o andamento",
+        "separando o baixo",
+    ]

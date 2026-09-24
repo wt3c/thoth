@@ -38,3 +38,14 @@ class Exporter(Protocol):
     """Notas posicionadas → arquivo de partitura. Hoje GP5 e MusicXML."""
 
     def export(self, notes: list[TabNote], out: Path, tuning: tuple[int, ...]) -> Path: ...
+
+
+class Progresso(Protocol):
+    """Recebe o nome de cada estágio quando ele começa (ADR-037).
+
+    Um método só, e nenhum "terminou": o estágio seguinte fecha o anterior, e o
+    último fecha quando `transcrever` devolve. Quem desenha sabe disso; o pipeline
+    não precisa saber. É o que mantém o `rich` na CLI e fora dos services.
+    """
+
+    def inicia(self, etapa: str, detalhe: str = "") -> None: ...

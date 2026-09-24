@@ -1734,3 +1734,94 @@ pelo mesmo endpoint dos outros.
   construção e a asserção não diria nada.
 - Os `.mscz` que eu gerava à mão para ver as duas pautas no MuseScore não têm mais
   função desde o ADR-035, e os sete que estavam em `out/` foram apagados a pedido.
+
+---
+
+## ADR-037 — uma pasta por música, todo o áudio dentro, e o estágio na tela
+
+**Data:** 2026-09-23
+**Status:** aceito — supera o ADR-036 na parte de onde e quantos áudios saem
+
+### Contexto
+
+Pedido direto: "cli colorido que mostra todas as etapas do processo", "salve os
+arquivos em pastas separadas com o nome da musica", "todos os wavs que você
+produzir".
+
+Dois problemas distintos, um de saída e um de tela.
+
+Na saída: o ADR-036 pôs mix e baixo em `out/` plano, ao lado do `.gp5` e do
+`.musicxml`. Com oito músicas isso é quarenta arquivos intercalados, e os de uma
+mesma música só se agrupam porque o nome começa igual. Além disso, dois áudios que
+o pipeline já produzia ficavam de fora: o `no_bass.wav`, que o Demucs devolve junto
+com o baixo e ninguém usava, e a auralização, que só saía pelo comando `auralizar`
+rodado à mão depois.
+
+Na tela: o `transcribe` imprimia uma frase antes da chamada — "separando e
+transcrevendo — ~2,5x a duração do áudio em CPU…" — e depois nada por minutos. Medido
+nesta sessão numa música de 5'34": 2m36 só na transcrição. Uma frase solta não diz em
+qual estágio se está, nem se algo travou.
+
+### Decisão
+
+**Uma pasta por música, e o nome repetido dentro dela.** `out/<título>/<título>.gp5`,
+`.musicxml`, `.mix.wav`, `.baixo.wav`, `.sem-baixo.wav`, `.aural.wav`. Repetir o nome
+é redundante dentro da pasta e é exatamente o ponto: o arquivo arrastado para fora
+dela continua dizendo de que música é (a propriedade que o ADR-017 comprou).
+
+**Os quatro áudios, e a auralização dentro do pipeline.** O `no_bass` era desperdício
+puro — o Demucs já o escrevia no cache. A auralização deixa de ser opt-in e sai junto:
+é o arquivo com que se confere se a transcrição descola do original, e quem acabou de
+esperar quinze minutos não deveria precisar de um segundo comando para ouvir isso.
+
+**Falha na auralização vira relato, não exceção.** Ela depende de `fluidsynth` e de
+soundfont, e nenhum dos dois vale os minutos de CPU já gastos: volta em
+`Resultado.falha_na_auralizacao` e a CLI avisa em amarelo, com a partitura entregue
+(mesma forma do ADR-014). Há teste afirmando que o `.gp5` sobrevive à falha.
+
+**`Progresso` como `Protocol` em `domain/ports.py`, com um método só.** O pipeline
+anuncia `inicia(etapa, detalhe)` antes de cada estágio; quem desenha é a CLI, com
+`rich`. Não há "terminou" porque o estágio seguinte fecha o anterior e o último fecha
+quando `transcrever` devolve — quem desenha sabe disso, o pipeline não precisa saber.
+É o que mantém terminal, cor e barra fora dos services. O default é um objeto nulo
+(`_Silencio`), não dez `if progresso is not None`.
+
+Detalhes de terminal que custaram medição: `markup=False` em tudo, porque título de
+música tem `[` (`[Official Video]`) e como marcação engoliria o resto da linha;
+`highlight=False` no `Console`, porque o rich colore número e pontuação no meio do
+título; `soft_wrap=True`, porque caminho quebrado em duas linhas não se copia.
+`processos.py::rodar` usa `capture_output=True`, então Demucs, MuScriptor e ffmpeg não
+escrevem no terminal e não atropelam a região viva do `rich`.
+
+### Alternativa descartada
+
+Deixar a auralização opt-in e pôr uma flag `--sem-auralizacao` no `transcribe`. Flag
+para desligar um estágio de seis segundos num pipeline de quinze minutos é
+configuração que ninguém vai usar.
+
+Reprocessar as oito músicas em vez de mover os arquivos. Custaria ~40 min de CPU para
+produzir os mesmos bytes: o `.gp5` e o `.musicxml` já vinham do exportador de duas
+pautas (ADR-035). Movidas, e o que faltava foi preenchido.
+
+### Consequência
+
+- `out/` passa a ~200 MB por música (quatro WAVs em vez de dois). Continua fora do
+  git (ADR-005) — e agora inclusive a auralização, que carrega o mix original num
+  dos canais.
+- **Todo job da API paga a auralização.** `api/app.py:199` chama a mesma
+  `pipeline.transcrever`, então cada job agora roda `fluidsynth` e `ffmpeg` sobre a
+  faixa inteira. Foram 6s na música medida; não é gratuito, e se a API virar o
+  caminho principal isso é o primeiro lugar a olhar.
+- O comando `auralizar` grava na pasta da música, não em `out/` plano — fora disso
+  ele produziria uma segunda cópia num segundo lugar.
+- O dublê de separação da suíte rápida precisou produzir um `no_bass` **distinto**
+  (silêncio, arquivo próprio): apontá-lo para a entrada faria mix, baixo e sem-baixo
+  saírem com os mesmos bytes, e o teste de cópia não distinguiria fiação correta de
+  laço gravando o mix três vezes. O teste `slow` afirma o que só ele pode: com o
+  Demucs real os três são dois a dois diferentes.
+- `no_bass` é opcional no contrato do `Separator` — quem dubla a separação não é
+  obrigado a produzir playback para exercitar o resto. Há teste com um separador que
+  devolve só `{"bass": …}`.
+- Fora de terminal (log, CI, teste) o `rich` não anima: imprime cada estágio concluído
+  como uma linha `✓ <estágio>  0:00:00`. É o que se quer num log, e é o que os testes
+  da CLI afirmam.

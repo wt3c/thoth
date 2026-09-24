@@ -426,3 +426,44 @@ Os sete artefatos em `out/` são anteriores a isto: ainda de uma pauta. Reexport
 - [x] ADR-036 em `tasks/decisions.md`.
 - [x] Oito músicas já processadas preenchidas sem reprocessar, e os sete `.mscz`
       apagados.
+
+## Fase 11 — pasta por música e CLI que mostra os estágios (ADR-037)
+
+> Origem: pedido direto — "cli colorido que mostra todas as etapas do processo",
+> "salve os arquivos em pastas separadas com o nome da musica", "todos os wavs que
+> você produzir". Decidido junto: nomes repetem o da música dentro da pasta, e os
+> wavs são mix, baixo, sem-baixo e a auralização.
+
+- [x] Teste primeiro: um dublê de `Progresso` coletando os nomes dos estágios na
+      ordem; caminhos dentro de `out/<nome>/`; os quatro wavs presentes e com os
+      bytes da origem.
+- [x] `Progresso` como `Protocol` em `domain/ports.py` — o pipeline anuncia o
+      estágio, quem desenha é o CLI. Sem isso o `rich` entraria num service.
+- [x] `transcrever` grava numa pasta por música e copia os quatro wavs.
+- [x] Auralização dentro do pipeline, e falha dela **não** mata a corrida: o
+      soundfont é opcional e são minutos de CPU em jogo (ADR-014).
+- [x] `transcribe` com `rich`: um estágio por linha, tempo decorrido, ✓ ao fechar.
+- [x] ADR-037 em `tasks/decisions.md`, emendando o ADR-036 no que muda.
+- [x] As oito músicas já em `out/` movidas para o formato novo.
+
+### Fechada
+
+Portão: `pytest -n auto` 289 passando; `ruff check` e `mypy --strict` limpos.
+
+Conferido rodando de verdade, e não só pelo teste: `thoth transcribe` numa música
+cacheada imprimiu os dez estágios com o tempo de cada um — `obtendo o áudio` 0:00,
+`estimando o andamento` 0:05, `separando o baixo` 0:00 (cache), `transcrevendo as
+notas` **2:36**, `ajustando a grade rítmica` 0:05, `conferindo as oitavas` 0:01,
+`posicionando no braço` 0:00, `exportando a partitura` 0:03, `copiando os áudios`
+0:00, `auralizando` 0:06. Total 3m15 de parede, 25m53 de CPU.
+
+As oito pastas em `out/` conferidas com 6 arquivos cada e nada solto em `out/`
+(`find out -maxdepth 1 -type f` vazio). Os quatro WAVs de uma delas conferidos por
+hash: distintos, e o RMS do playback (0,0896) fica entre o do mix (0,1215) e o do
+baixo (0,0290), como se espera de um mix sem o baixo.
+
+Achado que fica para outra tarefa: o music21 cospe `beam: WARNING: Found a messed up
+beam pair` dezenas de vezes por música ao gravar o MusicXML. Não foi silenciado de
+propósito — `Environment.warn` escreve direto em `sys.stderr` e ignora a configuração
+de `warnings`, e o aviso é sinal real sobre os grupos de colcheia que os offsets das
+notas produzem. Esconder esconderia o defeito.

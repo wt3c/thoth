@@ -3,10 +3,14 @@
 from __future__ import annotations
 
 from collections.abc import Mapping
+from dataclasses import dataclass
 from pathlib import Path
 
 import typer
 import uvicorn
+from rich.console import Console
+from rich.progress import Progress, SpinnerColumn, TaskID, TextColumn, TimeElapsedColumn
+from rich.text import Text
 
 from thoth.adapters.ingest import resolver_fonte
 from thoth.api.app import criar_app
@@ -23,6 +27,45 @@ from thoth.services.tonalidade import Tonalidade, tom_de_texto
 app = typer.Typer(help="Áudio → partitura e tablatura, com foco em contrabaixo.")
 
 CACHE_PADRAO = Path("cache")
+
+#: `highlight=False` porque nome de música não é código: o rich colore número e
+#: pontuação no meio do título e o nome fica ilegível.
+console = Console(highlight=False)
+
+
+def _diz(texto: str, estilo: str = "") -> None:
+    """Uma linha na tela, sem o rich interpretar nada dentro dela.
+
+    `markup=False` porque título de música tem `[` (`[Official Video]`), e como
+    marcação ele engoliria o resto da linha. `soft_wrap` porque caminho quebrado em
+    duas linhas não se copia.
+    """
+    console.print(texto, style=estilo, markup=False, soft_wrap=True)
+
+
+@dataclass(slots=True)
+class _Etapas:
+    """Desenha na tela os estágios que o pipeline anuncia — implementa `Progresso`.
+
+    O estágio seguinte fecha o anterior; o último fecha em `encerrar`, quando
+    `transcrever` devolve. É por isso que o `Protocol` tem um método só.
+
+    Fora de terminal (log, CI, teste) o rich não anima: imprime cada estágio
+    concluído como uma linha, o que é exatamente o que se quer num log.
+    """
+
+    barra: Progress
+    atual: TaskID | None = None
+
+    def inicia(self, etapa: str, detalhe: str = "") -> None:
+        self.encerrar()
+        self.atual = self.barra.add_task(f"{etapa} — {detalhe}" if detalhe else etapa, total=1)
+
+    def encerrar(self) -> None:
+        if self.atual is not None:
+            self.barra.update(self.atual, completed=1)
+            self.atual = None
+
 
 def _escolher[T](catalogo: Mapping[str, T], nome: str, opcao: str) -> T:
     """Nome fora do catálogo é erro de uso, não sinônimo do default (ADR-025).
@@ -62,14 +105,17 @@ def auralizar(
     ativo = resolver_fonte(ref).fetch(ref, cache)
     notas_jsonl = cache / ativo.source_id / "notas.jsonl"
     if not notas_jsonl.exists():
-        typer.secho(
+        _diz(
             f"sem notas em cache para {ativo.title!r}: rode `thoth transcribe {ref}` antes",
-            fg=typer.colors.RED,
+            "bold red",
         )
         raise typer.Exit(code=1)
 
-    destino = _auralizar(ativo.wav, ler(notas_jsonl), out / f"{nome_de_arquivo(ativo)}.aural.wav")
-    typer.echo(destino)
+    # Mesma pasta que o `transcribe` usa (ADR-037): fora dela, este comando gravaria
+    # uma segunda cópia num segundo lugar.
+    nome = nome_de_arquivo(ativo)
+    destino = _auralizar(ativo.wav, ler(notas_jsonl), out / nome / f"{nome}.aural.wav")
+    _diz(str(destino), "green")
 
 
 @app.command()
@@ -104,15 +150,26 @@ def transcribe(
 
     cordas = _escolher(AFINACOES, afinacao, "--afinacao")
     custos = _escolher(DIGITACOES, digitacao, "--digitacao")
-    typer.echo("separando e transcrevendo — ~2,5x a duração do áudio em CPU…")
-    r = pipeline.transcrever(
-        ref,
-        out,
-        bpm=bpm,
-        tuning=cordas,
-        cache_dir=cache,
-        assigner=ViterbiFretAssigner(custos=custos),
-    )
+    # O tempo por estágio é o que faltava: a separação e a transcrição levam
+    # minutos cada, e uma frase solta antes da chamada não dizia em qual delas se
+    # estava — nem se algo havia travado (ADR-037).
+    with Progress(
+        SpinnerColumn(finished_text=Text("✓", style="bold green")),
+        TextColumn("{task.description}", style="cyan", markup=False),
+        TimeElapsedColumn(),
+        console=console,
+    ) as barra:
+        etapas = _Etapas(barra)
+        r = pipeline.transcrever(
+            ref,
+            out,
+            bpm=bpm,
+            tuning=cordas,
+            cache_dir=cache,
+            assigner=ViterbiFretAssigner(custos=custos),
+            progresso=etapas,
+        )
+        etapas.encerrar()
 
     if r.andamento is not None:
         recado = (
@@ -121,26 +178,40 @@ def transcribe(
             else f"andamento ESTIMADO: {r.bpm:.2f} BPM — pouca confiança, o segundo "
             f"método leu {r.andamento.conferencia}"
         )
-        typer.secho(recado, fg=typer.colors.YELLOW)
+        _diz(recado, "yellow")
         if r.desdobrado:
-            typer.secho(
+            _diz(
                 f"a dobra para a faixa musical foi desfeita: as notas colidiam na grade "
                 f"de {r.andamento.bpm} BPM (ADR-024)",
-                fg=typer.colors.YELLOW,
+                "yellow",
             )
-        typer.secho("confira ouvindo; se soar errado, reexporte com --bpm", fg=typer.colors.YELLOW)
+        _diz("confira ouvindo; se soar errado, reexporte com --bpm", "yellow")
 
     if r.tonalidade:
-        typer.echo(_tom(r.tonalidade))
-    typer.echo(f"{r.notas} notas de baixo em {r.rotulos}")
+        _diz(_tom(r.tonalidade))
+    _diz(f"{r.notas} notas de baixo em {r.rotulos}", "bold")
     if r.descartadas:
-        typer.echo(f"{len(r.descartadas)} descartada(s): simultâneas ou fora do braço")
+        _diz(f"{len(r.descartadas)} descartada(s): simultâneas ou fora do braço", "yellow")
+    if r.falha_na_auralizacao:
+        _diz(f"sem auralização: {r.falha_na_auralizacao}", "yellow")
     if r.avisos_de_oitava:
-        typer.echo(f"{len(r.avisos_de_oitava)} oitava(s) a conferir:")
+        _diz(f"{len(r.avisos_de_oitava)} oitava(s) a conferir:", "yellow")
         for a in r.avisos_de_oitava:
-            typer.echo(f"  {_aviso_de_oitava(a)}")
-    for caminho in r.artefatos.values():
-        typer.echo(str(caminho))
+            _diz(f"  {_aviso_de_oitava(a)}", "yellow")
+    _artefatos(r.artefatos)
+
+
+def _artefatos(artefatos: Mapping[str, Path]) -> None:
+    """A pasta uma vez, os arquivos embaixo — eles compartilham o nome (ADR-037).
+
+    Repetir o caminho inteiro em seis linhas quase idênticas obrigava a comparar
+    caractere por caractere para achar a diferença.
+    """
+    pastas = {c.parent for c in artefatos.values()}
+    for pasta in sorted(pastas):
+        _diz(str(pasta), "bold green")
+        for caminho in sorted(c for c in artefatos.values() if c.parent == pasta):
+            _diz(f"  {caminho.name}", "green")
 
 
 def _tom(tonalidade: Tonalidade) -> str:

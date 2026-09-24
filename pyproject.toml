@@ -15,6 +15,7 @@ dependencies = [
     "numpy>=2.5.3",
     "pretty-midi>=0.2.11.post0",
     "pyguitarpro>=0.11",
+    "rich>=15.0.0",
     "typer>=0.15",
     "uvicorn[standard]>=0.53.0",
 ]

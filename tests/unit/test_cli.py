@@ -99,7 +99,9 @@ def test_auralizar_usa_as_notas_do_cache(tmp_path: Path) -> None:
     )
 
     assert resultado.exit_code == 0, resultado.output
-    assert (tmp_path / "o" / "t.aural.wav").exists()
+    # Na pasta da música, a mesma que o `transcribe` usa (ADR-037): fora dela este
+    # comando gravaria uma segunda cópia num segundo lugar.
+    assert (tmp_path / "o" / "t" / "t.aural.wav").exists()
 
 
 def test_auralizar_sem_cache_orienta_a_transcrever(tmp_path: Path) -> None:
@@ -232,3 +234,63 @@ def test_tom_ilegivel_e_recusado_antes_de_qualquer_cpu(tmp_path: Path) -> None:
     # "No such option" também conteria "tom": o que prova a recusa é a mensagem
     # do catálogo, com o formato que o Thoth aceita.
     assert "não é um tom" in resultado.output
+
+
+# --- Os estágios desenhados enquanto rodam (ADR-037) --------------------------
+
+
+def test_transcribe_desenha_cada_estagio_que_o_pipeline_anuncia(
+    tmp_path: Path, monkeypatch
+) -> None:
+    """A fiação CLI → pipeline → tela. O `rich` fora de terminal imprime cada
+    estágio como linha própria, que é exatamente o que dá para afirmar aqui.
+
+    Sem isto a única saída durante quinze minutos era uma frase solta antes da
+    chamada: quem rodava não sabia se estava separando, transcrevendo ou travado.
+    """
+    from thoth.services.pipeline import Resultado
+
+    asset = AudioAsset(wav=tmp_path / "mix.wav", source_id="abc123", title="t", duration_s=1.0)
+
+    def falso(*args: object, **kwargs: object) -> Resultado:
+        progresso = kwargs["progresso"]
+        assert progresso is not None, "a CLI tem que passar um relator"
+        progresso.inicia("separando o baixo", "Demucs")  # type: ignore[attr-defined]
+        progresso.inicia("transcrevendo as notas")  # type: ignore[attr-defined]
+        return Resultado(
+            asset=asset, stem=tmp_path / "bass.wav",
+            artefatos={"gp5": tmp_path / "t" / "t.gp5"}, notas=3,
+            rotulos={"electric_bass": 3}, descartadas=[], fora_do_braco=[], bpm=90,
+            avisos_de_oitava=[],
+        )
+
+    monkeypatch.setattr(pipeline, "transcrever", falso)
+
+    resultado = runner.invoke(app, ["transcribe", "x.mp3", "--out", str(tmp_path), "--bpm", "90"])
+
+    assert resultado.exit_code == 0, resultado.output
+    assert "separando o baixo" in resultado.output
+    assert "Demucs" in resultado.output, "o detalhe do estágio também vai para a tela"
+    assert "transcrevendo as notas" in resultado.output
+
+
+def test_transcribe_avisa_quando_a_auralizacao_falha(tmp_path: Path, monkeypatch) -> None:
+    """Áudio que não saiu tem que aparecer: ausência silenciosa é o que se evita."""
+    from thoth.services.pipeline import Resultado
+
+    asset = AudioAsset(wav=tmp_path / "mix.wav", source_id="abc123", title="t", duration_s=1.0)
+    monkeypatch.setattr(
+        pipeline, "transcrever",
+        lambda *a, **k: Resultado(
+            asset=asset, stem=tmp_path / "bass.wav",
+            artefatos={"gp5": tmp_path / "t" / "t.gp5"}, notas=3,
+            rotulos={"electric_bass": 3}, descartadas=[], fora_do_braco=[], bpm=90,
+            avisos_de_oitava=[], falha_na_auralizacao="soundfont ausente: /nao/existe.sf2",
+        ),
+    )
+
+    resultado = runner.invoke(app, ["transcribe", "x.mp3", "--out", str(tmp_path), "--bpm", "90"])
+
+    assert resultado.exit_code == 0, resultado.output
+    assert "auralização" in resultado.output
+    assert "soundfont" in resultado.output

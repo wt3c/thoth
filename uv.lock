@@ -1140,6 +1140,7 @@ dependencies = [
     { name = "numpy" },
     { name = "pretty-midi" },
     { name = "pyguitarpro" },
+    { name = "rich" },
     { name = "typer" },
     { name = "uvicorn", extra = ["standard"] },
 ]
@@ -1165,6 +1166,7 @@ requires-dist = [
     { name = "numpy", specifier = ">=2.5.3" },
     { name = "pretty-midi", specifier = ">=0.2.11.post0" },
     { name = "pyguitarpro", specifier = ">=0.11" },
+    { name = "rich", specifier = ">=15.0.0" },
     { name = "typer", specifier = ">=0.15" },
     { name = "uvicorn", extras = ["standard"], specifier = ">=0.53.0" },
 ]
