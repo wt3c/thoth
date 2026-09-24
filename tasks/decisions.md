@@ -182,6 +182,17 @@ concordância entre modelos, não acerto. **Toda referência externa exige
 (auralização, que não depende de referência), mas **não** para a Camada 3. A
 Camada 3 usa um clássico com tab humana.
 
+### Emenda (2026-09-24) — o Songsterr também não serve por automação
+
+Conferido nesta data: o `robots.txt` do Songsterr tem `Disallow: /api/` para todo
+agente, e a política para IA (`/ai.txt`) lista o download em Guitar Pro e MIDI como
+recurso pago (Plus), pedindo que nada "equivalente" seja obtido por automação. Extrair
+as notas de uma tab por script para servir de referência é exatamente esse equivalente.
+**O Thoth também não automatiza o Songsterr** — a regra do UG vale para ele. A API serviu
+para verificar `aiGenerated`, e isso não se repete. A referência humana da Camada 3 chega
+só por download legítimo feito pelo usuário (`.gp5` da comunidade no UG Pro, ou Songsterr
+Plus) e entra aqui como arquivo local, lido pelo PyGuitarPro.
+
 ---
 
 ## ADR-008 — Decodificação livre + filtro por rótulo, nunca `--instruments`

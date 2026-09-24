@@ -21,9 +21,9 @@ Nada do que resta é barato: tudo depende de material externo ou de sessão manu
 - Validar o limiar de oitava **fora do Equus** — depende do `.gp5` de *Equus*, download
   manual do UG (ADR-007). Sem referência não se sabe quanto das taxas por faixa (jorge
   1,9%, sade 12,9%, neo 15,8%) é erro real.
-- Tab clássica **humana** para conferir oitava e notas — filtrar `aiGenerated == false`
-  em `/api/meta/{songId}/revisions` do Songsterr. A da SOJA é `aiGenerated: true` e não
-  serve (seria circular).
+- Tab clássica **humana** para conferir oitava e notas — só por download seu (`.gp5` do
+  UG Pro ou Songsterr Plus). Automatizar o Songsterr está fora (emenda do ADR-007:
+  `robots.txt` e `ai.txt` deles). A da SOJA é `aiGenerated: true` e não serve.
 
 ### 2. Verificação manual — precisa de ouvido e navegador
 
