@@ -33,7 +33,6 @@ Nada do que resta é barato: tudo depende de material externo ou de sessão manu
 
 ### 3. Aberto sem urgência
 
-- `small` vs `medium` cronometrado em CPU (o lock já tem os dois pesos).
 - Fase 6 inteira: sync de cursor via Spotify, Containerfile + compose, multi-instrumento.
 - Fora do contrato do ADR-039: fórmula não inteira (7/16) e anacruse no conserto de beams
   — só importa se a fórmula deixar de ser 4/4 fixo.
@@ -61,9 +60,10 @@ A avaliação **não depende de saber tocar** (ADR-006).
 - [x] Medir o **pipeline completo** (com separação) contra ground truth: no
       `misto`, nota F1 0,682 → **0,968** com separação, onset inalterado em 0,938
       (ADR-010, emenda de 2026-09-22). Separar recupera altura, não tempo
-- [ ] Repetir com `small` vs `medium`, cronometrando em CPU — **medição
-      registrada, não critério de aprovação**: o teste de regressão vale só para o `small` (ADR-009). O lock
-      já tem os dois pesos (corrigido em 2026-09-24; dizia que só tinha o `small`)
+- [x] Repetir com `small` vs `medium`, cronometrando em CPU — feito em 2026-09-24,
+      emenda do ADR-009: com separação o `medium` não degenera, mas não ganha em
+      nenhuma fixture, custa ~2× e em `escala` rotula o baixo como `acoustic_guitar`.
+      A comparação em áudio real fica com a Camada 3 (precisa de tab humana)
 
 ### Camada 2 — perceptual assistida (dispensa treino)
 - [x] Auralização: original em um canal, MIDI no outro (`thoth auralizar`,

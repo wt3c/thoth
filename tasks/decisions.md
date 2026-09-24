@@ -266,6 +266,42 @@ para `small`**. Rodar `medium` contra fixtures de fluidsynth mede distância da
 distribuição de treino, não qualidade de transcrição. Fixtures sintéticas são
 métrica de regressão, nunca de qualidade — agora com evidência de por quê.
 
+### Emenda (2026-09-24) — remedido depois do ADR-010, com separação
+
+A tabela acima é de antes da separação obrigatória. Remedido no caminho atual —
+fixture renderizada → `htdemucs_ft` (demucs 4.1.0) → MuScriptor → filtro
+`ROTULOS_DE_BAIXO` → `avaliar`, 50 ms —, cada estágio cronometrado à parte, CPU de 20
+threads, nada mais rodando na máquina. **Medição registrada, não critério de
+aprovação**; o teste de regressão continua só para o `small`.
+
+| fixture | duração | demucs | `small` | × tempo real | nota F1 | `medium` | × tempo real | nota F1 |
+|---|---|---|---|---|---|---|---|---|
+| escala | 12,1 s | 31,8 s | 6,3 s | 0,52 | 0,933 | 14,7 s | 1,21 | **0,000** |
+| walking | 12,8 s | 32,1 s | 6,2 s | 0,48 | 0,968 | 12,3 s | 0,96 | 0,968 |
+| groove16 | 7,5 s | 24,2 s | 7,5 s | 0,99 | 1,000 | 15,4 s | 2,04 | 0,984 |
+| graves | 8,8 s | 22,8 s | 5,1 s | 0,58 | 1,000 | 9,4 s | 1,07 | 0,900 |
+| oitavas | 10,1 s | 23,3 s | 5,6 s | 0,55 | 0,957 | 10,8 s | 1,07 | 0,957 |
+| misto | 13,1 s | 31,9 s | 6,1 s | 0,46 | 0,968 | 12,1 s | 0,92 | 0,968 |
+
+O que muda na leitura:
+
+- **O `medium` não degenera mais nestas fixtures.** Com o stem no lugar do áudio
+  renderizado direto, nenhuma das seis explodiu em repetição (antes: 291 notas para
+  15). O que sobrou foi **rótulo**: em `escala` ele devolveu 14 notas, todas
+  `acoustic_guitar` — o filtro esvazia e o pipeline recusaria a música ("nenhuma nota
+  de baixo"). O `small` rotulou as mesmas como `electric_bass`.
+- **Em nenhuma fixture o `medium` ganhou**: empata em três, perde em três.
+- **Custo:** o `medium` é ~2× o `small` na transcrição, mas o demucs domina o tempo
+  de parede (3–5× o do `small` nestas durações curtas). Trocar de modelo não é onde
+  está o tempo.
+- O `misto` com separação sai em 0,968 com os dois — o ganho do ADR-010 não depende
+  do modelo.
+
+O `small` continua padrão. O "atrás de flag" da decisão nunca virou flag na CLI: o
+`medium` só entra injetando `MuscriptorTranscriber(model="medium")`. Com esta medição
+não há motivo para criá-la; a comparação em áudio real, que é a que falta, precisa de
+referência humana (Camada 3, ADR-007).
+
 ---
 
 ## ADR-010 — Demucs promovido de condicional a etapa do pipeline
