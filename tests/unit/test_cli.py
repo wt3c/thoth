@@ -10,7 +10,7 @@ import typer
 from typer.testing import CliRunner
 
 from thoth.cli import app
-from thoth.domain.models import TUNING_BASS_DROP_D, AudioAsset
+from thoth.domain.models import TUNING_BASS_6, TUNING_BASS_DROP_D, AudioAsset
 from thoth.services import pipeline
 from thoth.services.fretboard import PADRAO
 
@@ -220,7 +220,7 @@ def test_bpm_absurdamente_alto_e_recusado() -> None:
 
 def test_afinacao_fora_do_catalogo_e_recusada_em_vez_de_virar_quatro_cordas() -> None:
     """Silenciosamente virar 4 cordas produzia tablatura plausível e errada."""
-    resultado = runner.invoke(app, ["transcribe", "x.mp3", "--afinacao", "6"])
+    resultado = runner.invoke(app, ["transcribe", "x.mp3", "--afinacao", "7"])
 
     assert resultado.exit_code != 0
     assert "drop-d" in resultado.output, "recusar sem listar o que existe não ensina nada"
@@ -251,6 +251,22 @@ def test_afinacao_e_digitacao_escolhidas_chegam_ao_pipeline(
 
     assert recebido["tuning"] == TUNING_BASS_DROP_D
     assert recebido["assigner"].custos is PADRAO
+
+
+def test_seis_cordas_chega_ao_pipeline_com_o_do_agudo(monkeypatch: pytest.MonkeyPatch) -> None:
+    """*And Plague Flowers* pede mais que cinco cordas: sem o dó agudo, o que passa
+    do sol solto da quinta corda vira nota descartada."""
+    recebido: dict[str, object] = {}
+
+    def espiao(ref: str, out: Path, **kw: object):
+        recebido.update(kw)
+        raise typer.Exit(code=0)
+
+    monkeypatch.setattr(pipeline, "transcrever", espiao)
+
+    runner.invoke(app, ["transcribe", "x.mp3", "--afinacao", "6"])
+
+    assert recebido["tuning"] == TUNING_BASS_6 == (23, 28, 33, 38, 43, 48)
 
 
 def test_o_aviso_de_oitava_diz_a_alternativa_ou_a_falta_dela(tmp_path: Path, monkeypatch) -> None:

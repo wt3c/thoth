@@ -23,7 +23,7 @@ arquivo de áudio  ou  link do YouTube
 ```
 
 O MuScriptor transcreve. O código deste repositório existe para o que ele não cobre:
-**GP5 editável**, **afinação configurável** (4/5 cordas, Drop D), separação antes de
+**GP5 editável**, **afinação configurável** (4/5/6 cordas, Drop D), separação antes de
 transcrever (ADR-010), andamento e grade rítmica (ADR-019/021), sanity-check de oitava
 e a orquestração com cache.
 
@@ -69,7 +69,7 @@ URL do YouTube; o Thoth detecta sozinho. O áudio normalizado fica em
 O `transcribe` grava uma pasta por música (ADR-037): `<título>.gp5`, `.musicxml`
 (partitura e tablatura), `.mix.wav`, `.baixo.wav`, `.sem-baixo.wav` e `.aural.wav` —
 original num canal, transcrição no outro, para ouvir se o ritmo descola. Opções:
-`--afinacao` (`4`, `5`, `drop-d`), `--digitacao` (`iniciante`, `experiente`), `--bpm` e
+`--afinacao` (`4`, `5`, `6`, `drop-d`), `--digitacao` (`iniciante`, `experiente`), `--bpm` e
 `--tom`; `uv run thoth transcribe --help` lista todas.
 
 Leva cerca de 2,5× a duração do áudio em CPU. Sem `--bpm`, o andamento é estimado do mix

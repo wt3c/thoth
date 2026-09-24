@@ -88,7 +88,7 @@ def test_bpm_afinacao_e_digitacao_chegam_ao_pipeline(tmp_path: Path) -> None:
 
 
 def test_afinacao_desconhecida_e_recusada_na_entrada(tmp_path: Path) -> None:
-    resposta = _cliente(tmp_path).post("/jobs", json={"ref": "x.mp3", "afinacao": "6"})
+    resposta = _cliente(tmp_path).post("/jobs", json={"ref": "x.mp3", "afinacao": "7"})
 
     assert resposta.status_code == 422
 

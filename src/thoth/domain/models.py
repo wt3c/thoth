@@ -8,6 +8,7 @@ from pathlib import Path
 #: Afinações padrão, da corda mais grave para a mais aguda, em pitch MIDI.
 TUNING_BASS_4 = (28, 33, 38, 43)  # E1 A1 D2 G2
 TUNING_BASS_5 = (23, 28, 33, 38, 43)  # B0 E1 A1 D2 G2
+TUNING_BASS_6 = (23, 28, 33, 38, 43, 48)  # B0 E1 A1 D2 G2 C3
 TUNING_BASS_DROP_D = (26, 33, 38, 43)  # D1 A1 D2 G2
 
 #: As afinações com porta de entrada, por **nome** (ADR-028). Contar cordas não
@@ -15,6 +16,7 @@ TUNING_BASS_DROP_D = (26, 33, 38, 43)  # D1 A1 D2 G2
 AFINACOES: dict[str, tuple[int, ...]] = {
     "4": TUNING_BASS_4,
     "5": TUNING_BASS_5,
+    "6": TUNING_BASS_6,
     "drop-d": TUNING_BASS_DROP_D,
 }
 

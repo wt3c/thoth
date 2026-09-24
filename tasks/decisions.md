@@ -2257,3 +2257,19 @@ Dois achados que a primeira rodada não registrou:
   cerca de 600 s e só cai perto de 640 s, mas nenhuma nota passa de 511,4 s — com 4
   cordas ou com 5. O cache guarda só as notas finais, então esta rodada não diz se é o
   MuScriptor que para ou um filtro do pipeline que descarta. Fica aberto no todo.
+
+
+### Emenda (2026-09-24, depois) — e com `--afinacao 6`
+
+A afinação de 6 cordas (B0 E1 A1 D2 G2 C3) entrou no catálogo do ADR-028 — `"6"` em
+`AFINACOES`, sem outra mudança: CLI e API leem o catálogo. A transcrição refeita com ela
+saiu **idêntica** à de 5 cordas: 2402 notas, 195 descartadas, 1294 pares, 89,3% na mesma
+oitava contra piso de 71,9%, mesmo alinhamento, mesmos números por trecho.
+
+- O `.gp5` exportado tem as seis cordas, e 470 notas foram para a corda de dó: a
+  afinação muda a **digitação**, não as notas. A tab humana não passa de 67, que já cabe
+  em 5 cordas.
+- **As 195 descartadas não são altura fora do braço.** Com 6 cordas não sobra altura de
+  baixo sem lugar, e o número não mudou: são notas simultâneas. Mais cordas não as
+  recuperam.
+- O corte em 511,4 s também não mudou — não depende da afinação.

@@ -97,7 +97,7 @@ A avaliação **não depende de saber tocar** (ADR-006).
       contra piso de 71,9%, alinhamento igual — a afinação não mudava o quadro
 - [ ] **Transcrição some depois de 511 s** em *And Plague Flowers* (`yt_ArBcOGvMvGU`):
       o stem do baixo segue alto até ~640 s, nenhuma nota passa de 511,4 s. Achar em
-      que estágio — MuScriptor ou filtro do pipeline (emenda do ADR-041)
+      que estágio — MuScriptor ou filtro do pipeline (emenda do ADR-041); não depende da afinação (igual com 4, 5 e 6 cordas)
 
 ### Comparações a fazer
 - [x] **mix direto** vs **stem do Demucs** → decidido no ADR-010 (separar sempre)

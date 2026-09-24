@@ -13,7 +13,13 @@ import guitarpro as gp
 import pytest
 
 from thoth.adapters.export.gp5 import Gp5Exporter
-from thoth.domain.models import TUNING_BASS_4, TUNING_BASS_5, NoteEvent, TabNote
+from thoth.domain.models import (
+    TUNING_BASS_4,
+    TUNING_BASS_5,
+    TUNING_BASS_6,
+    NoteEvent,
+    TabNote,
+)
 from thoth.services.fretboard import ViterbiFretAssigner
 
 BPM = 90
@@ -70,6 +76,14 @@ def test_cinco_cordas_sobrevive(tmp_path: Path) -> None:
 
     assert [corda.value for corda in track.strings] == list(reversed(TUNING_BASS_5))
     assert len(track.strings) == 5
+
+
+def test_seis_cordas_sobrevive(tmp_path: Path) -> None:
+    tabs = _tabs([23, 48, 52], afinacao=TUNING_BASS_6)
+    alvo = Gp5Exporter(bpm=BPM).export(tabs, tmp_path / "b.gp5", TUNING_BASS_6)
+    track = gp.parse(str(alvo)).tracks[0]
+
+    assert [corda.value for corda in track.strings] == list(reversed(TUNING_BASS_6))
 
 
 def test_quebra_em_compassos_de_quatro_tempos(tmp_path: Path) -> None:
