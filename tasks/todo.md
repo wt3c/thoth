@@ -5,7 +5,7 @@
 
 ## Próxima sessão — o que está aberto (fechado em 2026-09-24)
 
-Estado: verificação de entrega verde (295 passed na suíte padrão, ruff e mypy limpos; varredura `slow`
+Estado: verificação de entrega verde (299 passed na suíte padrão, ruff e mypy limpos; varredura `slow`
 de beams 32767/0). As nove músicas reexportadas em `out/` em 2026-09-24 com o conserto
 de beams: **0 mal-formados**. Conferir `git status -sb` — o push fica a pedido.
 
@@ -33,7 +33,8 @@ Nada do que resta é barato: tudo depende de material externo ou de sessão manu
 
 ### 3. Aberto sem urgência
 
-- Fase 6 inteira: sync de cursor via Spotify, Containerfile + compose, multi-instrumento.
+- Fase 6: sync de cursor via Spotify (precisa de app e OAuth seus) e multi-instrumento
+  (escopo grande, validação por ouvido). O contêiner fechou (ADR-040).
 - Fora do contrato do ADR-039: fórmula não inteira (7/16) e anacruse no conserto de beams
   — só importa se a fórmula deixar de ser 4/4 fixo.
 
@@ -237,7 +238,7 @@ Pré-requisito invisível até agora: a Fase 5 só existe se houver o que o
 ## Fase 6 — Opcionais
 
 - [ ] Sync do cursor via Spotify `currently-playing`
-- [ ] Containerfile + compose (CPU)
+- [x] Containerfile + compose (CPU) — ADR-040, job real verificado dentro do contêiner
 - [ ] Multi-instrumento: guitarra polifônica, piano, bateria
 
 ## Pendências para o Welington

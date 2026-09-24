@@ -73,6 +73,19 @@ Leva cerca de 2,5× a duração do áudio em CPU. Sem `--bpm`, o andamento é es
 e **anunciado** — confira ouvindo (ADR-019). O `auralizar` precisa das notas já em cache,
 então só roda depois de um `transcribe`.
 
+### Em contêiner (só CPU)
+
+```bash
+mkdir -p out cache           # antes: se o Docker criar, nascem de root
+docker compose up --build   # → http://127.0.0.1:8000
+```
+
+A imagem traz `ffmpeg`, `fluidsynth`, a soundfont, o `yt-dlp` e o alphaTab; os pesos do
+MuScriptor **não** entram nela (licença CC BY-NC) — o `hf auth login` continua sendo feito
+na máquina, e o cache do HuggingFace é montado. `out/` e `cache/` são os do repositório.
+O primeiro job baixa o torch do demucs e do MuScriptor para um volume; os seguintes não
+(ADR-040).
+
 ## Desenvolvimento
 
 ```bash

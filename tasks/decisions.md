@@ -2063,3 +2063,61 @@ feitas sobre eles — mudariam sem aviso. 4.1.0 é a única versão no cache do 
 estação. **O cache de stems continua identificado só pelo modelo** (`htdemucs_ft`), não
 pela versão: um stem produzido por outra versão seria reutilizado sem rodar o 4.1.0. Hoje
 todos vieram do 4.1.0; mudar a versão pregada exige limpar `cache/stems/`.
+
+### Emenda (2026-09-24, depois)
+
+O cache de stems passou a levar a versão na chave — `<out>/<modelo>/<versão>/` (emenda do
+ADR-026). Mudar o pin já não exige limpar `cache/stems/`.
+
+---
+
+## ADR-040 — contêiner só CPU, sem os pesos na imagem
+
+**Data:** 2026-09-24 · **Status:** aceito
+
+### Contexto
+
+A Fase 6 previa `Containerfile` + compose para CPU. O Thoth chama seis programas de fora
+(`ffmpeg`, `ffprobe`, `fluidsynth`, `yt-dlp` e, por `uvx`, o demucs e o MuScriptor), mais
+o alphaTab vendorizado por `npm pack`. Na máquina isso é uma lista de requisitos no README;
+no contêiner, vem pronto.
+
+### Decisão
+
+- **Os pesos do MuScriptor não entram na imagem.** São CC BY-NC 4.0 e o ADR-005 já os
+  deixa fora do repositório pelo mesmo motivo. O cache do HuggingFace da máquina é montado
+  (`${HF_HOME:-~/.cache/huggingface}`); `hf auth login` e o aceite da licença continuam
+  fora do contêiner.
+- **O torch também não.** O demucs e o MuScriptor continuam por `uvx`, com as mesmas versões
+  pregadas, e baixam no primeiro job para o volume `uv-cache` (pesos do demucs em
+  `torch-cache`). Pré-aquecer na imagem somaria gigabytes de CUDA que a máquina não usa.
+- **Dois estágios:** o `npm pack` do alphaTab roda num estágio descartável; a imagem final
+  não carrega Node.
+- **O soundfont vai por link simbólico.** O Debian instala em `/usr/share/sounds/sf2/`, e
+  a auralização procura em `/usr/share/soundfonts/` (caminho do Arch, exceção já conhecida
+  no AGENTS.md). Um `ln -s` na imagem, em vez de tornar o caminho configurável sem outro
+  motivo.
+- **Usuário `thoth` (uid 1000)**, para que `out/` e `cache/` montados fiquem com o dono do
+  repositório. As duas pastas precisam existir antes do `up` — se o Docker as criar, nascem
+  de root e o primeiro job não grava (o README manda o `mkdir -p`). Máquina cujo usuário
+  não é o 1000 precisa de `user:` no compose. Os diretórios dos volumes nomeados são criados na imagem com esse dono: o
+  volume herda o dono do ponto de montagem, e sem isso nasce de root — medido, o primeiro
+  job falhou com `Permission denied` no cache do `uv`.
+- `serve --host 0.0.0.0` dentro do contêiner; quem restringe ao localhost é o `ports:
+  127.0.0.1:8000:8000` do compose.
+
+### Verificação (2026-09-24)
+
+`docker compose up --build`, depois `GET /` → 200, `GET /vendor/alphatab/alphaTab.min.mjs`
+→ 200 e um `POST /jobs` real com a fixture `misto` (baixo + piano, `bpm=90`): status
+`pronto`, 15 notas `electric_bass`, 0 descartadas, os seis formatos (`gp5`, `musicxml`,
+`mix`, `baixo`, `sem-baixo`, `aural`) servidos com 200, e os arquivos em `out/` com o dono
+do repositório. O stem saiu em `htdemucs_ft/4.1.0/`. Imagem: 3,09 GB (o `chown -R` do
+primeiro rascunho recopiava o venv numa camada e custava 800 MB a mais).
+
+### Não coberto
+
+- O `yt-dlp` vai pelo `uv tool install`, sem versão pregada, como o da máquina. Se o
+  YouTube passar a exigir um runtime de JavaScript, a imagem não o tem; o canário
+  (`-m network`) roda na máquina, não no contêiner.
+- Só `amd64` e só CPU, como o resto do projeto.

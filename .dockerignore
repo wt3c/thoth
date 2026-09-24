@@ -1,0 +1,17 @@
+.git
+.venv
+.idea
+.claude
+.hypothesis
+.mypy_cache
+.pytest_cache
+.ruff_cache
+**/__pycache__
+audio
+cache
+out
+models
+spike
+tasks
+tests
+web/vendor

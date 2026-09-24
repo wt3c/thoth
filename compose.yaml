@@ -1,0 +1,25 @@
+# mkdir -p out cache && docker compose up --build  →  http://127.0.0.1:8000
+#
+# As duas pastas antes: se o Docker as criar, nascem de root e o contêiner (uid 1000)
+# não grava nelas.
+#
+# Os pesos do MuScriptor vêm do cache do HuggingFace desta máquina (`hf auth login` e
+# licença aceita antes, fora do contêiner). `out/` e `cache/` são os mesmos do
+# repositório: o que o contêiner produz aparece onde a CLI produziria.
+services:
+  thoth:
+    build:
+      context: .
+      dockerfile: Containerfile
+    ports:
+      - "127.0.0.1:8000:8000"  # só localhost: uso pessoal, nada sai da máquina
+    volumes:
+      - ./out:/data/out
+      - ./cache:/data/cache
+      - ${HF_HOME:-~/.cache/huggingface}:/home/thoth/.cache/huggingface
+      - uv-cache:/home/thoth/.cache/uv        # ambientes do demucs e do MuScriptor
+      - torch-cache:/home/thoth/.cache/torch  # pesos do demucs
+
+volumes:
+  uv-cache:
+  torch-cache:
