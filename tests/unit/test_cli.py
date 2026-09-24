@@ -117,6 +117,89 @@ def test_auralizar_sem_cache_orienta_a_transcrever(tmp_path: Path) -> None:
     assert "transcribe" in resultado.output
 
 
+def _tab_e_cache(tmp_path: Path, mudar: dict[int, int]) -> tuple[Path, Path, Path]:
+    """Tab sintética e, no cache, a mesma linha 2 s depois — com alturas trocadas em `mudar`."""
+    from tests.unit.test_tab_referencia import B, _baixo, _gravar
+    from thoth.domain.models import NoteEvent
+    from thoth.services.cache_notas import gravar
+    from thoth.services.tab_referencia import ler_tab
+
+    # Ritmo irregular: com intervalos todos iguais o alinhamento não teria o que distinguir.
+    figuras = [8, 4, 8, 2] * 2 + [4, 8, 8, 2] * 2
+    compassos = [[B(f, (i * 3 + k) % 12) for k, f in enumerate(figuras)] for i in range(4)]
+    tab = _gravar(tmp_path, [_baixo(compassos)])
+
+    origem = _wav(tmp_path / "t.wav", segundos=1)
+    cache = tmp_path / "c"
+    runner.invoke(app, ["fetch", str(origem), "--cache", str(cache)])
+    fonte = next(p for p in cache.iterdir() if p.is_dir())
+    gravar(
+        [
+            NoteEvent(n.pitch + mudar.get(i, 0), n.onset_s + 2, n.offset_s + 2, n.instrument)
+            for i, n in enumerate(ler_tab(tab).notas)
+        ],
+        fonte / "notas.jsonl",
+    )
+    return tab, origem, cache
+
+
+def test_comparar_relata_o_veredito_de_oitava_e_o_piso(tmp_path: Path) -> None:
+    tab, origem, cache = _tab_e_cache(tmp_path, {0: 12, 5: -12, 9: 7})
+
+    resultado = runner.invoke(app, ["comparar", str(tab), str(origem), "--cache", str(cache)])
+
+    assert resultado.exit_code == 0, resultado.output
+    saida = resultado.output
+    assert "Baixo" in saida
+    assert "deslocamento +2.000 s" in saida
+    assert "63 pares de mesmo nome de nota" in saida  # a nota trocada por +7 não casa
+    assert "mesma oitava 61 (96.8%)" in saida
+    assert "oitava acima 1 (1.6%)" in saida
+    assert "oitava abaixo 1 (1.6%)" in saida
+    assert "piso de acaso" in saida
+
+
+def test_comparar_sem_cache_orienta_a_transcrever(tmp_path: Path) -> None:
+    tab, origem, _ = _tab_e_cache(tmp_path, {})
+
+    resultado = runner.invoke(
+        app, ["comparar", str(tab), str(origem), "--cache", str(tmp_path / "vazio")]
+    )
+
+    assert resultado.exit_code != 0
+    assert "transcribe" in resultado.output
+
+
+def test_comparar_com_faixa_ambigua_pede_a_opcao(tmp_path: Path) -> None:
+    """O `ValueError` do leitor vira recado, não traceback."""
+    tab, origem, cache = _tab_e_cache(tmp_path, {})
+
+    resultado = runner.invoke(
+        app, ["comparar", str(tab), str(origem), "--cache", str(cache), "--faixa", "3"]
+    )
+
+    assert resultado.exit_code == 1
+    assert "1: Baixo" in resultado.output
+    assert resultado.exception is None or isinstance(resultado.exception, SystemExit)
+
+
+def test_comparar_sem_encaixe_e_recado_nao_percentual(tmp_path: Path, monkeypatch) -> None:
+    """Alinhamento que falhou não pode virar percentual impresso com cara de medida."""
+    from thoth import cli
+
+    def falha(*_: object) -> None:
+        raise ValueError("sem encaixe: a escala parou na borda da busca (0.900)")
+
+    monkeypatch.setattr(cli, "_comparar", falha)
+    tab, origem, cache = _tab_e_cache(tmp_path, {})
+
+    resultado = runner.invoke(app, ["comparar", str(tab), str(origem), "--cache", str(cache)])
+
+    assert resultado.exit_code == 1
+    assert "sem encaixe" in resultado.output
+    assert "%" not in resultado.output
+
+
 # --- Validação na fachada (ADR-025) ------------------------------------------
 
 

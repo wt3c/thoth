@@ -18,9 +18,11 @@ from thoth.domain.models import AFINACOES
 from thoth.services import pipeline
 from thoth.services.auralizacao import auralizar as _auralizar
 from thoth.services.cache_notas import ler
+from thoth.services.comparacao import comparar as _comparar
 from thoth.services.fretboard import DIGITACOES, ViterbiFretAssigner
 from thoth.services.nomes import nome_de_arquivo
 from thoth.services.octave_check import OctaveWarning
+from thoth.services.tab_referencia import ler_tab
 from thoth.services.tempo import BPM_MAXIMO, BPM_MINIMO
 from thoth.services.tonalidade import Tonalidade, tom_de_texto
 
@@ -116,6 +118,49 @@ def auralizar(
     nome = nome_de_arquivo(ativo)
     destino = _auralizar(ativo.wav, ler(notas_jsonl), out / nome / f"{nome}.aural.wav")
     _diz(str(destino), "green")
+
+
+@app.command()
+def comparar(
+    tab: Path = typer.Argument(..., help="Tab .gp5 baixada à mão (ADR-007)."),
+    ref: str = typer.Argument(..., help="O áudio já transcrito: caminho ou URL do YouTube."),
+    faixa: int | None = typer.Option(None, help="Faixa da tab (1 = primeira), se ambígua."),
+    cache: Path = typer.Option(CACHE_PADRAO, help="Diretório de cache."),
+) -> None:
+    """Transcrição contra tab humana: a oitava confere? (ADR-041)."""
+    ativo = resolver_fonte(ref).fetch(ref, cache)
+    notas_jsonl = cache / ativo.source_id / "notas.jsonl"
+    if not notas_jsonl.exists():
+        _diz(
+            f"sem notas em cache para {ativo.title!r}: rode `thoth transcribe {ref}` antes",
+            "bold red",
+        )
+        raise typer.Exit(code=1)
+    try:
+        referencia = ler_tab(tab, faixa)
+        c = _comparar(referencia.notas, ler(notas_jsonl))
+    except ValueError as erro:
+        _diz(str(erro), "bold red")
+        raise typer.Exit(code=1) from erro
+
+    _diz(f"faixa {referencia.faixa!r}: {c.n_ref} notas na tab, {c.n_est} na transcrição")
+    _diz(f"alinhamento: escala {c.escala:.4f}, deslocamento {c.deslocamento_s:+.3f} s")
+    _diz(
+        f"{c.casadas} pares de mesmo nome de nota ({100 * c.casadas / c.n_ref:.0f}% da tab):",
+        "bold",
+    )
+    for rotulo, n in (
+        ("mesma oitava", c.mesma_oitava),
+        ("oitava acima", c.oitava_acima),
+        ("oitava abaixo", c.oitava_abaixo),
+    ):
+        _diz(f"  {rotulo} {n} ({100 * n / c.casadas if c.casadas else 0:.1f}%)")
+    # Sem o piso ao lado, o número não diz quanto dele é sorte (ADR-041).
+    _diz(
+        f"piso de acaso (tab deslocada ±0,25 e ±0,5 s): {c.piso_casadas} pares, "
+        f"{100 * c.piso_mesma_oitava:.1f}% na mesma oitava",
+        "dim",
+    )
 
 
 @app.command()

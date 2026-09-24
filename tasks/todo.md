@@ -73,13 +73,25 @@ A avaliação **não depende de saber tocar** (ADR-006).
       por grupo**, nunca um número agregado (Grupo A é otimista por construção)
 
 ### Camada 3 — referência externa (ADR-007)
-- [ ] Escolher música clássica com tab de baixo **humana** — filtrar
-      `aiGenerated == false` em `/api/meta/{songId}/revisions` do Songsterr
-      (verificados: 14, 14046, 371). A tab da SOJA é `aiGenerated: true` e
-      **não serve** — seria circular
-- [ ] Conferir oitava e notas contra essa tab
-- [ ] Opcional: baixar manualmente o `.gp5` da tab da comunidade no UG Pro e
-      ler com PyGuitarPro. Download manual — o Thoth não faz scraping do UG
+- [x] Tabs humanas escolhidas: três `.gp5` da comunidade do UG, baixados à mão
+      pelo usuário para `samples/` (ignorada pelo git): *Fear Is the Key*, *Dance
+      of Death*, *And Plague Flowers*. O Songsterr ficou fora (emenda do ADR-007)
+- [x] `thoth comparar <tab.gp5> <fonte>` (ADR-041):
+  - [x] leitor da tab → `NoteEvent` em segundos: faixa de baixo, andamento de
+        **todas** as faixas na posição exata, repetições com finais alternativos,
+        ligaduras, compasso que não é 4/4. D.S./coda fora, declarado
+  - [x] ~~alinhamento só por ataque~~ — medido e derrubado: a tab deslocada casava
+        quase tanto quanto a alinhada. Alinhamento pelo nome da nota (sem oitava),
+        escala + deslocamento globais, correção por trecho de ±80 ms
+  - [x] relatório: mesma oitava / acima / abaixo nos pares de mesmo nome, com o piso
+        de acaso (tab deslocada) ao lado; escala na borda da grade é recusada
+  - [x] subcomando na CLI, lendo `notas.jsonl` do cache como o `auralizar`
+  - [x] rodar nas três músicas → ADR-041
+- [x] Conferir oitava contra essa tab: duas oitavas quase nunca (6 de 1266 pares, só
+      em *And Plague Flowers*); 5–15% a uma.
+      *Dance of Death* ficou no piso de acaso — não confirma nada
+- [ ] "Nota errada" contra tab: exige alinhar a tab ao stem do baixo (DTW), não à
+      transcrição (ADR-041, consequência). Refazer *And Plague Flowers* com `--afinacao 5`
 
 ### Comparações a fazer
 - [x] **mix direto** vs **stem do Demucs** → decidido no ADR-010 (separar sempre)

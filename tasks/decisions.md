@@ -2132,3 +2132,90 @@ primeiro rascunho recopiava o venv numa camada e custava 800 MB a mais).
   YouTube passar a exigir um runtime de JavaScript, a imagem não o tem; o canário
   (`-m network`) roda na máquina, não no contêiner.
 - Só `amd64` e só CPU, como o resto do projeto.
+
+---
+
+## ADR-041 — tab humana contra transcrição: alinhamento cego à oitava, veredito só de oitava, piso de acaso ao lado
+
+**Data:** 2026-09-24 · **Status:** aceito
+
+### Contexto
+
+A Camada 3 pede referência externa. O usuário baixou à mão três `.gp5` da comunidade do
+Ultimate Guitar (ADR-007, emenda) para `samples/`, ignorada pelo git: *Fear Is the Key*,
+*Dance of Death*, *And Plague Flowers*. O `thoth comparar <tab.gp5> <fonte>` lê a tab
+(`services/tab_referencia.py`) e a compara às notas em cache (`notas.jsonl`) da mesma
+música (`services/comparacao.py`).
+
+A tab está em tempo de partitura e a gravação em tempo de execução: antes de comparar, é
+preciso alinhar. O plano aprovado alinhava **só pelo ataque**, para a altura da
+transcrição nunca entrar na própria medida.
+
+### O que a medição derrubou
+
+Só o ataque não alinha uma linha de baixo. Com quatro, cinco notas por segundo e ±0,1 s
+de tolerância, a tab deslocada de propósito casava quase o mesmo número de ataques que a
+alinhada, e o acerto de altura não separava os dois:
+
+| Música | casados, alinhada | casados, deslocada | mesma altura, alinhada | mesma altura, deslocada |
+|---|---|---|---|---|
+| *Fear Is the Key* | 944 | 785–892 | 61,9% | 35,8–56,5% |
+| *Dance of Death* | 1474 | 1401–1431 | 27,0% | 22,5–**40,7%** |
+
+Em *Dance of Death* deslocar a tab **melhorava** o acerto: o alinhamento estava errado.
+Em *And Plague Flowers* a escala parou em 0,900, a borda da grade. Com 0,05 s de
+tolerância o quadro era o mesmo.
+
+### Decisão
+
+- **O alinhamento usa o nome da nota** (a classe de altura, sem a oitava): um ataque da
+  tab só conta se houver, a ±0,1 s, um ataque da transcrição com o mesmo nome. Estrutura
+  igual à do plano: escala e deslocamento globais em grade, refinados por mínimos
+  quadrados, e correção por trecho de 10 s limitada a ±80 ms.
+- **O veredito é só de oitava**: entre os pares de mesmo nome, mesma oitava, acima ou
+  abaixo. "Nota errada" deixa de ser medida — o encaixe foi escolhido para os nomes
+  coincidirem. A oitava ficou de fora do alinhamento, então o veredito dela não se prova
+  sozinho (teste: uma transcrição toda uma oitava acima casa inteira, e 100% acima).
+- **Piso de acaso sempre ao lado.** O mesmo veredito com a tab deslocada ±0,25 e ±0,5 s,
+  a uma e duas notas de distância — o erro em que o alinhamento cairia. A CLI imprime o
+  deslocamento que mais casou.
+- **Escala na borda da grade é recusada** com recado, não percentual. A guarda é
+  necessária, não suficiente: em teste sintético com a escala verdadeira fora da grade, o
+  acaso às vezes faz um pico no interior. Contra isso, a defesa é o piso.
+- A tolerância de 0,1 s (e não os 50 ms do ADR-006) fica: a tab é grade, não execução.
+
+### Resultado (2026-09-24)
+
+| Música | pares | piso | mesma oitava | piso | acima | abaixo |
+|---|---|---|---|---|---|---|
+| *Fear Is the Key* | 704 (49% da tab) | 582 | 88,2% | 85,2% | 6,1% | 5,7% |
+| *Dance of Death* | 861 (36%) | 803 | 84,8% | 84,3% | 0,3% | 14,9% |
+| *And Plague Flowers* | 1266 (35%) | 876 | 89,6% | 74,9% | 5,0% | 5,5% |
+
+- **Duas oitavas é raro**: nenhum par em *Fear* e *Dance*, 6 de 1266 em *And Plague
+  Flowers* (contados em "acima"/"abaixo"). O erro de uma oitava fica entre 5% e 15%.
+- ***Dance of Death* está no piso**: o alinhamento não se confirma, e 84,8% é o que sai
+  de qualquer encaixe. O desvio para baixo (14,9% contra 0,3% acima) aparece também com a
+  tab deslocada (107 a 123 abaixo contra 1 a 4 acima), então é do **registro** — trechos em que a tab e o Thoth leem a linha em
+  oitavas diferentes —, não de um par a par. Se o erro é do Thoth ou da tab, esta medida
+  não diz.
+- *Fear Is the Key* fica 3 pontos acima do piso: sinal fraco.
+- *And Plague Flowers* é a única com margem (89,6% contra 74,9%), mas com duas ressalvas:
+  a transcrição foi feita com a afinação de 4 cordas (a tab é de 5, com B0) e para em
+  511 s de 653 s de áudio.
+
+### Limites
+
+- D.S./coda não são seguidos; final alternativo ocupa um compasso. Nenhuma das três usa
+  D.S.; *And Plague Flowers* tem uma repetição aberta sem fecho no compasso 344.
+- Tab de comunidade tem erro próprio e pode ser de outra versão da música.
+- 36% a 49% da tab entra em par: o veredito vale para as notas em que tab e transcrição
+  concordam no nome, que não são uma amostra neutra.
+
+### Consequência
+
+A pergunta "o Thoth erra a oitava?" tem resposta parcial: quase nunca por duas, de 5% a 15%
+por uma, e a medida só se sustenta onde fica acima do piso. Para "a nota está certa?" a
+tab de comunidade, alinhada automaticamente, não serve. O próximo passo, se houver, é
+alinhar a tab ao stem do baixo e não à transcrição (DTW sobre o envelope de ataques), o
+que devolveria "nota errada" à medida.
