@@ -2232,3 +2232,28 @@ em *Fear*, por pouco, e no trecho de 60–300 s de *And Plague Flowers*. Para "a
 tab de comunidade, alinhada automaticamente, não serve. O próximo passo, se houver, é
 alinhar a tab ao stem do baixo e não à transcrição (DTW sobre o envelope de ataques), o
 que devolveria "nota errada" à medida.
+
+
+### Emenda (2026-09-24) — *And Plague Flowers* refeita com `--afinacao 5`
+
+A transcrição foi refeita com a afinação de 5 cordas, a mesma da tab (B0). Agora há
+notas abaixo de E1 (122, a mais grave B0 = 23), e 2402 notas contra 2280.
+
+| | pares | mesma oitava | piso | acima | abaixo |
+|---|---|---|---|---|---|
+| 4 cordas | 1266 | 89,6% | 74,9% | 5,0% | 5,5% |
+| 5 cordas | 1294 | 89,3% | 71,9% | 4,9% | 5,8% |
+
+O alinhamento não mudou (escala 1,0482, deslocamento −31,836 s, tab mapeada de −5,2 s a
+663,4 s), e continua valendo só o trecho de 60–300 s, com 90% a 100% na mesma oitava
+contra um piso de 61% a 83%. A afinação não era o que segurava o resultado.
+
+Dois achados que a primeira rodada não registrou:
+
+- **O vídeo é um cover de baixo** (Martino Garattoni), não a gravação da banda. A tab é da
+  faixa do baixista do disco. Onde os dois tocam a mesma linha a comparação vale; onde o
+  cover difere, o desencontro não é erro de ninguém.
+- **A transcrição para em 511 s, e o baixo não.** O stem separado segue a −24 dB até
+  cerca de 600 s e só cai perto de 640 s, mas nenhuma nota passa de 511,4 s — com 4
+  cordas ou com 5. O cache guarda só as notas finais, então esta rodada não diz se é o
+  MuScriptor que para ou um filtro do pipeline que descarta. Fica aberto no todo.

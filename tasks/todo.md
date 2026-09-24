@@ -92,7 +92,12 @@ A avaliação **não depende de saber tocar** (ADR-006).
       *Dance of Death* ficou no piso de acaso — não confirma nada; *And Plague
       Flowers* só alinhou em 60–300 s
 - [ ] "Nota errada" contra tab: exige alinhar a tab ao stem do baixo (DTW), não à
-      transcrição (ADR-041, consequência). Refazer *And Plague Flowers* com `--afinacao 5`
+      transcrição (ADR-041, consequência)
+- [x] Refazer *And Plague Flowers* com `--afinacao 5` (emenda do ADR-041): 89,3%
+      contra piso de 71,9%, alinhamento igual — a afinação não mudava o quadro
+- [ ] **Transcrição some depois de 511 s** em *And Plague Flowers* (`yt_ArBcOGvMvGU`):
+      o stem do baixo segue alto até ~640 s, nenhuma nota passa de 511,4 s. Achar em
+      que estágio — MuScriptor ou filtro do pipeline (emenda do ADR-041)
 
 ### Comparações a fazer
 - [x] **mix direto** vs **stem do Demucs** → decidido no ADR-010 (separar sempre)
