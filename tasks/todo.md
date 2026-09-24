@@ -540,7 +540,8 @@ não há correção a montar.
       fronteira de tempo é o candidato, mas não está verificado que resolve, e não há
       botão para isso (conferido em `meter/base.py::getBeams` e
       `stream/makeNotation.py::makeBeams`).
-- [ ] Reexportar as oito músicas depois da correção.
+- [x] Reexportar as músicas depois da correção — são **nove**, não oito; a conta
+      anterior estava errada. Resultado abaixo.
 - [x] ADR-038 com a medição. — escrito para (A); a parte (B) fica registrada como aberta.
 
 ### (A) fechada — medição controlada
@@ -564,3 +565,32 @@ Portão: 291 passed + 1 xfailed (era 289), ruff e mypy limpos. O `xfail(strict=T
 O conteúdo não mudou com a correção: nos sete pares antes/depois, notas, compassos e
 pausas batem exatamente — o `makeNotation` já produzia as mesmas pausas, e a correção só
 muda **quando** elas existem. Nenhum `begin` aninhado nem pendurado em nenhuma das bases.
+
+### Reexportadas e validadas — 2026-09-23
+
+As nove pelo caminho de verdade (`thoth transcribe`, com stems e download em cache;
+34 min de relógio no total, 2m03 a 8m11 por música, todas com saída 0). O validador de
+gramática sobre `out/*/*.musicxml`:
+
+| música | mal-formados |
+|--------|--------------|
+| Dance of Death | 50 |
+| Smooth Operator | 24 |
+| Seu Jorge — Tive Razão | 22 |
+| SOU EU | 38 |
+| Feel Like Makin' Love | 28 |
+| Sade — Is It A Crime | 14 |
+| Hallowed Be Thy Name | 10 |
+| SOJA — Everything Changes | 2 |
+| Ne Obliviscaris — Equus | **0** |
+| **total** | **188** |
+
+Nenhum `begin` pendurado, nenhum `begin` aninhado. E a asserção que importa: **0 grupos de
+beam abraçando pausa** nos nove arquivos — a assinatura da forma (A) desapareceu.
+
+Os 16 que o classificador ainda põe em "(A)" são (B) com pausa por perto: a heurística de
+proximidade deixa de valer quando as pausas passam a existir em todo compasso, e a conta
+estrutural acima é a que decide. Os 188 são todos (B), o defeito aberto do music21 10.5.
+
+Os artefatos não entram no repositório (`out/` no `.gitignore`, ADR-005): o que fica
+versionado é a correção que os gera e esta medição.
