@@ -4,10 +4,9 @@
 > importa este conteúdo e acrescenta o que só vale para o Claude Code.
 
 Áudio → partitura e tablatura, foco em contrabaixo elétrico. **Uso pessoal, CPU-only,
-rodando na máquina.** O `README.md` é introdutório e está atrás do código (promete um
-exportador MIDI que não existe e não cita `transcribe`, `auralizar` nem `serve`); as
-fontes canônicas de comportamento são `src/thoth/cli.py`, `src/thoth/services/pipeline.py`
-e `tasks/decisions.md`.
+rodando na máquina.** O `README.md` é introdutório; as fontes canônicas de comportamento
+são `src/thoth/cli.py`, `src/thoth/services/pipeline.py` e `tasks/decisions.md`. Quando o
+README e elas discordarem, elas vencem — e o README se corrige junto.
 
 ## Este não é um projeto do MPRJ
 

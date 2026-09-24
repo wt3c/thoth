@@ -32,7 +32,7 @@ condicional C1** (separação com Demucs vale a pena ou não).
 
 | id | faixa | dur | o que testa |
 |---|---|---|---|
-| `4dJz6U3_Xlk` | Ne Obliviscaris — *Equus* (playthrough, Martino Garattoni) | 12m36 | prog metal com baixo de extensão estendida (Strandberg): rápido, grave abaixo do B0, provável glissando. previsão registrada aqui era **falha esperada** (estouro do vocabulário de afinação). **Medido em 2026-09-22: a previsão estava errada** — saiu `B0..D3`, zero notas simultâneas, 5,5 notas/s, cabendo inteiro em `TUNING_BASS_5`. **Confirmado pelo Welington (2026-09-22): é de 5 cordas** — transcrever sempre com `--cordas 5`. Ver `fase0-resultados.md` |
+| `4dJz6U3_Xlk` | Ne Obliviscaris — *Equus* (playthrough, Martino Garattoni) | 12m36 | prog metal com baixo de extensão estendida (Strandberg): rápido, grave abaixo do B0, provável glissando. previsão registrada aqui era **falha esperada** (estouro do vocabulário de afinação). **Medido em 2026-09-22: a previsão estava errada** — saiu `B0..D3`, zero notas simultâneas, 5,5 notas/s, cabendo inteiro em `TUNING_BASS_5`. **Confirmado pelo Welington (2026-09-22): é de 5 cordas** — transcrever sempre com `--afinacao 5`. Ver `fase0-resultados.md` |
 | `5zqlgMh4aYs` | Toshiki Soejima — *Feel Like Makin' Love* | 7m47 | **não é baixo, é guitarra neo-soul.** Acordes sobrepostos batem exatamente na fraqueza documentada do MuScriptor (notas simultâneas do mesmo instrumento: onset F1 60,4 → 51,8). Testa o objetivo secundário multi-instrumento e o efeito de `--instruments` |
 
 ## Regras de leitura dos resultados

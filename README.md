@@ -32,7 +32,11 @@ e a orquestração com cache.
 - Python 3.12 (fixo — o MuScriptor não suporta 3.13+; o `uv` cuida disso)
 - `ffmpeg` e `ffprobe` no PATH
 - `yt-dlp` no PATH (só para links do YouTube)
+- `fluidsynth` e a soundfont `FluidR3_GM.sf2` em `/usr/share/soundfonts/` — para a
+  auralização; sem eles a partitura sai igual e o `transcribe` avisa (ADR-037)
 - `uv`
+- Pesos do MuScriptor: aceitar a licença no HuggingFace e `hf auth login` uma vez
+- Para o `serve`: `uv run python scripts/vendor_alphatab.py` uma vez (alphaTab local, ADR-006)
 
 ## Uso
 
@@ -45,10 +49,10 @@ uv run thoth fetch caminho/para/musica.mp3
 # link do YouTube
 uv run thoth fetch "https://www.youtube.com/watch?v=QTOyeFQgZKk"
 
-# áudio → .gp5 e .musicxml em out/ (separa, transcreve, posiciona e exporta)
-uv run thoth transcribe caminho/para/musica.mp3 --cordas 5
+# áudio → out/<título>/ (separa, transcreve, posiciona, exporta e auraliza)
+uv run thoth transcribe caminho/para/musica.mp3 --afinacao 5
 
-# original à esquerda, transcrição à direita: ouvir se o ritmo descola
+# refaz só a auralização, a partir das notas em cache
 uv run thoth auralizar caminho/para/musica.mp3
 
 # API + página de estudo com alphaTab local, em 127.0.0.1
@@ -59,9 +63,15 @@ Toda referência — em `fetch`, `transcribe` ou `auralizar` — pode ser um cam
 URL do YouTube; o Thoth detecta sozinho. O áudio normalizado fica em
 `cache/<source_id>/mix.wav` e não é rebaixado nem reconvertido em execuções seguintes.
 
-O `transcribe` leva cerca de 2,5× a duração do áudio em CPU. Sem `--bpm`, o andamento é
-estimado do mix e **anunciado** — confira ouvindo (ADR-019). O `auralizar` precisa das
-notas já em cache, então roda depois do `transcribe`.
+O `transcribe` grava uma pasta por música (ADR-037): `<título>.gp5`, `.musicxml`
+(partitura e tablatura), `.mix.wav`, `.baixo.wav`, `.sem-baixo.wav` e `.aural.wav` —
+original num canal, transcrição no outro, para ouvir se o ritmo descola. Opções:
+`--afinacao` (`4`, `5`, `drop-d`), `--digitacao` (`iniciante`, `experiente`), `--bpm` e
+`--tom`; `uv run thoth transcribe --help` lista todas.
+
+Leva cerca de 2,5× a duração do áudio em CPU. Sem `--bpm`, o andamento é estimado do mix
+e **anunciado** — confira ouvindo (ADR-019). O `auralizar` precisa das notas já em cache,
+então só roda depois de um `transcribe`.
 
 ## Desenvolvimento
 
@@ -86,5 +96,5 @@ yt-dlp tem os dois primeiros, então `-m slow` sozinho também toca a rede.
 
 ## Licenças
 
-Código deste repositório: a definir. Pesos do MuScriptor: **CC BY-NC 4.0** — uso
+Código deste repositório: **MIT** (`LICENSE`). Pesos do MuScriptor: **CC BY-NC 4.0** — uso
 não comercial. O `Protocol Transcriber` mantém a troca de modelo barata.
