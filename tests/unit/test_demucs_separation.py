@@ -35,6 +35,12 @@ def test_comando_prega_a_versao_do_demucs() -> None:
     assert comando[3] == "demucs@4.1.0"
 
 
+def test_a_versao_pregada_e_a_que_vai_no_comando() -> None:
+    """A versão é um campo só: o comando e a chave do cache leem o mesmo valor."""
+    comando = DemucsSeparator(versao="4.0.1")._comando(Path("a.wav"), Path("/saida"))
+    assert comando[3] == "demucs@4.0.1"
+
+
 def test_comando_fixa_modelo_dispositivo_e_dois_stems() -> None:
     comando = DemucsSeparator()._comando(Path("a.wav"), Path("/saida"))
     assert comando[comando.index("-n") + 1] == "htdemucs_ft"
@@ -60,7 +66,7 @@ def test_localizar_reclama_quando_nao_ha_stem(tmp_path: Path) -> None:
 
 def test_separar_reaproveita_stem_existente(tmp_path: Path) -> None:
     """Separar custa ~88s por 30s de áudio: repetir à toa é caro demais."""
-    _toca(tmp_path / "htdemucs_ft" / "x" / "bass.wav")
+    _toca(tmp_path / "htdemucs_ft" / "4.1.0" / "x" / "bass.wav")
     # `false` falha na hora: se o cache não pegar, o subprocesso denuncia.
     separador = DemucsSeparator(binary=("false",))
 
@@ -97,12 +103,40 @@ def test_stem_de_outro_modelo_nao_conta_como_cache(tmp_path: Path) -> None:
 
 def test_cada_modelo_tem_o_proprio_cache(tmp_path: Path) -> None:
     """Trocar de modelo não pode exigir apagar o cache na mão."""
-    _toca(tmp_path / "htdemucs_ft" / "x" / "bass.wav")
-    _toca(tmp_path / "mdx_extra" / "x" / "bass.wav")
+    _toca(tmp_path / "htdemucs_ft" / "4.1.0" / "x" / "bass.wav")
+    _toca(tmp_path / "mdx_extra" / "4.1.0" / "x" / "bass.wav")
 
     for modelo in ("htdemucs_ft", "mdx_extra"):
         achado = DemucsSeparator(model=modelo, binary=("false",)).separate(Path("a.wav"), tmp_path)
-        assert achado["bass"].parent.parent.name == modelo
+        assert achado["bass"].parent.parent.parent.name == modelo
+
+
+def test_stem_sem_versao_no_caminho_nao_conta_como_cache(tmp_path: Path) -> None:
+    """Antes de 2026-09-24 o cache era `<out>/<modelo>/<nome>/`, sem a versão: não há
+    como saber de que demucs aquele stem veio, então ele não é cache de ninguém."""
+    _toca(tmp_path / "htdemucs_ft" / "x" / "bass.wav")
+    # `true` não separa nada: se o stem sem versão fosse aceito, ninguém notaria.
+    with pytest.raises(FileNotFoundError, match=r"bass\.wav"):
+        DemucsSeparator(binary=("true",)).separate(Path("a.wav"), tmp_path)
+
+
+def test_stem_de_outra_versao_nao_conta_como_cache(tmp_path: Path) -> None:
+    """Mudar o pin não pode reaproveitar calado o stem da versão anterior."""
+    _toca(tmp_path / "htdemucs_ft" / "4.0.1" / "x" / "bass.wav")
+    with pytest.raises(FileNotFoundError, match=r"bass\.wav"):
+        DemucsSeparator(binary=("true",)).separate(Path("a.wav"), tmp_path)
+
+
+def test_cada_versao_tem_o_proprio_cache(tmp_path: Path) -> None:
+    """Trocar o pin e voltar não exige apagar nem refazer nada."""
+    for versao in ("4.0.1", "4.1.0"):
+        _toca(tmp_path / "htdemucs_ft" / versao / "x" / "bass.wav")
+
+    for versao in ("4.0.1", "4.1.0"):
+        achado = DemucsSeparator(versao=versao, binary=("false",)).separate(
+            Path("a.wav"), tmp_path
+        )
+        assert achado["bass"].parent.parent.name == versao
 
 
 def test_demucs_morto_no_meio_nao_deixa_stem_pela_metade(tmp_path: Path) -> None:
@@ -120,12 +154,12 @@ def test_demucs_morto_no_meio_nao_deixa_stem_pela_metade(tmp_path: Path) -> None
 
 def test_o_stem_fica_no_lugar_documentado(tmp_path: Path) -> None:
     """A promoção do diretório provisório não pode aninhar o modelo duas vezes:
-    `<out>/<modelo>/<nome>/bass.wav` é o caminho que o docstring promete."""
+    `<out>/<modelo>/<versão>/<nome>/bass.wav` é o caminho que o docstring promete."""
     # Imita o demucs: escreve sob `<-o>/<modelo>/<nome do arquivo>/`. `$8` é o `-o`.
     finge = ("sh", "-c", 'mkdir -p "$8/htdemucs_ft/a" && : > "$8/htdemucs_ft/a/bass.wav"'
              ' && : > "$8/htdemucs_ft/a/no_bass.wav"', "demucs")
 
     achado = DemucsSeparator(binary=finge).separate(Path("a.wav"), tmp_path)
 
-    assert achado["bass"] == tmp_path / "htdemucs_ft" / "a" / "bass.wav"
+    assert achado["bass"] == tmp_path / "htdemucs_ft" / "4.1.0" / "a" / "bass.wav"
     assert sorted(achado) == ["bass", "no_bass"]

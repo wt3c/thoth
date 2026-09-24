@@ -34,12 +34,9 @@ Nada do que resta é barato: tudo depende de material externo ou de sessão manu
 ### 3. Aberto sem urgência
 
 - `small` vs `medium` cronometrado em CPU (o lock já tem os dois pesos).
-- Ligaduras no GP5 (hoje figura + pausa: ataque exato, duração truncada — ADR-013).
 - Fase 6 inteira: sync de cursor via Spotify, Containerfile + compose, multi-instrumento.
 - Fora do contrato do ADR-039: fórmula não inteira (7/16) e anacruse no conserto de beams
   — só importa se a fórmula deixar de ser 4/4 fixo.
-- Cache de stems identificado só pelo modelo, não pela versão do Demucs (emenda do
-  ADR-039): mudar o pin exige limpar `cache/stems/`.
 
 ## Fase 0 — Spike de viabilidade ✅ **CONCLUÍDA (2026-09-22) — veredito: SEGUIR**
 
@@ -178,7 +175,8 @@ linha permitir, verificado por propriedade — não por execução no instrument
       GP5 e os quatro MusicXML (incluindo `graves`, de 5 cordas) abriram
       corretamente. É o único leitor independente disponível — o round-trip
       sozinho prova consistência com quem escreveu, não validade do formato
-- [ ] Ligaduras no GP5 (hoje: figura + pausa; ataque exato, duração truncada — ADR-013)
+- [x] Ligaduras no GP5 — feito pelo ADR-022 (`NoteType.tie`, fatiado nas barras); o item
+      ficou aberto por engano até 2026-09-24
 
 **Pronto quando:** abrir sem erro no TuxGuitar.
 

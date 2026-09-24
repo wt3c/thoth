@@ -459,6 +459,13 @@ O round-trip é verificado contra as bibliotecas reais (grava arquivo, relê, co
 corda, traste, altura, afinação, andamento e clave). Isso prova consistência, **não**
 validade para outro leitor — a verificação no TuxGuitar continua sendo manual.
 
+### Emenda (2026-09-24)
+
+A primeira consequência — **GP5 sem ligaduras** — não vale mais desde o ADR-022: a
+duração que não cabe numa figura, ou que atravessa a barra, sai em beats
+`NoteType.tie` encadeados, e o resto deixou de virar pausa. O restante deste ADR
+(BPM explícito, monofonia, 4/4 fixo) continua como está.
+
 ## ADR-014 — O pipeline descarta e relata, em vez de falhar
 **Data:** 2026-09-22 · **Status:** aceito
 
@@ -1048,6 +1055,19 @@ O catálogo de afinações mudou de chave: `{4: ..., 5: ...}` virou
 ## ADR-026 — O cache guarda só o que está inteiro, e a ferramenta que falha explica por quê
 
 **Data:** 2026-09-23 · **Status:** aceito
+
+### Emenda (2026-09-24) — a versão do demucs entra na chave
+
+O item 3 fez o cache pertencer ao modelo, mas não à versão: com `demucs@4.1.0` pregado
+(emenda do ADR-039), um stem de outra versão ainda passaria por este. O cache agora é
+`<out>/<modelo>/<versão>/<nome>/`, e `DemucsSeparator.versao` é o único lugar do valor —
+o comando e a chave leem o mesmo campo. Stem sob o layout antigo, sem versão, não conta
+como cache de ninguém. Trocar o pin e voltar não exige apagar nada: cada versão tem o
+próprio diretório.
+
+Os 13 stems desta estação foram movidos para `htdemucs_ft/4.1.0/` em vez de refeitos:
+4.1.0 é a única versão que o `uv` desta estação já baixou. Verificado com o demucs real
+(`-m "slow and not network"` nos dois testes de separação, 78 s).
 
 ### Contexto
 
