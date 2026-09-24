@@ -6,7 +6,9 @@ remover o instrumento do áudio resolve — nenhuma flag do transcritor resolve.
 
 Por subprocesso via `uvx`, como o transcritor, e pelo mesmo motivo: o demucs
 arrasta torch. O `--with "numpy<2"` não é preferência — o demucs declara mal as
-dependências e quebra com `ModuleNotFoundError: numpy` sem ele.
+dependências e quebra com `ModuleNotFoundError: numpy` sem ele. A versão vai pregada
+(`demucs@4.1.0`), como a do transcritor: sem ela o `uvx` pega a mais nova do dia e os
+stems — e o cache e as medições do ADR-010 feitos sobre eles — mudam sem aviso.
 """
 
 from __future__ import annotations
@@ -47,7 +49,7 @@ class DemucsSeparator:
 
     model: str = "htdemucs_ft"
     device: str = "cpu"  # mesma razão do transcritor: a estação não tem CUDA
-    binary: tuple[str, ...] = field(default=("uvx", "--with", "numpy<2", "demucs"))
+    binary: tuple[str, ...] = field(default=("uvx", "--with", "numpy<2", "demucs@4.1.0"))
 
     def _comando(self, audio: Path, out_dir: Path) -> list[str]:
         return [

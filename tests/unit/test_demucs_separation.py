@@ -21,7 +21,18 @@ def _toca(caminho: Path) -> Path:
 def test_comando_carrega_numpy_antigo() -> None:
     """O demucs declara mal as dependências e quebra com numpy 2 (ADR-010)."""
     comando = DemucsSeparator()._comando(Path("a.wav"), Path("/saida"))
-    assert comando[:4] == ["uvx", "--with", "numpy<2", "demucs"]
+    assert comando[:3] == ["uvx", "--with", "numpy<2"]
+
+
+def test_comando_prega_a_versao_do_demucs() -> None:
+    """Sem versão, o `uvx` pega a mais nova do dia e os stems mudam calados.
+
+    Mesma regra do `muscriptor@0.3.0`: as medições do ADR-010 e o cache por
+    modelo (ADR-026) só valem para o separador que as produziu. 4.1.0 é a única
+    versão que esta estação já rodou.
+    """
+    comando = DemucsSeparator()._comando(Path("a.wav"), Path("/saida"))
+    assert comando[3] == "demucs@4.1.0"
 
 
 def test_comando_fixa_modelo_dispositivo_e_dois_stems() -> None:
