@@ -89,7 +89,8 @@ A avaliação **não depende de saber tocar** (ADR-006).
   - [x] rodar nas três músicas → ADR-041
 - [x] Conferir oitava contra essa tab: duas oitavas quase nunca (6 de 1266 pares, só
       em *And Plague Flowers*); 5–15% a uma.
-      *Dance of Death* ficou no piso de acaso — não confirma nada
+      *Dance of Death* ficou no piso de acaso — não confirma nada; *And Plague
+      Flowers* só alinhou em 60–300 s
 - [ ] "Nota errada" contra tab: exige alinhar a tab ao stem do baixo (DTW), não à
       transcrição (ADR-041, consequência). Refazer *And Plague Flowers* com `--afinacao 5`
 

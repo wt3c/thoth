@@ -2164,7 +2164,8 @@ alinhada, e o acerto de altura não separava os dois:
 
 Em *Dance of Death* deslocar a tab **melhorava** o acerto: o alinhamento estava errado.
 Em *And Plague Flowers* a escala parou em 0,900, a borda da grade. Com 0,05 s de
-tolerância o quadro era o mesmo.
+tolerância *Dance* seguiu igual; *Fear* separou melhor (65,3% contra 36,8–52,7%), mas
+ainda com a tab uma nota ao lado perto do alinhado.
 
 ### Decisão
 
@@ -2199,23 +2200,35 @@ tolerância o quadro era o mesmo.
   tab deslocada (107 a 123 abaixo contra 1 a 4 acima), então é do **registro** — trechos em que a tab e o Thoth leem a linha em
   oitavas diferentes —, não de um par a par. Se o erro é do Thoth ou da tab, esta medida
   não diz.
-- *Fear Is the Key* fica 3 pontos acima do piso: sinal fraco.
-- *And Plague Flowers* é a única com margem (89,6% contra 74,9%), mas com duas ressalvas:
-  a transcrição foi feita com a afinação de 4 cordas (a tab é de 5, com B0) e para em
+- *Fear Is the Key* fica 3 pontos acima do piso: sinal fraco. A tab mapeada cai em
+  3,6–322,5 s, dentro da transcrição (0,5–319,3 s).
+- ***And Plague Flowers* não alinhou a música inteira.** A tab mapeada vai de −5,2 s a
+  663,4 s — começa antes do áudio. Por janela de 60 s, só 60–300 s alinha: 91% a 100%
+  na mesma oitava contra um piso de 61% a 83%. Fora disso fica no piso ou sem par. A
+  margem da linha da tabela vem desse trecho, não da música. Duas ressalvas somam-se: a
+  transcrição foi feita com a afinação de 4 cordas (a tab é de 5, com B0) e para em
   511 s de 653 s de áudio.
+- **A coluna de pares não se compara com o piso de forma justa.** O número alinhado é o
+  máximo de uma busca em grade; cada deslocamento do piso é um sorteio sem otimização.
+  No teste sintético com a escala fora da grade, o alinhamento falho deu 20 pares
+  contra um piso de 10. Só a fração na mesma oitava é comparável, porque a oitava não
+  entra na busca.
 
 ### Limites
 
 - D.S./coda não são seguidos; final alternativo ocupa um compasso. Nenhuma das três usa
   D.S.; *And Plague Flowers* tem uma repetição aberta sem fecho no compasso 344.
 - Tab de comunidade tem erro próprio e pode ser de outra versão da música.
+- A extensão mapeada da tab não é conferida contra a do áudio: em *And Plague Flowers*
+  isso teria recusado o encaixe global. Guarda possível, do mesmo tipo da borda.
 - 36% a 49% da tab entra em par: o veredito vale para as notas em que tab e transcrição
   concordam no nome, que não são uma amostra neutra.
 
 ### Consequência
 
 A pergunta "o Thoth erra a oitava?" tem resposta parcial: quase nunca por duas, de 5% a 15%
-por uma, e a medida só se sustenta onde fica acima do piso. Para "a nota está certa?" a
+por uma, e a medida só se sustenta onde a fração na mesma oitava fica acima do piso —
+em *Fear*, por pouco, e no trecho de 60–300 s de *And Plague Flowers*. Para "a nota está certa?" a
 tab de comunidade, alinhada automaticamente, não serve. O próximo passo, se houver, é
 alinhar a tab ao stem do baixo e não à transcrição (DTW sobre o envelope de ataques), o
 que devolveria "nota errada" à medida.
