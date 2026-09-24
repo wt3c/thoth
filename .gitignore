@@ -223,6 +223,8 @@ audio/
 cache/
 models/
 *.gp5
+# Tabs de referência baixadas pelo usuário: conteúdo de terceiros, fica na máquina.
+samples/
 *.musicxml
 spike/
 # A auralização leva o mix original num dos canais: é o áudio de origem,
