@@ -10,7 +10,9 @@ import os
 import re
 import shutil
 import subprocess
+from itertools import pairwise
 from pathlib import Path
+from xml.etree import ElementTree
 
 import pytest
 from music21 import articulations, clef, converter, key, note, tempo
@@ -319,3 +321,105 @@ def test_corda_alterada_leva_o_acidente_na_afinacao(tmp_path: Path) -> None:
         r"<tuning-step>(\w)</tuning-step>\s*<tuning-alter>(-?\d)</tuning-alter>", xml
     )
     assert alterados == [("E", "-1"), ("G", "1"), ("C", "1"), ("F", "1")]
+
+
+# --- Gramática dos beams (ADR-038) -------------------------------------------
+
+
+def _beams_mal_formados(arquivo: Path) -> list[str]:
+    """Onde o arquivo viola a gramática de beam do MusicXML.
+
+    Por nível, a sequência válida é `begin` (`continue`*) `end`; gancho
+    (`forward hook`/`backward hook`) é isolado. `end` ou `continue` sem `begin`
+    aberto é arquivo mal-formado; `begin` sobre um `begin` já aberto e `begin` que fica
+    aberto no fim do compasso, também — este último foi o caso que a primeira versão
+    desta conta deixou passar.
+
+    O estado é por **(pauta, voz, nível)**: as duas pautas do ADR-035 convivem no
+    mesmo `<measure>`, e somar as duas acusa erro que não existe.
+
+    Isto não é redundante com o round-trip: o music21 relê o que ele mesmo
+    escreveu, então nenhuma asserção via `converter.parse` vê a gramática crua.
+    """
+    raiz = ElementTree.parse(arquivo).getroot()
+    achados = []
+    for compasso in raiz.iter("measure"):
+        numero = compasso.get("number")
+        abertos: dict[tuple[str, str, str], bool] = {}
+        for nota in compasso.findall("note"):
+            pauta = nota.findtext("staff", "1")
+            voz = nota.findtext("voice", "1")
+            for beam in nota.findall("beam"):
+                chave = (pauta, voz, beam.get("number", "1"))
+                valor = (beam.text or "").strip()
+                if valor == "begin":
+                    if abertos.get(chave):
+                        achados.append(f"c.{numero} pauta {pauta}: begin no nível "
+                                       f"{chave[2]} com um já aberto")
+                    abertos[chave] = True
+                elif valor in ("continue", "end"):
+                    if not abertos.get(chave):
+                        achados.append(f"c.{numero} pauta {pauta}: {valor!r} "
+                                       f"no nível {chave[2]} sem begin")
+                    abertos[chave] = valor == "continue"
+        achados += [
+            f"c.{numero} pauta {p}: begin no nível {n} sem end"
+            for (p, _, n), aberto in abertos.items()
+            if aberto
+        ]
+    return achados
+
+
+def _com_buracos(tmp_path: Path) -> Path:
+    """Duas semicolcheias a dois tempos e meio de distância, e pausa entre elas.
+
+    Era o caso que escrevia `end` no nível 2 sem `begin`: o `insert` deixava o
+    stream com buracos, o beam saía calculado antes de as pausas existirem e as
+    duas notas se viam como vizinhas a meio compasso de distância. Nenhuma delas
+    cruza a fronteira de semínima — é só o buraco.
+    """
+    notas = [
+        NoteEvent(pitch=36, onset_s=0.0, offset_s=SEMINIMA * 0.25,
+                  instrument="electric_bass"),
+        NoteEvent(pitch=38, onset_s=SEMINIMA * 2.5, offset_s=SEMINIMA * 2.75,
+                  instrument="electric_bass"),
+    ]
+    return _arquivo(ViterbiFretAssigner().assign(notas, TUNING_BASS_4), tmp_path)
+
+
+def test_a_gramatica_dos_beams_fecha_com_pausa_no_meio(tmp_path: Path) -> None:
+    assert _beams_mal_formados(_com_buracos(tmp_path)) == []
+
+
+def test_semicolcheia_isolada_nao_sai_beameada(tmp_path: Path) -> None:
+    """A asserção que diz o que é certo, e não só que nada está mal-formado.
+
+    Semicolcheia sozinha no tempo se escreve com bandeirola, não com beam. Sem
+    isto, um exportador que apagasse todos os beams passaria no teste de gramática.
+    """
+    xml = _com_buracos(tmp_path).read_text()
+
+    assert "<beam" not in xml
+
+
+@pytest.mark.xfail(
+    strict=True,
+    reason="Fase 12 (B): music21 10.5 erra o beam quando a nota cruza o tempo",
+)
+def test_beam_travessa_o_tempo_e_defeito_do_music21(tmp_path: Path) -> None:
+    """Colcheia, mínima, colcheia pontuada, colcheia pontuada — contíguas.
+
+    Sem pausa nenhuma, e o music21 10.5 escreve dois `end` no nível 1, calado.
+    Marcado `xfail(strict=True)` de propósito: é defeito aberto (Fase 12 (B)), e
+    `strict` faz o teste ficar vermelho no dia em que a correção entrar — um xfail
+    que passa em silêncio viraria defeito esquecido.
+    """
+    limites = [0.0, 0.5, 2.5, 3.25, 4.0]
+    notas = [
+        NoteEvent(pitch=36 + i, onset_s=inicio * SEMINIMA, offset_s=fim * SEMINIMA,
+                  instrument="electric_bass")
+        for i, (inicio, fim) in enumerate(pairwise(limites))
+    ]
+    arquivo = _arquivo(ViterbiFretAssigner().assign(notas, TUNING_BASS_4), tmp_path)
+
+    assert _beams_mal_formados(arquivo) == []

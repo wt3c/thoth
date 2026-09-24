@@ -1825,3 +1825,76 @@ pautas (ADR-035). Movidas, e o que faltava foi preenchido.
 - Fora de terminal (log, CI, teste) o `rich` não anima: imprime cada estágio concluído
   como uma linha `✓ <estágio>  0:00:00`. É o que se quer num log, e é o que os testes
   da CLI afirmam.
+
+---
+
+## ADR-038 — as pausas entram antes do `makeNotation`, e a gramática do beam é afirmada no XML cru
+
+**Data:** 2026-09-23
+**Status:** aceito na parte (A); a parte (B) fica aberta e documentada
+
+### Contexto
+
+O music21 cospe `beam: WARNING: Found a messed up beam pair` ao gravar o MusicXML.
+Investigar o aviso mostrou que ele **subnotifica**: dispara de 0 a 6 vezes por música,
+mas os arquivos entregues traziam **208** beams mal-formados — `end` ou `continue` num
+nível sem `begin` aberto, o que o MusicXML não admite. O aviso só cobre o subcaso que
+`mergeConnectingPartialBeams` examina; o resto sai calado.
+
+São **dois defeitos, não um**:
+
+- **(A), nossa.** `_pauta` fazia `parte.insert(offset, nota)` e nunca preenchia as
+  pausas. O beam é calculado antes de elas existirem, e duas notas a meio compasso de
+  distância se veem como vizinhas. Com pausas explícitas o music21 acerta:
+  `ts.getBeams([Note, Rest, Note, Rest])` devolve `[None, None, None, None]`.
+- **(B), do music21 10.5.** Ritmo contíguo, sem pausa nenhuma. Mínimo de quatro notas —
+  `(2, 8, 3, 3)` semicolcheias sai `1/begin, 1/continue, 1/end, 1/end`, dois `end`.
+  10.5.0 é a versão mais nova do PyPI: não há correção a montar.
+
+### Decisão
+
+1. **`parte.makeRests(fillGaps=True, inPlace=True)` no fim de `_pauta`**, antes que o
+   `makeNotation` beameie. É uma linha, e vale mais que escrever beaming próprio.
+2. **A gramática é afirmada sobre o XML cru**, por `(pauta, voz, nível)`, incluindo
+   `begin` que fica aberto no fim do compasso. Por duas razões: o round-trip pelo
+   music21 não vê nada disso (ele relê o que ele mesmo escreveu), e as duas pautas do
+   ADR-035 convivem no mesmo `<measure>` — somar as duas acusa erro que não existe.
+3. **(B) fica marcado `xfail(strict=True)`**, não silenciado. `strict` faz o teste ficar
+   vermelho no dia em que a correção entrar: xfail que passa calado vira defeito
+   esquecido.
+
+### Medição
+
+Experimento controlado — o **mesmo** conjunto de notas de sete músicas do cache
+exportado com e sem a linha do `makeRests` (comparar com o arquivo entregue não isola
+nada: sem o recuo de fase do pipeline o conjunto de notas muda, e as contagens sobre a
+base entregue foram 208):
+
+| base | mal-formados | (A) | (B) |
+|------|--------------|-----|-----|
+| sem a correção | 248 | 48 | 200 |
+| com a correção | 200 | 0 | 200 |
+
+A queda é monotônica em todas as sete músicas, nenhuma piora. Os 14 que uma primeira
+conta ainda classificava como (A) são (B) disfarçados: `end@1` solto numa colcheia
+pontuada, sem `begin` em lugar nenhum — a pausa estava por perto, não dentro do grupo.
+
+### Alternativas descartadas
+
+- **Não emitir beam nenhum.** O MuseScore 4.7.4 **não** beameia sozinho quando o arquivo
+  não traz beam: cada semicolcheia sai com bandeirola solta.
+- **Deixar o leitor consertar.** O MuseScore aceita o arquivo, mas o conserto é visível e
+  errado: no caso mínimo de (A) ele tira a primeira nota do grupo e pendura o beam numa
+  **pausa**.
+- **Silenciar o aviso.** `UserSettings['warnings'] = 0` grava em `~/.music21rc` — config
+  de estação, e o aviso é sinal verdadeiro.
+
+### Consequência
+
+- Restam **200** beams mal-formados de forma (B), em ritmo sincopado. O MuseScore abre e
+  desenha; o defeito é o grupo desenhado errado, não arquivo recusado.
+- Os oito arquivos já em `out/` seguem com a forma (A): só reexportar os corrige.
+- A varredura de compassos 4/4 contíguos na grade de semicolcheia deu 0 mal-formados em
+  13 sem nota cruzando a fronteira de semínima, contra 132 em 1535 com nota cruzando —
+  compatível com "cruzar o tempo é condição necessária", mas a amostra negativa é
+  pequena (13) e isso não é prova.

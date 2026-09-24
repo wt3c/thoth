@@ -107,6 +107,11 @@ class MusicXmlExporter:
                 # O nome só na partitura: na tablatura ele repete o traste ao lado.
                 n.lyric = nome_da_nota(tab.event.pitch, bemois=(self.armadura or 0) < 0)
             parte.insert(inicio / PPQ, n)
+        # As pausas antes do `makeNotation`, e não depois: ele beameia o que vê, e
+        # com o stream cheio de buracos duas notas a meio compasso de distância se
+        # veem como vizinhas e saem no mesmo grupo — `end` sem `begin` no nível 2,
+        # arquivo mal-formado (ADR-038). Com as pausas na mão, o music21 acerta.
+        parte.makeRests(fillGaps=True, inPlace=True)
         return parte
 
 

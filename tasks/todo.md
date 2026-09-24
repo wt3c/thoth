@@ -462,8 +462,105 @@ As oito pastas em `out/` conferidas com 6 arquivos cada e nada solto em `out/`
 hash: distintos, e o RMS do playback (0,0896) fica entre o do mix (0,1215) e o do
 baixo (0,0290), como se espera de um mix sem o baixo.
 
-Achado que fica para outra tarefa: o music21 cospe `beam: WARNING: Found a messed up
-beam pair` dezenas de vezes por música ao gravar o MusicXML. Não foi silenciado de
-propósito — `Environment.warn` escreve direto em `sys.stderr` e ignora a configuração
-de `warnings`, e o aviso é sinal real sobre os grupos de colcheia que os offsets das
-notas produzem. Esconder esconderia o defeito.
+Achado que virou a Fase 12: o music21 cospe `beam: WARNING: Found a messed up beam
+pair` ao gravar o MusicXML. Não foi silenciado — o aviso é sinal real, e investigar
+mostrou que ele **subnotifica** o problema. Números medidos abaixo.
+
+## Fase 12 — beams mal-formados no MusicXML (investigado, a corrigir)
+
+> Origem: o aviso `beam: WARNING: Found a messed up beam pair` que a Fase 11 deixou
+> anotado. Investigado em 2026-09-23. **São dois defeitos, não um**, e o aviso só
+> cobre o menor dos dois.
+
+### O defeito, medido nos oito arquivos já entregues
+
+**208 beams mal-formados** — `end` ou `continue` num nível de beam sem `begin` aberto,
+o que o MusicXML não admite. De 8 a 52 por música, metade em cada pauta (as duas
+compartilham o ritmo). Nenhum `begin` pendurado.
+
+O aviso do music21 aparece de 0 a 6 vezes por música: ele só dispara no subcaso que
+`mergeConnectingPartialBeams` examina. **O resto sai calado.**
+
+| forma | quantos | causa | quem tem culpa |
+|-------|---------|-------|----------------|
+| (A) há pausa dentro do grupo | 46 | entregamos um stream com buracos | nossa |
+| (B) grupo contíguo | 162 | nota cruzando a fronteira de tempo | music21 10.5 |
+
+> Este split vem do classificador por proximidade de pausa, que **superestima (A)**:
+> `end@1` solto perto de uma pausa era contado como (A) sem estar dentro de grupo
+> nenhum. A medição controlada mais abaixo o supera; o total (208) segue valendo.
+
+### (A) — nossa: o stream vai com buracos para o `makeNotation`
+
+`_pauta` faz `parte.insert(offset, nota)` e nunca preenche as pausas. O beam é
+calculado antes de elas existirem, e duas notas a meio compasso de distância se veem
+como vizinhas. Medido:
+
+```python
+ts.getBeams([Note(0.25), Rest(2.25), Note(0.25), Rest(1.25)])  # [None,None,None,None] ✅
+# mas o mesmo ritmo inserido com buracos: 1/begin + 2/forward hook … 1/end + 2/end ❌
+```
+
+Com `parte.makeRests(fillGaps=True, inPlace=True)` antes do `makeNotation`, o music21
+acerta sozinho: nenhum beam, que é o certo para semicolcheia isolada. **A forma (A) é
+uma linha.**
+
+### (B) — do music21: nota que cruza a fronteira de tempo
+
+Sobrevive ao `makeRests` — é ritmo contíguo, sem pausa nenhuma. O mínimo é quatro
+notas: `(2, 8, 3, 3)` semicolcheias (colcheia, mínima, colcheia pontuada, colcheia
+pontuada) sai `1/begin, 1/continue, 1/end, 1/end` — dois `end`. **O music21 não avisa
+em nenhum dos 18 ritmos mínimos encontrados.**
+
+Varredura de todas as composições contíguas de um compasso 4/4 na grade de
+semicolcheia, com 2 a 5 notas:
+
+- nenhuma nota cruzando a fronteira de semínima: **0 mal-formados em 13**
+- alguma nota cruzando: **132 mal-formados em 1535**
+
+A amostra negativa é pequena (13), então isso é compatível com "cruzar o tempo é
+condição necessária", não prova dela. 10.5.0 é a versão mais nova que existe no PyPI:
+não há correção a montar.
+
+### O que já foi descartado como saída
+
+- **Não emitir beams.** Conferido: o MuseScore 4.7.4 **não** beameia sozinho quando o
+  arquivo não traz beam nenhum — cada semicolcheia sai com bandeirola solta.
+- **Deixar o leitor consertar.** O MuseScore não recusa o arquivo, mas o conserto é
+  visível e errado: no caso mínimo de (A) ele tira a primeira nota do grupo e pendura
+  o beam numa **pausa**.
+
+### O que falta
+
+- [x] Teste de gramática sobre o XML escrito, por (pauta, voz, nível), incluindo
+      `begin` que fica aberto. É o teste que faltava: o round-trip pelo music21 não
+      pega nada disso, porque ele relê o que escreveu.
+- [x] (A): `makeRests(fillGaps=True)` antes do `makeNotation` em `_pauta`.
+- [ ] (B): decidir a abordagem — nenhuma foi escolhida ainda. Quebrar o grupo na
+      fronteira de tempo é o candidato, mas não está verificado que resolve, e não há
+      botão para isso (conferido em `meter/base.py::getBeams` e
+      `stream/makeNotation.py::makeBeams`).
+- [ ] Reexportar as oito músicas depois da correção.
+- [x] ADR-038 com a medição. — escrito para (A); a parte (B) fica registrada como aberta.
+
+### (A) fechada — medição controlada
+
+O mesmo conjunto de notas de sete músicas do cache, exportado com e sem a linha do
+`makeRests` (comparar com os arquivos entregues não isola nada: sem o recuo de fase do
+pipeline o conjunto de notas muda — daí 248 aqui contra os 208 medidos sobre a base
+entregue):
+
+| base | mal-formados | (A) | (B) |
+|------|--------------|-----|-----|
+| sem a correção | 248 | 48 | 200 |
+| com a correção | 200 | 0 | 200 |
+
+Queda monotônica nas sete, nenhuma piora. Os 14 que a primeira conta ainda punha em (A)
+são (B) disfarçados: `end@1` solto numa colcheia pontuada, sem `begin` em lugar nenhum.
+
+Portão: 291 passed + 1 xfailed (era 289), ruff e mypy limpos. O `xfail(strict=True)` de
+(B) é de propósito — fica vermelho no dia em que (B) for corrigido.
+
+O conteúdo não mudou com a correção: nos sete pares antes/depois, notas, compassos e
+pausas batem exatamente — o `makeNotation` já produzia as mesmas pausas, e a correção só
+muda **quando** elas existem. Nenhum `begin` aninhado nem pendurado em nenhuma das bases.
