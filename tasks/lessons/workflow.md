@@ -40,3 +40,21 @@ em português, "portão" não evoca "o que precisa passar antes de seguir".
 
 Vale para todo termo de jargão em inglês: traduzir só quando a palavra em português
 carrega o mesmo sentido; se não houver, o termo técnico usual é melhor que o literal.
+
+## O usuário não é juiz de música
+
+**2026-09-25.** Correção do Welington: o conhecimento de música dele é nulo, e o Thoth
+existe justamente para ele aprender. Eu vinha pedindo que ele escolhesse margem de
+acerto, recomendasse o que fazer com o limiar de oitava e deixando para ele a "passada
+perceptual" de ouvido.
+
+**Como aplicar:**
+
+- Qualidade e acerto musical se decidem por **medição** (tab humana, piso de acaso,
+  referência sintética), nunca por julgamento dele. Se não há como medir, dizer isso,
+  e não transferir a decisão.
+- Decisão de método (qual limiar, qual margem) é minha: decidir pela medição, registrar
+  no ADR e informar. Pedir aprovação do **plano de trabalho**, não do juízo musical.
+- Verificação manual só o que dispensa ouvido treinado: "sai som?", "o cursor anda?".
+  "Soa certo?" não é pergunta para ele.
+- Explicar termo musical na primeira vez que aparece (oitava, classe de altura, tab).

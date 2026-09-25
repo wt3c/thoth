@@ -5,7 +5,7 @@
 
 ## Próxima sessão — o que está aberto (fechado em 2026-09-24)
 
-Estado: verificação de entrega verde (299 passed na suíte padrão, ruff e mypy limpos; varredura `slow`
+Estado: verificação de entrega verde (342 passed na suíte padrão, ruff e mypy limpos; varredura `slow`
 de beams 32767/0). As nove músicas reexportadas em `out/` em 2026-09-24 com o conserto
 de beams: **0 mal-formados**. Conferir `git status -sb` — o push fica a pedido.
 
@@ -24,11 +24,15 @@ Nada do que resta é barato: tudo depende de material externo ou de sessão manu
   UG Pro ou Songsterr Plus). Automatizar o Songsterr está fora (emenda do ADR-007:
   `robots.txt` e `ai.txt` deles). A da SOJA é `aiGenerated: true` e não serve.
 
-### 2. Verificação manual — precisa de ouvido e navegador
+### 2. Verificação manual — navegador; nada que exija ouvido treinado
 
-- **Tocar e cursor** na página de estudo: o teste conta SVG, não prova que sai áudio nem
-  que o cursor anda.
+> O usuário não julga acerto musical (lição em `tasks/lessons/workflow.md`): o que
+> exige ouvido treinado precisa virar medição ou fica declarado como não verificado.
+
+- ~~Tocar e cursor~~ — virou teste `navegador` em 2026-09-25 (ver Fase 5).
 - Passada perceptual (auralização) sobre o corpus de `tasks/corpus.md`, F1 por grupo.
+  **Sem caminho hoje:** exige ouvido treinado, que o usuário não tem. Só sai do lugar
+  se virar medição (ex.: tab humana de cada música do corpus, como no ADR-042).
 
 ### 3. Aberto sem urgência
 
@@ -262,8 +266,12 @@ Pré-requisito invisível até agora: a Fase 5 só existe se houver o que o
       que nada está visível (ADR-016). Fechado com teste de navegador de verdade
       (`tests/navegador/`, marcador `navegador`), verificado nos dois sentidos
 - [x] Reabrir job pronto por `?job=<id>`, com guarda para id inexistente
-- [ ] **Tocar e cursor** — ainda verificação manual: o teste conta SVG, não prova
-      que o áudio sai nem que o cursor anda
+- [x] **Tocar e cursor** — medido, não ouvido (2026-09-25):
+      `test_tocar_faz_sair_som_e_andar_o_cursor_e_parar_cala`. Um analisador preso a
+      toda ligação com a saída de som mede o volume: 0 antes, ≈ 0,094 tocando, 0 depois
+      de Parar; o cursor anda (x 198 → 235 px em 1 s). Provado nos dois sentidos:
+      `enablePlayer: false` e `enableCursor: false` o fazem falhar. Limite: o autoplay
+      é liberado por flag, então a política de gesto do navegador real não é exercitada
 
 ## Fase 6 — Opcionais
 

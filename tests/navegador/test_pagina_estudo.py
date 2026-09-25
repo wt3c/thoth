@@ -18,7 +18,7 @@ from pathlib import Path
 import httpx
 import pytest
 
-from tests.navegador.cdp import CHROMIUM, avaliar
+from tests.navegador.cdp import CHROMIUM, avaliar, sessao
 from thoth.adapters.export.gp5 import Gp5Exporter
 from thoth.api.app import WEB_PADRAO, criar_app
 from thoth.domain.models import (
@@ -219,3 +219,64 @@ def test_o_formulario_manda_o_tom_e_a_pagina_relata_a_grafia(servidor: str) -> N
     assert RECEBIDOS and RECEBIDOS[0]["tom"] == "f menor"
     assert estado["tom"] == {"nome": "f minor", "armadura": -4, "margem": None}
     assert "f minor" in estado["texto"], estado
+
+
+#: Injetado antes da página: toda ligação à saída de som ganha um analisador, e o volume
+#: (RMS) de cada 100 ms fica em `window.__rms`. Só a API padrão do navegador, nada do
+#: alphaTab — se ele mudar a forma de ligar o som, `saidas` fica em 0 e o teste diz.
+OUVIDO = """
+(() => {
+  window.__rms = []; window.__saidas = 0;
+  const ligar = AudioNode.prototype.connect;
+  AudioNode.prototype.connect = function (alvo, ...resto) {
+    if (alvo instanceof AudioDestinationNode) {
+      const a = this.context.createAnalyser();
+      ligar.call(this, a);
+      window.__saidas += 1;
+      const b = new Float32Array(a.fftSize);
+      setInterval(() => {
+        a.getFloatTimeDomainData(b);
+        window.__rms.push(Math.sqrt(b.reduce((s, x) => s + x * x, 0) / b.length));
+      }, 100);
+    }
+    return ligar.call(this, alvo, ...resto);
+  };
+})();
+"""
+
+#: Volume no último segundo e posição horizontal do cursor.
+LEITURA = """(() => {
+  const c = document.querySelector('.at-cursor-beat');
+  const x = c && /translate\\(([-\\d.]+)px/.exec(c.style.transform);
+  return {rms: Math.max(0, ...window.__rms.slice(-10)), saidas: window.__saidas,
+          cursor_x: x ? Number(x[1]) : null};
+})()"""
+
+
+def test_tocar_faz_sair_som_e_andar_o_cursor_e_parar_cala(servidor: str) -> None:
+    """O que antes era verificação manual: sai som? o cursor anda? — medido, não ouvido."""
+    ident = httpx.post(
+        f"{servidor}/jobs", json={"ref": "x.wav", "bpm": BPM}, timeout=10
+    ).json()["id"]
+    antes, _, tocando_1, tocando_2, _, parado = sessao(
+        f"{servidor}/?job={ident}",
+        [
+            (12, LEITURA),
+            (0, "document.getElementById('tocar').click()"),
+            (1, LEITURA),
+            (1, LEITURA),
+            (0, "document.getElementById('parar').click()"),
+            (1.5, LEITURA),
+        ],
+        script_inicial=OUVIDO,
+    )
+    print(f"antes {antes} · tocando {tocando_1} → {tocando_2} · parado {parado}")
+
+    assert antes["rms"] == 0, f"som antes de tocar: {antes}"
+    assert tocando_2["saidas"] > 0, "nada ligado à saída de som — o gancho não viu o player"
+    assert tocando_2["rms"] > 0.01, f"tocando e sem som: {tocando_2}"
+    assert tocando_1["cursor_x"] is not None, f"a página não tem cursor: {tocando_1}"
+    assert tocando_2["cursor_x"] > tocando_1["cursor_x"], (
+        f"o cursor não andou: {tocando_1} → {tocando_2}"
+    )
+    assert parado["rms"] < 0.001, f"parar não calou: {parado}"

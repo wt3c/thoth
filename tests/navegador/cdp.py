@@ -33,6 +33,18 @@ def _porta_livre() -> int:
 
 def avaliar(url: str, expressao: str, *, espera_s: float = 15.0) -> Any:
     """Abre `url`, deixa a página viver `espera_s` de relógio e avalia `expressao`."""
+    return sessao(url, [(espera_s, expressao)])[0]
+
+
+def sessao(
+    url: str, leituras: list[tuple[float, str]], *, script_inicial: str | None = None
+) -> list[Any]:
+    """Abre `url` e, para cada `(espera_s, expressao)`, espera e avalia, na mesma página.
+
+    `script_inicial` roda antes de qualquer script da página. O autoplay fica liberado:
+    o clique vem de `Runtime.evaluate`, não de gesto humano, e sem isso o navegador
+    calaria o som que o teste quer medir.
+    """
     if CHROMIUM is None:
         raise RuntimeError("chromium não encontrado")
     from websockets.sync.client import connect
@@ -41,31 +53,43 @@ def avaliar(url: str, expressao: str, *, espera_s: float = 15.0) -> Any:
     porta = _porta_livre()
     proc = subprocess.Popen(
         [CHROMIUM, "--headless", "--disable-gpu", "--no-sandbox",
+         "--autoplay-policy=no-user-gesture-required",
          f"--remote-debugging-port={porta}", f"--user-data-dir={perfil}", "about:blank"],
         stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
     )
     try:
         alvo = _esperar_alvo(porta)
         with connect(alvo["webSocketDebuggerUrl"], max_size=None) as ws:
-            _enviar(ws, 1, "Page.enable")
-            _enviar(ws, 2, "Page.navigate", url=url)
-            time.sleep(espera_s)
-            _enviar(ws, 3, "Runtime.evaluate", expression=expressao,
-                    returnByValue=True, awaitPromise=True)
-            limite = time.time() + 30
-            while time.time() < limite:
-                msg = json.loads(ws.recv(timeout=max(1.0, limite - time.time())))
-                if msg.get("id") == 3:
-                    resultado = msg.get("result", {}).get("result", {})
-                    if "value" not in resultado:
-                        raise RuntimeError(f"avaliação falhou: {msg}")
-                    return resultado["value"]
-            raise TimeoutError("navegador não respondeu à avaliação")
+            _comando(ws, 1, "Page.enable")
+            if script_inicial is not None:
+                _comando(ws, 2, "Page.addScriptToEvaluateOnNewDocument", source=script_inicial)
+            _comando(ws, 3, "Page.navigate", url=url)
+            valores = []
+            for ident, (espera_s, expressao) in enumerate(leituras, start=4):
+                time.sleep(espera_s)
+                msg = _comando(ws, ident, "Runtime.evaluate", expression=expressao,
+                               returnByValue=True, awaitPromise=True)
+                resultado = msg.get("result", {}).get("result", {})
+                if "exceptionDetails" in msg.get("result", {}):
+                    raise RuntimeError(f"avaliação falhou: {msg}")
+                valores.append(resultado.get("value"))
+            return valores
     finally:
         proc.terminate()
         with suppress(subprocess.TimeoutExpired):
             proc.wait(timeout=10)
         shutil.rmtree(perfil, ignore_errors=True)
+
+
+def _comando(ws: Any, ident: int, metodo: str, **params: Any) -> dict[str, Any]:
+    """Envia e espera a resposta do mesmo `id`; eventos no meio são descartados."""
+    _enviar(ws, ident, metodo, **params)
+    limite = time.time() + 30
+    while time.time() < limite:
+        msg = json.loads(ws.recv(timeout=max(1.0, limite - time.time())))
+        if msg.get("id") == ident:
+            return dict(msg)
+    raise TimeoutError(f"navegador não respondeu a {metodo}")
 
 
 def _esperar_alvo(porta: int) -> dict[str, Any]:
