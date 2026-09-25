@@ -23,8 +23,11 @@ from thoth.arquivos import diretorio_atomico
 from thoth.domain.ports import Separator
 from thoth.processos import rodar
 
+#: O que o `htdemucs` sabe separar. Piano e guitarra saem em `other` (ADR-044).
+STEMS_DO_HTDEMUCS = frozenset({"bass", "drums", "other", "vocals"})
 
-def localizar_stems(out_dir: Path) -> dict[str, Path]:
+
+def localizar_stems(out_dir: Path, stem: str = "bass") -> dict[str, Path]:
     """Acha os stems por varredura sob `out_dir`, não reconstruindo o caminho.
 
     O demucs aninha a saída em `<out>/<modelo>/<nome do arquivo>/`, e o nome do
@@ -37,23 +40,40 @@ def localizar_stems(out_dir: Path) -> dict[str, Path]:
     """
     encontrados = {
         caminho.stem: caminho
-        for nome in ("bass.wav", "no_bass.wav")
+        for nome in (f"{stem}.wav", f"no_{stem}.wav")
         for caminho in out_dir.rglob(nome)
     }
-    if "bass" not in encontrados:
-        raise FileNotFoundError(f"nenhum bass.wav sob {out_dir}")
+    if stem not in encontrados:
+        raise FileNotFoundError(f"nenhum {stem}.wav sob {out_dir}")
     return encontrados
 
 
 @dataclass(frozen=True, slots=True)
 class DemucsSeparator:
-    """Mix → stem de baixo."""
+    """Mix → um stem e o resto (`--two-stems`). Baixo por padrão; o perfil escolhe outro."""
 
+    stem: str = "bass"
     model: str = "htdemucs_ft"
     device: str = "cpu"  # mesma razão do transcritor: a estação não tem CUDA
     versao: str = "4.1.0"
     # Só para teste: troca o programa inteiro, mas a versão continua na chave do cache.
     binary: tuple[str, ...] | None = None
+
+    def __post_init__(self) -> None:
+        if self.stem not in STEMS_DO_HTDEMUCS:
+            raise ValueError(
+                f"stem {self.stem!r} não existe no demucs; há {sorted(STEMS_DO_HTDEMUCS)}"
+            )
+
+    def _escopo(self, out_dir: Path) -> Path:
+        """Onde fica o cache deste stem. Irmãos, nunca aninhados: `diretorio_atomico`
+        apaga o destino inteiro antes de promover, e levaria o stem vizinho junto.
+
+        O baixo fica em `<modelo>/<versão>`, o caminho de antes do ADR-044, para não
+        invalidar os stems já em cache; os outros ganham o nome do stem ao lado.
+        """
+        base = out_dir / self.model
+        return base / (self.versao if self.stem == "bass" else f"{self.versao}-{self.stem}")
 
     def _comando(self, audio: Path, out_dir: Path) -> list[str]:
         programa = self.binary or ("uvx", "--with", "numpy<2", f"demucs@{self.versao}")
@@ -61,7 +81,7 @@ class DemucsSeparator:
             *programa,
             "-n", self.model,
             "-d", self.device,
-            "--two-stems", "bass",
+            "--two-stems", self.stem,
             "-o", str(out_dir),
             str(audio),
         ]
@@ -71,9 +91,9 @@ class DemucsSeparator:
         out_dir.mkdir(parents=True, exist_ok=True)
         # O cache pertence ao modelo *e* à versão que o produziram: sem a versão, um
         # stem de outro demucs passaria por este (emenda do ADR-026).
-        meu = out_dir / self.model / self.versao
+        meu = self._escopo(out_dir)
         try:
-            return localizar_stems(meu)
+            return localizar_stems(meu, self.stem)
         except FileNotFoundError:
             pass
         # Atômico (ADR-026): o demucs escreve `no_bass.wav` antes de `bass.wav`, e
@@ -89,7 +109,7 @@ class DemucsSeparator:
                 for item in produzido.iterdir():
                     item.rename(parcial / item.name)
                 produzido.rmdir()
-        return localizar_stems(meu)
+        return localizar_stems(meu, self.stem)
 
 
 if TYPE_CHECKING:  # pragma: no cover — trava a assinatura contra o Protocol

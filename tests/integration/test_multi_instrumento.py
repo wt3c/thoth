@@ -24,7 +24,6 @@ from thoth.adapters.separation import DemucsSeparator
 from thoth.adapters.transcription.muscriptor import MuscriptorTranscriber
 from thoth.domain.instrumentos import PERFIS
 from thoth.domain.models import Transcricao
-from thoth.processos import rodar
 from thoth.services.evaluation import avaliar_bateria, avaliar_polifonico
 
 pytestmark = [
@@ -37,9 +36,9 @@ CONDICOES = ("isolada", "mix", "mix-stem")
 PERFIS_NOVOS = sorted(p for p in PERFIS if p != "baixo")
 
 #: F1 medido em 2026-09-25 (`small`, `muscriptor@0.3.0`, `demucs@4.1.0 htdemucs_ft`):
-#: nota F1 para piano e guitarra, F1 micro para bateria. Sem folga, pelo mesmo motivo
-#: do `test_regressao_fase0.py`: renderização determinística, motor pregado, e com
-#: 34 a 53 eventos de referência a menor diferença possível já é um evento inteiro.
+#: nota F1 para piano e guitarra, F1 micro para bateria. Sem folga em `isolada` e `mix`,
+#: pelo mesmo motivo do `test_regressao_fase0.py`: renderização determinística, motor
+#: pregado, e com 34 a 53 eventos de referência a menor diferença já é um evento inteiro.
 MEDIDO: dict[tuple[str, str], float] = {
     ("bateria", "isolada"): 0.529,
     ("bateria", "mix"): 0.867,
@@ -63,23 +62,19 @@ MEDIDO: dict[tuple[str, str], float] = {
     ("piano-eletrico", "mix-stem"): 0.0,
 }
 
+#: O Demucs não repete o stem entre rodadas (duas separações da mesma fixture diferem
+#: em até 0,04 na amostra; o piano deu 0,879 e 0,892). Um evento de folga em 34, só
+#: onde há separação — emenda do ADR-044 (2026-09-25).
+FOLGA_DEMUCS = 0.03
+
 
 def _audio(perfil: str, condicao: str, tmp_path: Path) -> Path:
     fixture = f"{perfil}-{'isolada' if condicao == 'isolada' else 'mix'}"
     wav = renderizar_multi(fixture, tmp_path)
     if condicao != "mix-stem":
         return wav
-    # O adapter só separa o baixo (`--two-stems bass`), e o port só muda depois de um
-    # `seguir` (ADR-044). Aqui vai o mesmo demucs pregado, trocando só o stem.
-    d = DemucsSeparator()
     stem = PERFIS[perfil].stem
-    saida = tmp_path / "stems"
-    rodar([
-        "uvx", "--with", "numpy<2", f"demucs@{d.versao}",
-        "-n", d.model, "-d", d.device, "--two-stems", stem, "-o", str(saida), str(wav),
-    ])
-    (arquivo,) = saida.rglob(f"{stem}.wav")
-    return arquivo
+    return DemucsSeparator(stem=stem).separate(wav, tmp_path / "stems")[stem]
 
 
 @pytest.mark.parametrize("condicao", CONDICOES)
@@ -111,7 +106,7 @@ def test_mede_perfil(perfil: str, condicao: str, tmp_path: Path) -> None:
             f"nota P {s.nota.precisao:.3f} R {s.nota.revocacao:.3f} F1 {s.nota.f1:.3f} "
             f"ataque F1 {s.ataque.f1:.3f} ref={s.n_ref} est={s.n_est}"
         )
-    piso = MEDIDO[(perfil, condicao)]
+    piso = max(0.0, MEDIDO[(perfil, condicao)] - (FOLGA_DEMUCS if condicao == "mix-stem" else 0))
     print(
         f"\nMEDIDO {perfil} {condicao}: {resultado} {segundos:.0f}s rótulos={dict(rotulos)} "
         f"piso={piso} margem={f1 - piso:+.3f}"

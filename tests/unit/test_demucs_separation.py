@@ -163,3 +163,62 @@ def test_o_stem_fica_no_lugar_documentado(tmp_path: Path) -> None:
 
     assert achado["bass"] == tmp_path / "htdemucs_ft" / "4.1.0" / "a" / "bass.wav"
     assert sorted(achado) == ["bass", "no_bass"]
+
+
+# --- Stem por perfil (ADR-044) -----------------------------------------------------
+
+#: Imita o demucs escrevendo o stem pedido: `$6` é o valor de `--two-stems`, `$8` o `-o`.
+_FINGE_STEM = (
+    "sh",
+    "-c",
+    'mkdir -p "$8/htdemucs_ft/a" && : > "$8/htdemucs_ft/a/$6.wav"'
+    ' && : > "$8/htdemucs_ft/a/no_$6.wav"',
+    "demucs",
+)
+
+
+@pytest.mark.parametrize("stem", ["drums", "other"])
+def test_separa_o_stem_do_perfil(stem: str, tmp_path: Path) -> None:
+    separador = DemucsSeparator(stem=stem, binary=_FINGE_STEM)
+
+    achado = separador.separate(Path("a.wav"), tmp_path)
+
+    comando = separador._comando(Path("a.wav"), tmp_path)
+    assert comando[comando.index("--two-stems") + 1] == stem
+    assert sorted(achado) == sorted([stem, f"no_{stem}"])
+    assert achado[stem].name == f"{stem}.wav"
+
+
+def test_o_stem_do_baixo_continua_onde_sempre_esteve(tmp_path: Path) -> None:
+    """Mudar o caminho do baixo invalidaria em silêncio todo stem já em cache."""
+    achado = DemucsSeparator(stem="bass", binary=_FINGE_STEM).separate(Path("a.wav"), tmp_path)
+
+    assert achado["bass"] == tmp_path / "htdemucs_ft" / "4.1.0" / "a" / "bass.wav"
+
+
+def test_stem_de_um_perfil_nao_e_cache_de_outro(tmp_path: Path) -> None:
+    """Os dois caches convivem; nenhum apaga o outro nem responde por ele."""
+    baixo = DemucsSeparator(binary=_FINGE_STEM).separate(Path("a.wav"), tmp_path)
+    outro = DemucsSeparator(stem="other", binary=_FINGE_STEM).separate(Path("a.wav"), tmp_path)
+
+    assert baixo["bass"].exists() and outro["other"].exists()
+    with pytest.raises(ErroDeProcesso):
+        DemucsSeparator(stem="drums", binary=("false",)).separate(Path("a.wav"), tmp_path)
+    # Com cache, o binário que falharia nem é chamado.
+    DemucsSeparator(binary=("false",)).separate(Path("a.wav"), tmp_path)
+    DemucsSeparator(stem="other", binary=("false",)).separate(Path("a.wav"), tmp_path)
+
+
+def test_stem_que_o_modelo_nao_separa_e_recusado() -> None:
+    """O htdemucs separa bateria, baixo, voz e "o resto": piano não é stem dele."""
+    with pytest.raises(ValueError, match="piano"):
+        DemucsSeparator(stem="piano")
+
+
+def test_localizar_stems_procura_o_stem_pedido(tmp_path: Path) -> None:
+    esperado = _toca(tmp_path / "x" / "drums.wav")
+    _toca(tmp_path / "x" / "bass.wav")
+
+    assert localizar_stems(tmp_path, "drums") == {"drums": esperado}
+    with pytest.raises(FileNotFoundError, match=r"other\.wav"):
+        localizar_stems(tmp_path, "other")

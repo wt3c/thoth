@@ -3128,3 +3128,21 @@ nenhuma medida ainda em música real:
 Os custos são os `Custos` do baixo (`INICIANTE` por padrão), somados por nota, com o
 deslocamento da mão medido pelo menor traste pisado. O mi maior sai na forma aberta
 0-2-2-1-0-0, e os 16 eventos da fixture de guitarra são posicionados sem impossível.
+
+### Emenda (2026-09-25) — separador por perfil e o Demucs não determinístico
+
+- `DemucsSeparator(stem=...)` separa `bass`, `drums`, `other` ou `vocals` com
+  `--two-stems <stem>`; stem que o `htdemucs` não conhece é recusado na construção,
+  antes de qualquer transcrição. O perfil diz qual stem pedir (`PERFIS[...].stem`).
+- **O baixo não muda.** Continua transcrito do `bass.wav` (o stem em que ele está
+  isolado), `no_bass.wav` segue só para a reprodução, e o cache fica em
+  `<modelo>/<versão>` como antes: os stems de baixo já separados são reaproveitados.
+  Os outros stems ficam em pastas irmãs, `<modelo>/<versão>-<stem>`, nunca aninhadas,
+  porque `diretorio_atomico` apaga o destino inteiro ao promover.
+- **Medido:** duas separações da mesma fixture (`piano-acustico-mix`, stem `other`)
+  diferem em até 0,040 na amostra, e o F1 do piano no stem deu 0,879 e 0,892 em
+  rodadas diferentes. A causa provável é o deslocamento aleatório do `--shifts` padrão,
+  não conferida. Por isso os pisos `mix-stem` do `test_multi_instrumento.py` têm um
+  evento de folga (`FOLGA_DEMUCS = 0,03`); `isolada` e `mix` continuam exatos.
+- Tornar o Demucs determinístico (`--shifts 0`) mudaria também o stem do baixo e
+  exigiria remedir o baixo; fica fora do M4, como decisão própria se for preciso.

@@ -337,7 +337,7 @@ Pré-requisito invisível até agora: a Fase 5 só existe se houver o que o
 - [ ] Generalizar `Transcriber` para devolver a transcrição livre completa e remover o
       seletor opcional do contrato; pronto quando nenhum caminho usar `--instruments`
       e notas mais ataques de bateria sobreviverem ao parsing real do JSONL.
-- [ ] Manter `Separator.separate()` retornando stems nomeados, mas retirar do contrato a
+- [x] Manter `Separator.separate()` retornando stems nomeados, mas retirar do contrato a
       suposição de “baixo”; pronto quando os perfis resolverem `bass`, `drums` ou
       `other` e um stem ausente produzir erro explícito antes da transcrição.
 - [ ] Preservar o `FretAssigner` monofônico do baixo e criar um contrato distinto para
