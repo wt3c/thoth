@@ -448,9 +448,14 @@ Pré-requisito invisível até agora: a Fase 5 só existe se houver o que o
       tom idênticos byte a byte. O MusicXML só difere nos ids `P…`/`I…` que o music21
       sorteia a cada gravação — a versão antiga rodada duas vezes também difere de si
       mesma —; com eles normalizados, os 8 arquivos são idênticos.
-- [ ] Adaptar a página apenas para formatos realmente suportados; pronto com teste
+- [x] Adaptar a página apenas para formatos realmente suportados; pronto com teste
       `navegador` verificando seleção, artefatos e mensagem explícita quando o alvo não
       tiver GP5 — sem exigir julgamento musical.
+      - [x] `<select id="instrumento">` com baixo e as três guitarras; afinação
+            desabilitada fora do baixo e enviada como `null`.
+      - [x] Relato de `erro_de_rotulo`, `contaminacao` e `acordes_impossiveis`.
+      - [x] Job sem `gp5` em `formatos`: mensagem explícita, sem carregar.
+      - [x] GP5 de guitarra (6 cordas, acorde) renderizado no Chromium real.
 - [x] Rodar `uv run pytest -n auto`, `uv run ruff check src/ tests/`,
       `uv run mypy src/`, `uv run pytest -m "slow and not network"` e, se a página
       mudar, `uv run pytest -m navegador`; pronto somente com saídas e números

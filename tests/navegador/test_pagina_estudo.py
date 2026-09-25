@@ -13,6 +13,7 @@ import socket
 import threading
 import time
 from collections.abc import Iterator
+from dataclasses import replace
 from pathlib import Path
 
 import httpx
@@ -21,13 +22,16 @@ import pytest
 from tests.navegador.cdp import CHROMIUM, avaliar, sessao
 from thoth.adapters.export.gp5 import Gp5Exporter
 from thoth.api.app import WEB_PADRAO, criar_app
+from thoth.domain.instrumentos import PERFIS, TUNING_GUITARRA_6
 from thoth.domain.models import (
     TUNING_BASS_4,
     TUNING_BASS_DROP_D,
+    AcordeImpossivel,
     AudioAsset,
     NoteEvent,
     TabNote,
 )
+from thoth.services.acordes import ViterbiAcordes
 from thoth.services.fretboard import PADRAO
 from thoth.services.octave_check import OctaveWarning
 from thoth.services.pipeline import Resultado
@@ -51,6 +55,24 @@ RECEBIDOS: list[dict[str, object]] = []
 #: O que o executor vai devolver como aviso de oitava. O teste enche antes de postar.
 AVISOS: list[OctaveWarning] = []
 
+#: Campos que o teste troca no `Resultado` devolvido. Limpo pela fixture.
+TROCAS: dict[str, object] = {}
+
+
+def _guitarra_real(out_dir: Path) -> Path:
+    """GP5 de seis cordas com mi maior aberto e uma nota solta: o que a guitarra entrega."""
+    rotulo = "clean_electric_guitar"
+    notas = [NoteEvent(p, 0.0, 0.6, rotulo) for p in (40, 47, 52, 56, 59, 64)]
+    notas.append(NoteEvent(45, 60 / BPM, 2 * 60 / BPM, rotulo))
+    tab = list(ViterbiAcordes().posicionar(notas, TUNING_GUITARRA_6).tab)
+    exportador = Gp5Exporter(
+        bpm=BPM,
+        faixa="Guitarra",
+        programa_gm=PERFIS["guitarra-limpa"].programa_gm,
+        acordes=True,
+    )
+    return exportador.export(tab, out_dir / "estudo.guitarra-limpa.gp5", TUNING_GUITARRA_6)
+
 
 def _partitura_real(out_dir: Path, **kw: object) -> Resultado:
     """Executor de mentira, artefato de verdade: o alphaTab precisa de um GP5 legítimo."""
@@ -65,8 +87,11 @@ def _partitura_real(out_dir: Path, **kw: object) -> Resultado:
         )
         for i, (p, s, f) in enumerate([(28, 0, 0), (33, 1, 0), (38, 2, 0), (40, 2, 2)])
     ]
-    artefato = Gp5Exporter(bpm=BPM).export(notas, out_dir / "estudo.gp5", TUNING_BASS_4)
-    return Resultado(
+    if kw.get("instrumento", "baixo") == "baixo":
+        artefato = Gp5Exporter(bpm=BPM).export(notas, out_dir / "estudo.gp5", TUNING_BASS_4)
+    else:
+        artefato = _guitarra_real(out_dir)
+    resultado = Resultado(
         asset=AudioAsset(
             wav=out_dir / "mix.wav", source_id="estudo", title="estudo", duration_s=3.0
         ),
@@ -79,7 +104,9 @@ def _partitura_real(out_dir: Path, **kw: object) -> Resultado:
         fora_do_braco=[],
         avisos_de_oitava=list(AVISOS),
         tonalidade=tom_de_texto(str(kw["tom"])) if kw.get("tom") else None,
+        instrumento=str(kw.get("instrumento", "baixo")),
     )
+    return replace(resultado, **TROCAS)  # type: ignore[arg-type]
 
 
 @pytest.fixture
@@ -88,6 +115,7 @@ def servidor(tmp_path: Path) -> Iterator[str]:
 
     RECEBIDOS.clear()
     AVISOS.clear()
+    TROCAS.clear()
 
     with socket.socket() as s:
         s.bind(("127.0.0.1", 0))
@@ -174,6 +202,7 @@ def test_o_formulario_manda_afinacao_e_digitacao_por_nome(servidor: str) -> None
 
     assert estado["status"] == "pronto", estado
     assert RECEBIDOS and RECEBIDOS[0]["tuning"] == TUNING_BASS_DROP_D
+    assert RECEBIDOS[0]["instrumento"] == "baixo"
     assert RECEBIDOS[0]["assigner"].custos is PADRAO
 
 
@@ -219,6 +248,104 @@ def test_o_formulario_manda_o_tom_e_a_pagina_relata_a_grafia(servidor: str) -> N
     assert RECEBIDOS and RECEBIDOS[0]["tom"] == "f menor"
     assert estado["tom"] == {"nome": "f minor", "armadura": -4, "margem": None}
     assert "f minor" in estado["texto"], estado
+
+
+def _pronto(servidor: str, corpo: dict[str, object]) -> str:
+    ident = httpx.post(f"{servidor}/jobs", json=corpo, timeout=10).json()["id"]
+    limite = time.time() + 30
+    while time.time() < limite:
+        if httpx.get(f"{servidor}/jobs/{ident}", timeout=5).json()["status"] == "pronto":
+            return str(ident)
+        time.sleep(0.3)
+    pytest.fail("job não ficou pronto")
+
+
+def test_o_formulario_de_guitarra_manda_o_instrumento_e_nao_a_afinacao(servidor: str) -> None:
+    """A afinação da guitarra é a do perfil: mandá-la dá 422 (ADR-044)."""
+    estado = avaliar(
+        f"{servidor}/",
+        """(async () => {
+             document.getElementById('ref').value = 'x.wav';
+             const escolha = document.getElementById('instrumento');
+             escolha.value = 'guitarra-limpa';
+             escolha.dispatchEvent(new Event('change'));
+             const desabilitada = document.getElementById('afinacao').disabled;
+             document.getElementById('enviar').click();
+             for (let i = 0; i < 100; i++) {
+               const jobs = await (await fetch('/jobs')).json();
+               if (jobs.length && jobs[0].status !== 'na fila') {
+                 return {status: jobs[0].status, desabilitada};
+               }
+               await new Promise(r => setTimeout(r, 100));
+             }
+             return {status: 'nenhum job criado', desabilitada,
+                     texto: document.getElementById('estado').innerText};
+           })()""",
+        espera_s=6,
+    )
+
+    assert estado["status"] == "pronto", estado
+    assert estado["desabilitada"] is True
+    assert RECEBIDOS[0]["instrumento"] == "guitarra-limpa"
+    assert RECEBIDOS[0]["tuning"] is None
+
+
+def test_a_partitura_de_guitarra_com_acorde_aparece_na_tela(servidor: str) -> None:
+    """Seis cordas e um beat de seis notas: o alphaTab só tinha visto o baixo."""
+    ident = _pronto(servidor, {"ref": "x.wav", "bpm": BPM, "instrumento": "guitarra-limpa"})
+
+    estado = avaliar(
+        f"{servidor}/?job={ident}",
+        "({svg: document.querySelectorAll('#tab svg').length,"
+        " viva_por_ms: performance.now(),"
+        " texto: document.getElementById('estado').innerText})",
+        espera_s=15,
+    )
+
+    assert estado["viva_por_ms"] > 10_000, f"sessão curta demais para concluir nada: {estado}"
+    assert estado["svg"] > 0, f"a partitura de guitarra não foi desenhada: {estado}"
+
+
+def test_a_pagina_relata_as_tres_causas_de_nota_fora(servidor: str) -> None:
+    acorde = (
+        NoteEvent(40, 12.0, 12.4, "clean_electric_guitar"),
+        NoteEvent(41, 12.06, 12.4, "clean_electric_guitar"),
+    )
+    TROCAS.update(
+        erro_de_rotulo={"acoustic_guitar": 3},
+        contaminacao={"acoustic_piano": 2},
+        acordes_impossiveis=[AcordeImpossivel(acorde, "as duas só cabem na mesma corda")],
+    )
+    ident = _pronto(servidor, {"ref": "x.wav", "bpm": BPM, "instrumento": "guitarra-limpa"})
+
+    texto = avaliar(
+        f"{servidor}/?job={ident}", "document.getElementById('estado').innerText", espera_s=6
+    )
+
+    assert "erro de rótulo" in texto and "acoustic_guitar" in texto, texto
+    assert "contaminação" in texto and "acoustic_piano" in texto, texto
+    assert "40 41 @12s: as duas só cabem na mesma corda" in texto, texto
+
+
+def test_job_sem_gp5_diz_por_que_nao_ha_partitura_na_tela(servidor: str) -> None:
+    """O alphaTab só lê GP5; um alvo que só tem MusicXML é dito, não quebrado (ADR-044)."""
+    ident = _pronto(servidor, {"ref": "x.wav", "bpm": BPM})
+    job = httpx.get(f"{servidor}/jobs/{ident}", timeout=5).json()
+    assert job["formatos"] == ["gp5"]
+    TROCAS["artefatos"] = {}  # só para o próximo job
+    ident = _pronto(servidor, {"ref": "y.wav", "bpm": BPM})
+
+    estado = avaliar(
+        f"{servidor}/?job={ident}",
+        "({texto: document.getElementById('estado').innerText,"
+        " oculto: document.getElementById('controles').classList.contains('oculto'),"
+        " viva_por_ms: performance.now()})",
+        espera_s=6,
+    )
+
+    assert estado["viva_por_ms"] > 5_000, estado
+    assert "sem GP5" in estado["texto"], estado
+    assert estado["oculto"] is True, estado
 
 
 #: Injetado antes da página: toda ligação à saída de som ganha um analisador, e o volume

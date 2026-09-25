@@ -58,7 +58,8 @@ uv run thoth auralizar caminho/para/musica.mp3
 # oitava e nota da transcrição contra uma tab .gp5 baixada à mão (ADR-041, ADR-042)
 uv run thoth comparar tab.gp5 caminho/para/musica.mp3
 
-# API + página de estudo com alphaTab local, em 127.0.0.1
+# API + página de estudo com alphaTab local, em 127.0.0.1; a página escolhe o
+# instrumento como o --instrumento da CLI (afinação só vale para o baixo)
 uv run thoth serve
 ```
 

@@ -54,7 +54,16 @@
         <input id="tom" placeholder="Bb maior, f menor…">
       </div>
       <div>
-        <label for="afinacao">Afinação</label>
+        <label for="instrumento">Instrumento</label>
+        <select id="instrumento">
+          <option value="baixo">baixo</option>
+          <option value="guitarra-limpa">guitarra limpa</option>
+          <option value="guitarra-distorcida">guitarra distorcida</option>
+          <option value="guitarra-acustica">guitarra acústica</option>
+        </select>
+      </div>
+      <div>
+        <label for="afinacao">Afinação — só baixo</label>
         <select id="afinacao">
           <option value="4">4 cordas</option>
           <option value="5">5 cordas</option>
@@ -119,6 +128,12 @@ $('parar').addEventListener('click', () => api.stop());
 $('metronomo').addEventListener('change', (e) => { api.metronomeVolume = e.target.checked ? 1 : 0; });
 $('repetir').addEventListener('change', (e) => { api.isLooping = e.target.checked; });
 
+// A guitarra usa a afinação do perfil; o servidor recusa `afinacao` nela (ADR-044).
+const ehBaixo = () => $('instrumento').value === 'baixo';
+$('instrumento').addEventListener('change', () => { $('afinacao').disabled = !ehBaixo(); });
+
+const contagem = (rotulos) => Object.entries(rotulos).map(([r, n]) => `${r} ${n}`).join(', ');
+
 const relatar = (job) => {
   const partes = [`${job.status}`];
   if (job.notas != null) partes.push(`${job.notas} notas — ${JSON.stringify(job.rotulos)}`);
@@ -137,6 +152,19 @@ const relatar = (job) => {
   }
   if (job.descartadas) partes.push(`${job.descartadas} nota(s) descartada(s): simultâneas`);
   if (job.fora_do_braco) partes.push(`${job.fora_do_braco} fora do braço`);
+  // As três causas de nota fora da guitarra nunca se fundem (ADR-044).
+  if (job.erro_de_rotulo && Object.keys(job.erro_de_rotulo).length) {
+    partes.push(`fora da parte por erro de rótulo: ${contagem(job.erro_de_rotulo)}`);
+  }
+  if (job.contaminacao && Object.keys(job.contaminacao).length) {
+    partes.push(`fora da parte por contaminação do stem: ${contagem(job.contaminacao)}`);
+  }
+  if (job.acordes_impossiveis?.length) {
+    const lista = job.acordes_impossiveis
+      .map((a) => `${a.alturas.join(' ')} @${a.onset_s}s: ${a.motivo}`)
+      .join('\n  ');
+    partes.push(`⚠ ${job.acordes_impossiveis.length} acorde(s) impossível(is):\n  ${lista}`);
+  }
   if (job.avisos_de_oitava?.length) {
     // A oitava acima é ranqueada, não afirmada: quando nenhuma explica melhor,
     // `sugestao` vem nula e o aviso é diagnóstico puro (ADR-030).
@@ -147,10 +175,19 @@ const relatar = (job) => {
   }
   if (job.erro) partes.push(`erro: ${job.erro}`);
   estado.textContent = partes.join('\n');
-  estado.classList.toggle('aviso', Boolean(job.erro || job.avisos_de_oitava?.length));
+  estado.classList.toggle(
+    'aviso',
+    Boolean(job.erro || job.avisos_de_oitava?.length || job.acordes_impossiveis?.length),
+  );
 };
 
-const carregar = async (ident) => {
+const carregar = async (ident, formatos) => {
+  // O alphaTab só lê GP5. Alvo sem ele tem os outros arquivos, mas não a tela (ADR-044).
+  if (!formatos.includes('gp5')) {
+    estado.textContent += `\nsem GP5 para exibir aqui — arquivos: ${formatos.join(', ') || 'nenhum'}`;
+    estado.classList.add('aviso');
+    return;
+  }
   const resposta = await fetch(`/jobs/${ident}/artifacts/gp5`);
   api.load(new Uint8Array(await resposta.arrayBuffer()));
   $('controles').classList.remove('oculto');
@@ -169,7 +206,7 @@ const acompanhar = async (ident) => {
     }
     const job = await resposta.json();
     relatar(job);
-    if (job.status === 'pronto') return carregar(ident);
+    if (job.status === 'pronto') return carregar(ident, job.formatos);
     if (job.status === 'erro') return;
     await new Promise((r) => setTimeout(r, 2000));
   }
@@ -193,7 +230,8 @@ $('enviar').addEventListener('click', async () => {
         // Nomes, não números: `Number('drop-d')` é NaN, que o servidor recusa.
         // Vazio é `null`, não string vazia: quem não informa quer a estimativa.
         tom: $('tom').value.trim() || null,
-        afinacao: $('afinacao').value,
+        instrumento: $('instrumento').value,
+        afinacao: ehBaixo() ? $('afinacao').value : null,
         digitacao: $('digitacao').value,
       }),
     });

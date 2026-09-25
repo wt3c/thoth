@@ -3229,3 +3229,22 @@ deslocamento da mão medido pelo menor traste pisado. O mi maior sai na forma ab
   exportar não perderam nota nenhuma. Nenhum acorde impossível; os acordes de cinco
   e seis notas ficaram cada um num beat só no GP5. Mix, `outros` e `sem-outros` saem
   como três arquivos distintos, e nenhum artefato do baixo foi gerado.
+
+### Emenda (2026-09-25) — a página escolhe o instrumento
+
+- `<select id="instrumento">` com o baixo e as três guitarras, que são os perfis que
+  têm GP5. Fora do baixo, a afinação fica desabilitada e vai como `null`: a API
+  recusa `afinacao` numa guitarra.
+- O relato da página mostra os mesmos três campos da CLI: erro de rótulo,
+  contaminação do stem e acordes impossíveis (alturas, instante e motivo).
+- **Job sem `gp5` em `formatos` não chama o alphaTab.** A página diz que não há GP5
+  para exibir e lista os arquivos que há. Hoje nenhum alvo aceito cai nesse caso,
+  porque bateria e piano são recusados na entrada. A guarda existe para quando o
+  piano entregar só MusicXML, como está previsto acima.
+- **Verificado com Chromium real (`-m navegador`, 10 testes):**
+  - o formulário manda `instrumento` e manda `afinacao: null` na guitarra;
+  - a afinação fica desabilitada fora do baixo;
+  - um GP5 de guitarra com seis cordas e acorde aparece na tela (contagem de
+    `#tab svg`, com a sessão viva por mais de 10 s);
+  - o relato traz as três causas;
+  - job sem GP5 mostra a mensagem e não abre os controles de estudo.
