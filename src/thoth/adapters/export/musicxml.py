@@ -14,6 +14,13 @@ escrita depois, no XML (`_com_digitacao`), como a afinação.
 
 Ao contrário do GP5, aqui não decomponho figuras à mão — o `makeNotation` do
 music21 resolve ligaduras e pausas a partir dos offsets.
+
+A bateria (`MusicXmlPercussaoExporter`, ADR-044) é outra pauta: não afinada, clave
+de percussão, cada peça GM numa posição e com uma cabeça (`MAPA_PERCUSSAO`, o
+drumset padrão do MuseScore). Posição e cabeça não identificam a peça — a caixa
+acústica e a eletrônica caem as duas em C5 —, e o music21 10.5 só escreve um
+instrumento genérico por parte. O instrumento de cada peça, com o seu
+`midi-unpitched`, é escrito depois, no XML (`_com_pecas`).
 """
 
 from __future__ import annotations
@@ -35,15 +42,16 @@ from music21 import (
     metadata,
     meter,
     note,
+    percussion,
     pitch,
     stream,
     tempo,
 )
 
-from thoth.domain.models import TabNote
-from thoth.domain.ports import Exporter
+from thoth.domain.models import EventoPercussivo, TabNote
+from thoth.domain.ports import ExportadorDePercussao, Exporter
 from thoth.services.notas import nome_da_nota
-from thoth.services.rhythm import PPQ, acordes_em_ticks, eventos
+from thoth.services.rhythm import COMPASSO, PPQ, acordes_em_ticks, ataques_em_ticks, eventos
 
 #: `(início, duração, acorde)` em ticks; no baixo o acorde tem sempre uma nota.
 Posicionadas = list[tuple[int, int, tuple[TabNote, ...]]]
@@ -319,5 +327,140 @@ def _anotar(nota: ElementTree.Element, corda: int, traste: int) -> None:
     ElementTree.SubElement(tecnica, "fret").text = str(traste)
 
 
+@dataclass(frozen=True, slots=True)
+class PecaNaPauta:
+    """Onde e como uma peça GM é desenhada na pauta de percussão."""
+
+    nome: str
+    altura: str
+    """Posição na pauta, como altura de clave de Sol (`display-step`/`display-octave`)."""
+    cabeca: str = "normal"
+    """Cabeça MusicXML (`notehead`)."""
+
+
+#: O drumset padrão do MuseScore 4 para o kit GM (35 a 59), lido de um arquivo importado:
+#: linha e cabeça de cada peça. O prato chinês usa lá uma cabeça que o MusicXML não
+#: tem; sai `x`, e o instrumento da nota desfaz a ambiguidade com o prato 2.
+MAPA_PERCUSSAO: dict[int, PecaNaPauta] = {
+    35: PecaNaPauta("Acoustic Bass Drum", "E4"),
+    36: PecaNaPauta("Bass Drum 1", "F4"),
+    37: PecaNaPauta("Side Stick", "C5", "x"),
+    38: PecaNaPauta("Acoustic Snare", "C5"),
+    39: PecaNaPauta("Hand Clap", "C5"),
+    40: PecaNaPauta("Electric Snare", "C5"),
+    41: PecaNaPauta("Low Floor Tom", "G4"),
+    42: PecaNaPauta("Closed Hi-Hat", "G5", "x"),
+    43: PecaNaPauta("High Floor Tom", "G4"),
+    44: PecaNaPauta("Pedal Hi-Hat", "D4", "x"),
+    45: PecaNaPauta("Low Tom", "A4"),
+    46: PecaNaPauta("Open Hi-Hat", "G5", "circle-x"),
+    47: PecaNaPauta("Low-Mid Tom", "B4"),
+    48: PecaNaPauta("Hi-Mid Tom", "D5"),
+    49: PecaNaPauta("Crash Cymbal 1", "A5", "x"),
+    50: PecaNaPauta("High Tom", "E5"),
+    51: PecaNaPauta("Ride Cymbal 1", "F5", "x"),
+    52: PecaNaPauta("Chinese Cymbal", "B5", "x"),
+    53: PecaNaPauta("Ride Bell", "F5", "diamond"),
+    54: PecaNaPauta("Tambourine", "D5", "x"),
+    55: PecaNaPauta("Splash Cymbal", "A5", "x"),
+    56: PecaNaPauta("Cowbell", "F5"),
+    57: PecaNaPauta("Crash Cymbal 2", "B5", "x"),
+    58: PecaNaPauta("Vibraslap", "C5"),
+    59: PecaNaPauta("Ride Cymbal 2", "D5", "x"),
+}
+
+
+@dataclass(frozen=True, slots=True)
+class MusicXmlPercussaoExporter:
+    """Implementa o `ExportadorDePercussao`: uma pauta, sem tablatura."""
+
+    bpm: float = 120
+    titulo: str = "Thoth"
+    parte: str = "Bateria"
+
+    def exportar(self, ataques: list[EventoPercussivo], out: Path) -> Path:
+        if not ataques:
+            raise ValueError("sem ataques para exportar")
+        fora = sorted({a.peca_gm for a in ataques} - MAPA_PERCUSSAO.keys())
+        if fora:
+            raise ValueError(f"peça {fora[0]} fora do mapa de percussão")
+
+        grupos, _ = ataques_em_ticks(ataques, self.bpm)
+        pauta = stream.Part()
+        pauta.partName = self.parte
+        pauta.insert(0, instrument.Percussion())
+        pauta.insert(0, clef.PercussionClef())
+        pauta.insert(0, meter.TimeSignature("4/4"))
+        pauta.insert(0, tempo.MetronomeMark(number=round(self.bpm)))
+        for inicio, duracao, pecas in grupos:
+            # Corta na barra: ligadura seria sustentação, e a bateria não a tem medida.
+            figura = min(duracao, COMPASSO - inicio % COMPASSO) / PPQ
+            notas = [_nao_afinada(p.peca_gm) for p in pecas]
+            elemento = notas[0] if len(notas) == 1 else percussion.PercussionChord(notas)
+            elemento.quarterLength = figura
+            pauta.insert(inicio / PPQ, elemento)
+        pauta.makeRests(fillGaps=True, inPlace=True)
+
+        score = stream.Score()
+        score.insert(0, pauta)
+        score.insert(0, metadata.Metadata(title=self.titulo))
+        out.parent.mkdir(parents=True, exist_ok=True)
+        score.makeNotation().write("musicxml", fp=str(out))
+        ordem = [p.peca_gm for _, _, pecas in grupos for p in pecas]
+        out.write_text(_com_pecas(out.read_text(), ordem), encoding="utf-8")
+        return out
+
+
+def _nao_afinada(peca: int) -> note.Unpitched:
+    na_pauta = MAPA_PERCUSSAO[peca]
+    nota = note.Unpitched(displayName=na_pauta.altura)
+    nota.notehead = na_pauta.cabeca
+    return nota
+
+
+def _com_pecas(xml: str, ordem: list[int]) -> str:
+    """Um `score-instrument` por peça usada, e o `<instrument id>` de cada nota.
+
+    As notas saem na ordem em que foram postas — grupo a grupo, peças por número
+    GM —, sem ligadura que as duplicasse. A posição de cada uma é conferida contra
+    a peça que recebe, e a contagem no fim: um desencontro vira erro, não arquivo
+    com a peça trocada.
+    """
+    cabecalho = xml[: xml.index("<score-partwise")]
+    raiz = ElementTree.fromstring(xml[len(cabecalho) :])
+    parte = raiz.find("part-list/score-part")
+    if parte is None:  # pragma: no cover — o music21 sempre escreve a parte
+        raise ValueError("MusicXML sem <score-part>")
+    for velho in parte.findall("score-instrument") + parte.findall("midi-instrument"):
+        parte.remove(velho)
+    # `score-instrument` logo depois do nome, `midi-instrument` no fim da parte.
+    posicao = max(i for i, f in enumerate(parte) if f.tag.startswith("part-")) + 1
+    for i, peca in enumerate(sorted(set(ordem))):
+        ident = f"I{peca + 1}"
+        instrumento = ElementTree.Element("score-instrument", id=ident)
+        ElementTree.SubElement(instrumento, "instrument-name").text = MAPA_PERCUSSAO[peca].nome
+        parte.insert(posicao + i, instrumento)
+        midi = ElementTree.SubElement(parte, "midi-instrument", id=ident)
+        ElementTree.SubElement(midi, "midi-channel").text = "10"
+        ElementTree.SubElement(midi, "midi-unpitched").text = str(peca + 1)
+
+    restantes = iter(ordem)
+    for nota in raiz.iter("note"):
+        exibida = nota.find("unpitched")
+        if exibida is None:
+            continue
+        peca = next(restantes)
+        altura = f"{exibida.findtext('display-step')}{exibida.findtext('display-octave')}"
+        if altura != MAPA_PERCUSSAO[peca].altura:  # pragma: no cover — defesa
+            raise ValueError(f"nota em {altura} para a peça {peca}")
+        # `instrument` vem depois de `duration` e das `tie`, antes de `voice`/`type`.
+        antes = [i for i, f in enumerate(nota) if f.tag in ("duration", "tie")]
+        nota.insert(antes[-1] + 1, ElementTree.Element("instrument", id=f"I{peca + 1}"))
+    if next(restantes, None) is not None:  # pragma: no cover — defesa
+        raise ValueError("MusicXML com menos notas que ataques")
+    return cabecalho + ElementTree.tostring(raiz, encoding="unicode")
+
+
 if TYPE_CHECKING:  # pragma: no cover — trava a assinatura contra o Protocol
     _: Exporter = MusicXmlExporter()
+    __: ExportadorDePercussao = MusicXmlPercussaoExporter()

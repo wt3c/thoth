@@ -3405,6 +3405,30 @@ pauta de percussão com as mesmas 32 figuras, na ordem, e as mesmas peças em ca
 O round-trip pegou um defeito que o MuseScore não pegou: `gp.Note` nasce
 `NoteType.rest`, e a peça voltava como pausa.
 
+### Emenda (2026-09-25) — MusicXML de bateria: posição, cabeça e instrumento por peça
+
+Item 4 do M2. `MusicXmlPercussaoExporter` (em `adapters/export/musicxml.py`) implementa
+o mesmo `ExportadorDePercussao`: uma pauta com clave de percussão, `Unpitched` ou
+`PercussionChord` por grupo de `ataques_em_ticks`, e o mesmo corte na barra sem
+ligadura do GP5.
+
+`MAPA_PERCUSSAO` cobre o kit GM (35–59), com a linha e a cabeça do drumset padrão do
+MuseScore 4, lidas de um arquivo importado. Peça fora dele é recusada; o item 5
+descarta e relata (ADR-014).
+
+**Posição e cabeça não identificam a peça.** A caixa acústica e a eletrônica (38, 40)
+caem as duas em C5 com cabeça normal, assim como os dois surdos (41, 43). O music21
+10.5 escreve só um `score-instrument` genérico por parte, então `_com_pecas` reescreve
+o XML: um `score-instrument` e um `midi-instrument` (canal 10, `midi-unpitched` = GM+1)
+por peça usada, e o `<instrument id>` em cada nota. Medido: sem esse `id`, o MuseScore
+lê 38, 40, 41 e 43 como as alturas exibidas (72, 72, 67, 67), e não como peças.
+
+**Verificado:** o XML cru, com posição, cabeça, acorde, clave e a cadeia nota →
+instrumento → peça; o round-trip do music21, com offset, posição e cabeça (o music21
+não relê o instrumento por nota, e por isso a peça é conferida no XML); a fixture
+`bateria-isolada` inteira. O MuseScore 4 importa a referência com as mesmas 32 figuras
+e as mesmas peças, e separa 38 de 40 no mesmo tique.
+
 ---
 
 ## ADR-045 — silêncio na frente do áudio: só na bateria, porque troca o rótulo dos outros

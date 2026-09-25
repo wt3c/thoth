@@ -393,10 +393,13 @@ Pré-requisito invisível até agora: a Fase 5 só existe se houver o que o
       peça, tique e simultaneidade, além de abertura por leitor independente.
       → `Gp5PercussaoExporter` atrás de `ExportadorDePercussao` (Protocol próprio,
       decisão do usuário; emenda do ADR-044). MuseScore lê as 32 figuras e as peças.
-- [ ] MusicXML: escrever pauta não afinada, clave de percussão e
+- [x] MusicXML: escrever pauta não afinada, clave de percussão e
       `Unpitched`/`PercussionChord` com mapa GM explícito; pronto quando XML cru,
       round-trip do music21 e importação real no MuseScore preservarem peça, tique e
       simultaneidade.
+      → `MusicXmlPercussaoExporter` e `MAPA_PERCUSSAO` (GM 35–59, drumset do MuseScore),
+      com `<instrument id>` por nota; sem ele o MuseScore confunde 38 com 40 (emenda do
+      ADR-044).
 - [ ] Integrar `--instrumento bateria` na CLI/API sem alterar o default; pronto com
       teste ponta a ponta que usa o stem `drums`, entrega os dois formatos e não gera
       tablatura de cordas. O transcritor da bateria usa `silencio_inicial_s=0.1`
