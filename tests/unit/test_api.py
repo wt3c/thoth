@@ -61,6 +61,26 @@ def test_job_roda_e_relata_o_que_o_pipeline_descartou(tmp_path: Path) -> None:
     assert job["notas"] == 15
     assert job["descartadas"] == 1
     assert job["formatos"] == ["gp5"]
+    assert job["trechos_sem_baixo"] == []
+
+
+def test_job_relata_trecho_sem_baixo(tmp_path: Path) -> None:
+    from thoth.services.rotulos import TrechoSemBaixo
+
+    trecho = TrechoSemBaixo(516.5, 654.88, {"clean_electric_guitar": 621})
+    cliente = _cliente(
+        tmp_path,
+        lambda ref, out_dir, **kw: replace(
+            _resultado_falso(out_dir), trechos_sem_baixo=[trecho]
+        ),
+    )
+
+    criado = cliente.post("/jobs", json={"ref": "x.mp3", "bpm": 90})
+    job = cliente.get(f"/jobs/{criado.json()['id']}").json()
+
+    assert job["trechos_sem_baixo"] == [
+        {"inicio_s": 516.5, "fim_s": 654.88, "rotulos": {"clean_electric_guitar": 621}}
+    ]
 
 
 def test_bpm_afinacao_e_digitacao_chegam_ao_pipeline(tmp_path: Path) -> None:

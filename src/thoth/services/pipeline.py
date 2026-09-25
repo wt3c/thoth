@@ -13,7 +13,9 @@ Três restrições medidas, embutidas aqui porque é aqui que elas se aplicam:
   oitava do Demucs (ADR-010: B0 onde a mix diz B1), e uma nota errada não pode
   custar os 16 minutos de processamento da música inteira.
 - **Filtrar por conjunto de rótulos, nunca por literal**, e relatar a contagem
-  bruta: um literal que não casa devolveria zero notas em silêncio.
+  bruta: um literal que não casa devolveria zero notas em silêncio. E readmitir,
+  relatando, os trechos sem baixo (emenda do ADR-008): o rótulo depende de
+  contexto, e o baixo chamado de guitarra no meio da música sairia do filtro.
 
 Cada estágio se anuncia por `Progresso` antes de começar (ADR-037). Quem desenha é
 a CLI: o pipeline não conhece terminal, cor nem barra de progresso.
@@ -23,7 +25,7 @@ from __future__ import annotations
 
 import shutil
 from collections import Counter
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 
 from thoth.adapters.export.gp5 import Gp5Exporter
@@ -46,6 +48,7 @@ from thoth.services.fretboard import ViterbiFretAssigner, cabe_no_braco
 from thoth.services.nomes import nome_de_arquivo
 from thoth.services.octave_check import OctaveWarning, verificar_oitavas
 from thoth.services.rhythm import deslocar, monofonizar, recuo_de_fase
+from thoth.services.rotulos import TrechoSemBaixo, readmitidas, trechos_sem_baixo
 from thoth.services.tempo import (
     BPM_MAXIMO,
     BPM_MINIMO,
@@ -83,6 +86,9 @@ class Resultado:
     #: Por que não saiu `.aural.wav`. A auralização depende de soundfont e de
     #: fluidsynth, e nenhum dos dois vale os minutos de CPU já gastos (ADR-037).
     falha_na_auralizacao: str | None = None
+    #: Onde o stem seguiu tocando com rótulo de outro instrumento, longe de qualquer
+    #: baixo — essas notas foram readmitidas como baixo (emenda do ADR-008).
+    trechos_sem_baixo: list[TrechoSemBaixo] = field(default_factory=list)
 
 
 @dataclass(frozen=True, slots=True)
@@ -158,11 +164,16 @@ def transcrever(
     todas = transcriber.transcribe(stem)
     rotulos = Counter(n.instrument for n in todas)
     baixo = [n for n in todas if n.instrument in ROTULOS_DE_BAIXO]
+    outras = [n for n in todas if n.instrument not in ROTULOS_DE_BAIXO]
+    sem_baixo = trechos_sem_baixo(baixo, outras)
     if not baixo:
         raise ValueError(
             f"nenhuma nota de baixo em {asset.title!r}: o transcritor devolveu "
             f"{dict(rotulos) or 'nada'}"
         )
+    # Longe de qualquer baixo, a linha com outro rótulo é o baixo mal rotulado
+    # (emenda do ADR-008). Perto dele, é vazamento ou duplicata e continua fora.
+    baixo = sorted(baixo + readmitidas(outras, sem_baixo), key=lambda n: n.onset_s)
 
     no_braco = [n for n in baixo if cabe_no_braco(n.pitch, tuning)]
 
@@ -204,9 +215,7 @@ def transcrever(
     armadura = tonalidade.armadura if tonalidade else None
     exporters = exporters or {
         "gp5": Gp5Exporter(bpm=andamento_fino, armadura=armadura, titulo=asset.title),
-        "musicxml": MusicXmlExporter(
-            bpm=andamento_fino, armadura=armadura, titulo=asset.title
-        ),
+        "musicxml": MusicXmlExporter(bpm=andamento_fino, armadura=armadura, titulo=asset.title),
     }
 
     relator.inicia("exportando a partitura", ", ".join(exporters))
@@ -243,6 +252,7 @@ def transcrever(
         falha = str(erro)
     return Resultado(
         falha_na_auralizacao=falha,
+        trechos_sem_baixo=sem_baixo,
         bpm=andamento_fino,
         tonalidade=tonalidade,
         andamento=andamento,

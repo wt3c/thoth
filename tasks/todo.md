@@ -95,9 +95,10 @@ A avaliação **não depende de saber tocar** (ADR-006).
       transcrição (ADR-041, consequência)
 - [x] Refazer *And Plague Flowers* com `--afinacao 5` (emenda do ADR-041): 89,3%
       contra piso de 71,9%, alinhamento igual — a afinação não mudava o quadro
-- [ ] **Transcrição some depois de 511 s** em *And Plague Flowers* (`yt_ArBcOGvMvGU`):
-      o stem do baixo segue alto até ~640 s, nenhuma nota passa de 511,4 s. Achar em
-      que estágio — MuScriptor ou filtro do pipeline (emenda do ADR-041); não depende da afinação (igual com 4, 5 e 6 cordas)
+- [x] **Transcrição some depois de 511 s** em *And Plague Flowers* (`yt_ArBcOGvMvGU`):
+      era o filtro de rótulo — o baixo vira `clean_electric_guitar`. Trechos sem baixo
+      agora são relatados e readmitidos (emenda do ADR-008); vai até 654,9 s, 1558 pares,
+      89,5% na mesma oitava contra piso de 75,2%
 
 ### Comparações a fazer
 - [x] **mix direto** vs **stem do Demucs** → decidido no ADR-010 (separar sempre)

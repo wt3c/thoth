@@ -22,6 +22,7 @@ from thoth.services.comparacao import comparar as _comparar
 from thoth.services.fretboard import DIGITACOES, ViterbiFretAssigner
 from thoth.services.nomes import nome_de_arquivo
 from thoth.services.octave_check import OctaveWarning
+from thoth.services.rotulos import TrechoSemBaixo
 from thoth.services.tab_referencia import ler_tab
 from thoth.services.tempo import BPM_MAXIMO, BPM_MINIMO
 from thoth.services.tonalidade import Tonalidade, tom_de_texto
@@ -237,6 +238,8 @@ def transcribe(
     _diz(f"{r.notas} notas de baixo em {r.rotulos}", "bold")
     if r.descartadas:
         _diz(f"{len(r.descartadas)} descartada(s): simultâneas ou fora do braço", "yellow")
+    for trecho in r.trechos_sem_baixo:
+        _diz(_aviso_sem_baixo(trecho), "yellow")
     if r.falha_na_auralizacao:
         _diz(f"sem auralização: {r.falha_na_auralizacao}", "yellow")
     if r.avisos_de_oitava:
@@ -271,6 +274,20 @@ def _tom(tonalidade: Tonalidade) -> str:
 
 def _grafia(tonalidade: Tonalidade) -> str:
     return "bemóis" if tonalidade.bemois else "sustenidos"
+
+
+def _minutos(segundos: float) -> str:
+    minutos, resto = divmod(int(segundos), 60)
+    return f"{minutos}:{resto:02d}"
+
+
+def _aviso_sem_baixo(trecho: TrechoSemBaixo) -> str:
+    """Onde ouvir: se ali não há baixo, o que entrou na partitura é vazamento."""
+    rotulos = ", ".join(f"{n} {r}" for r, n in trecho.rotulos.items())
+    return (
+        f"sem baixo em {_minutos(trecho.inicio_s)} a {_minutos(trecho.fim_s)}: "
+        f"readmitidas {rotulos} como baixo — se ali não há baixo, é vazamento"
+    )
 
 
 def _aviso_de_oitava(aviso: OctaveWarning) -> str:

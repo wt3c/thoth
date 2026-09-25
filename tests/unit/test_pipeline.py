@@ -127,12 +127,22 @@ def test_o_titulo_da_musica_entra_dentro_da_partitura(tmp_path: Path) -> None:
 @requer_soundfont
 def test_descarta_o_que_nao_e_baixo_e_relata_os_rotulos(tmp_path: Path) -> None:
     """Rotular certo não impede vazamento (ADR-010): o filtro é nosso, e visível."""
-    resultado = _rodar(
-        tmp_path, (_nota(36, 0.0), _nota(72, 0.7, "acoustic_piano"), _nota(38, 1.4))
-    )
+    resultado = _rodar(tmp_path, (_nota(36, 0.0), _nota(72, 0.7, "acoustic_piano"), _nota(38, 1.4)))
 
     assert resultado.notas == 2
     assert resultado.rotulos == {"electric_bass": 2, "acoustic_piano": 1}
+
+
+@requer_soundfont
+def test_baixo_rotulado_como_outro_instrumento_e_readmitido(tmp_path: Path) -> None:
+    """Longe de qualquer baixo, a linha com outro rótulo volta para a partitura."""
+    baixo = tuple(_nota(40, t * 0.5) for t in range(8))
+    guitarra = tuple(_nota(40, 10.0 + t * 0.5, "clean_electric_guitar") for t in range(20))
+
+    resultado = _rodar(tmp_path, baixo + guitarra)
+
+    assert resultado.notas == 8 + 20
+    assert [t.rotulos for t in resultado.trechos_sem_baixo] == [{"clean_electric_guitar": 20}]
 
 
 @requer_soundfont
@@ -222,8 +232,12 @@ def test_andamento_estimado_e_desdobrado_quando_as_notas_colidem(tmp_path: Path)
     """A fixture pulsa a 90; as notas, a 360. A grade de 90 colapsaria os ataques."""
     wav, _ = renderizar("escala", tmp_path)
     resultado = transcrever(
-        str(wav), tmp_path / "out", bpm=None, cache_dir=tmp_path / "cache",
-        separator=SeparadorFalso(), transcriber=TranscritorFalso(_semicolcheias_rapidas(360.0)),
+        str(wav),
+        tmp_path / "out",
+        bpm=None,
+        cache_dir=tmp_path / "cache",
+        separator=SeparadorFalso(),
+        transcriber=TranscritorFalso(_semicolcheias_rapidas(360.0)),
     )
 
     assert resultado.desdobrado is True
@@ -239,9 +253,7 @@ def test_andamento_estimado_e_desdobrado_quando_as_notas_colidem(tmp_path: Path)
 
 
 @pytest.mark.parametrize("bpm", [0, -120, 5, 1000])
-def test_bpm_fora_de_faixa_e_erro_antes_de_qualquer_processamento(
-    bpm: int, tmp_path: Path
-) -> None:
+def test_bpm_fora_de_faixa_e_erro_antes_de_qualquer_processamento(bpm: int, tmp_path: Path) -> None:
     """A CLI valida, mas quem usa o pipeline como biblioteca também merece o erro."""
     with pytest.raises(ValueError, match="BPM"):
         transcrever("x.mp3", tmp_path, bpm=bpm)

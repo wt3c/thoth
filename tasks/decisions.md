@@ -251,6 +251,68 @@ Isto **não** reabre o `--instruments`: condicionar continua sendo pior (medido 
 próprio ADR-008). O que a emenda diz é que o filtro tem um modo de falha próprio,
 e ele é silencioso.
 
+### Emenda (2026-09-24) — o modo de falha apareceu numa música inteira
+
+*And Plague Flowers* (`yt_ArBcOGvMvGU`, 653 s) saía com a transcrição acabando em
+511,4 s, embora o stem continue alto até ~655 s. A saída bruta do MuScriptor sobre o
+stem mostra a causa:
+
+| rótulo | notas | primeiro ataque | último ataque |
+|---|---|---|---|
+| `electric_bass` | 2597 | 8,6 s | 511,4 s |
+| `clean_electric_guitar` | 879 | 453,9 s | 654,9 s |
+
+É o baixo com outro nome: as duas distribuições de altura têm mediana 40 (E2), e
+entre 454 e 511 s, 208 das 239 notas "de guitarra" têm um ataque de baixo a menos de
+50 ms — a mesma nota, rotulada duas vezes, na transição. Depois de 511 s só sobra o
+rótulo de guitarra. O filtro descartou dois minutos e meio **sem relatar**, contra o
+ADR-014: a contagem bruta de rótulos aparecia, mas não dizia onde.
+
+A afinação não tem parte nisso (4, 5 e 6 cordas cortam no mesmo ponto).
+
+**Decisão 1 — relatar:** `services/rotulos.trechos_sem_baixo` aponta sequências de
+notas de outro rótulo com altura (bateria fica fora) a mais de `LACUNA_S` = 5 s de
+qualquer ataque de baixo, com pelo menos `MINIMO_DE_NOTAS` = 10 notas. O pipeline
+devolve os trechos em `Resultado.trechos_sem_baixo`; a CLI avisa com o intervalo e os
+rótulos, e a API expõe o campo. Nota de outro rótulo **perto** do baixo continua
+sendo tratada como vazamento ou duplicata e não entra no aviso. Nesta música o
+aviso é `516,5–654,9 s, 621 clean_electric_guitar`. Nenhuma nota muda: relatar não
+reabre o filtro.
+
+**Decisão 2 — readmitir o que está dentro dos trechos.** Medido antes de mudar,
+sobre a saída bruta do MuScriptor de todos os 16 stems em cache (5 fixtures, 11
+músicas), duas opções:
+
+- **A** — aceitar todo rótulo com altura que venha do stem; `monofonizar` resolve
+  as duplicatas;
+- **B** — manter o filtro e readmitir só as notas de dentro de `trechos_sem_baixo`.
+
+| stems | A | B |
+|---|---|---|
+| 15 (inclusive Sade ×2, SOJA, Seu Jorge — os candidatos a vazamento) | +0 | +0 |
+| *And Plague Flowers* | +879 | +621 |
+
+Nas outras 15, a única coisa fora de `ROTULOS_DE_BAIXO` é `drums`. Ficou **B**: a
+diferença de 258 notas são justamente as da transição, perto de um ataque de baixo —
+o que o ADR-010 manda tratar como vazamento — e B deixa o filtro intacto onde ele já
+acerta. `rotulos.readmitidas` devolve as notas de outro rótulo com altura dentro de
+algum trecho; o pipeline as junta ao baixo antes de `cabe_no_braco`, e tudo o que
+vem depois (braço, grade, monofonia, oitavas) vale para elas igual. Uma música sem
+nenhuma nota rotulada baixo continua falhando: o trecho sem baixo precisa de baixo
+em volta para existir como exceção.
+
+O aviso da CLI passa a dizer `readmitidas … como baixo — se ali não há baixo, é
+vazamento`. **O risco que a medição não fecha:** nenhum dos 15 stems disparou o
+critério, então não há caso negativo — num trecho instrumental sem baixo, com
+guitarra vazando no stem, B transcreve a guitarra. O aviso diz onde ouvir.
+
+**Resultado em *And Plague Flowers*** (`--afinacao 6`): 2402 → 3023 notas, a última em
+654,9 s; as descartadas continuam 195 — o acréscimo é exatamente as 621 readmitidas.
+Aviso de oitava em 121 das 611 notas depois de 516,5 s (20%), contra 658 das 2412
+antes (27%): o trecho readmitido não é pior que o resto.
+Contra a tab (ADR-041): 1558 pares, 89,5% na mesma oitava contra piso de 75,2%; a
+janela de 540–600 s, que antes não tinha nota, dá 146 pares, **90%** contra piso de 69%.
+
 ---
 
 ## ADR-009 — Modelo `small` como padrão
@@ -2273,3 +2335,10 @@ oitava contra piso de 71,9%, mesmo alinhamento, mesmos números por trecho.
   baixo sem lugar, e o número não mudou: são notas simultâneas. Mais cordas não as
   recuperam.
 - O corte em 511,4 s também não mudou — não depende da afinação.
+
+### Emenda (2026-09-25) — o corte em 511 s era o filtro de rótulo
+
+Era o pipeline, não o MuScriptor: depois de 511 s o modelo rotula o baixo como
+`clean_electric_guitar`, e o filtro descartava. Causa, medição e correção estão na
+emenda de 2026-09-24 do ADR-008. Refeita com a correção, a transcrição vai até 654,9 s
+e a comparação sobe de 1294 para 1558 pares, 89,5% na mesma oitava contra piso de 75,2%.

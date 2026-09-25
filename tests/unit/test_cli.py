@@ -57,6 +57,29 @@ def test_transcribe_relata_descartes_e_avisos(tmp_path: Path, monkeypatch) -> No
     assert "abc123.gp5" in resultado.output
 
 
+def test_transcribe_avisa_trecho_sem_baixo(tmp_path: Path, monkeypatch) -> None:
+    """O baixo rotulado como guitarra sai do filtro: o aviso diz onde e com que rótulo."""
+    from thoth.services.pipeline import Resultado
+    from thoth.services.rotulos import TrechoSemBaixo
+
+    asset = AudioAsset(wav=tmp_path / "mix.wav", source_id="abc123", title="t", duration_s=1.0)
+    trecho = TrechoSemBaixo(516.5, 654.88, {"clean_electric_guitar": 621})
+    monkeypatch.setattr(
+        pipeline, "transcrever",
+        lambda *a, **k: Resultado(
+            asset=asset, stem=tmp_path / "bass.wav", artefatos={}, notas=12,
+            rotulos={"electric_bass": 12}, descartadas=[], fora_do_braco=[], bpm=90,
+            avisos_de_oitava=[], trechos_sem_baixo=[trecho],
+        ),
+    )
+
+    resultado = runner.invoke(app, ["transcribe", "x.mp3", "--out", str(tmp_path), "--bpm", "90"])
+
+    assert resultado.exit_code == 0, resultado.output
+    assert "8:36 a 10:54" in resultado.output
+    assert "readmitidas 621 clean_electric_guitar" in resultado.output
+
+
 def test_serve_monta_o_app_sem_subir_o_servidor(monkeypatch) -> None:
     """Checa a fiação até o uvicorn — subir servidor de verdade é teste de outro nível."""
     from thoth import cli

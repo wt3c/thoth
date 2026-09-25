@@ -19,7 +19,7 @@ import math
 import mimetypes
 import threading
 import uuid
-from dataclasses import dataclass, field
+from dataclasses import asdict, dataclass, field
 from pathlib import Path
 from typing import Any, Protocol
 
@@ -170,6 +170,7 @@ def _resumo(job: Job) -> dict[str, Any]:
         "rotulos": r.rotulos if r else None,
         "descartadas": len(r.descartadas) if r else None,
         "fora_do_braco": len(r.fora_do_braco) if r else None,
+        "trechos_sem_baixo": [asdict(t) for t in r.trechos_sem_baixo] if r else None,
         "avisos_de_oitava": [_oitava(a) for a in r.avisos_de_oitava] if r else None,
         "tom": _tom(r.tonalidade) if r else None,
         "formatos": sorted(r.artefatos) if r else [],
