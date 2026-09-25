@@ -96,6 +96,11 @@ def _pico_dbfs(wav: Path) -> float:
 def renderizar(nome: str, destino: Path) -> tuple[Path, pretty_midi.PrettyMIDI]:
     """Devolve o WAV normalizado a -1 dBFS de pico e o MIDI que é sua referência."""
     midi = FIXTURES[nome]
+    return renderizar_midi(midi, nome, destino), midi
+
+
+def renderizar_midi(midi: pretty_midi.PrettyMIDI, nome: str, destino: Path) -> Path:
+    """MIDI → WAV com a soundfont, normalizado a -1 dBFS de pico."""
     mid = destino / f"{nome}.mid"
     bruto = destino / f"{nome}.bruto.wav"
     wav = destino / f"{nome}.wav"
@@ -110,4 +115,4 @@ def renderizar(nome: str, destino: Path) -> tuple[Path, pretty_midi.PrettyMIDI]:
          "-af", f"volume={ganho:.2f}dB", str(wav)],
         check=True,
     )
-    return wav, midi
+    return wav

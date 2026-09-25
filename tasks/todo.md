@@ -302,26 +302,35 @@ Pré-requisito invisível até agora: a Fase 5 só existe se houver o que o
 
 ### Multi-instrumento: guitarra polifônica, piano e bateria — plano (ADR-044)
 
-> Uma parte-alvo por execução; o baixo continua sendo o padrão. Ordem recomendada:
-> contrato e medição comum → bateria → piano → guitarra. Nenhuma etapa autoriza
+> Uma parte-alvo por execução; o baixo continua sendo o padrão. Ordem **revista pelo
+> veredito** (ADR-044, 2026-09-25): contrato e medição comum → **guitarra (M4)** →
+> bateria (M2) → piano acústico (M3). Só a guitarra tem `seguir`; bateria e piano
+> acústico estão em `ajustar`; piano elétrico fora de escopo. Nenhuma etapa autoriza
 > áudio ou tablatura de terceiros no repositório.
 
 #### M0 — aceitar o recorte antes de implementar
 
-- [ ] Aceitar ou rejeitar o ADR-044; pronto quando o status deixar de ser `Proposto` e
+- [x] Aceitar ou rejeitar o ADR-044 (aceito em 2026-09-25, com emenda no ADR-011); pronto quando o status deixar de ser `Proposto` e
       estiver decidido se piano sem GP5 nativo ainda conta como suporte completo.
-- [ ] Congelar em teste a taxonomia do MuScriptor 0.3.0 para o escopo: piano
+- [x] Congelar em teste a taxonomia do MuScriptor 0.3.0 (`slow`, via `list-instruments`) para o escopo: piano
       (`acoustic_piano`, `electric_piano`), guitarra (`acoustic_guitar`,
       `clean_electric_guitar`, `distorted_electric_guitar`) e `drums`; pronto quando
       uma mudança de nome no motor falhar com a lista observada impressa.
-- [ ] Criar perfis de instrumento no domínio sem misturar rótulos por conveniência;
+- [x] Criar perfis de instrumento no domínio (`domain/instrumentos.py`) sem misturar rótulos por conveniência;
       pronto quando cada perfil declarar família, rótulos aceitos, stem, programa GM e
       afinação opcional, e guitarra limpa/acústica/distorcida puderem ser selecionadas
       separadamente.
 
 #### M1 — contrato de domínio e régua comum, por TDD
 
-- [ ] Testar primeiro e introduzir `EventoPercussivo`, `Transcricao` e `ParteMusical`:
+> Ordem ajustada na aceitação (ADR-044, decisão do usuário): tipos, fixtures e avaliador,
+> depois a medição e o veredito. Os itens que mudam `Transcriber`, `Separator`,
+> `FretAssigner` e `Exporter`, e a `ParteMusical`, que só tem consumidor nos
+> exportadores, esperam um `seguir`. Critério do veredito fixado no ADR-044.
+
+
+- [x] Testar primeiro e introduzir `EventoPercussivo` e `Transcricao` (`ParteMusical` espera
+      o primeiro exportador novo):
       nota com altura continua sendo `NoteEvent`; ataque de bateria guarda instante e
       peça GM, sem fingir altura ou sustentação; pronto com testes de igualdade,
       ordenação e validação de cada modelo.
@@ -337,22 +346,25 @@ Pré-requisito invisível até agora: a Fase 5 só existe se houver o que o
 - [ ] Generalizar `Exporter` para receber uma `ParteMusical`, não apenas
       `list[TabNote] + tuning`; pronto quando exportadores falsos provarem por teste que
       piano e bateria não exigem afinação e que baixo/guitarra não perdem posições.
-- [ ] Gerar, em código versionado, fixtures MIDI de pelo menos 8 s, isoladas e em mix,
+- [x] Gerar, em código versionado (`tests/sintetico_multi.py`), fixtures MIDI de pelo menos 8 s, isoladas e em mix,
       para cada instrumento; pronto quando `fluidsynth` real renderizar WAVs
       normalizados, os MIDI forem a referência e nenhum `.mid`, `.wav`, `.gp5` ou
       `.musicxml` gerado aparecer no índice do Git.
-- [ ] Estender o avaliador: piano/guitarra com precisão, revocação e F1 de ataque e de
+- [x] Estender o avaliador (`avaliar_polifonico`, `avaliar_bateria`): piano/guitarra com precisão, revocação e F1 de ataque e de
       nota sem cobrar offset; bateria com F1 micro e macro por peça GM a 50 ms, sem
       métrica de duração; pronto com testes contra `mir_eval` real e casos que
       demonstrem erro de altura, troca de peça e ataque deslocado.
-- [ ] Medir cada fixture em três condições — isolada, mix direta e stem do Demucs
+- [x] Medir cada fixture em três condições — isolada, mix direta e stem do Demucs
       (`drums` para bateria; `other` para piano/guitarra) — com decodificação livre;
       pronto com tabela de tempo de CPU, contagem por rótulo, precisão, revocação e F1,
       sempre imprimindo medido e piso lado a lado.
-- [ ] Registrar o veredito por instrumento antes do respectivo exportador; pronto
+      → `tests/integration/test_multi_instrumento.py` (2026-09-25).
+- [x] Registrar o veredito por instrumento antes do respectivo exportador; pronto
       quando a medição disser `seguir`, `ajustar` ou `manter fora de escopo`, sem usar
       avaliação auditiva do usuário e sem promover a primeira rodada a piso por
       simples conveniência.
+      → ADR-044, Veredito: bateria e piano acústico `ajustar`, piano elétrico fora
+      de escopo, as três guitarras `seguir`.
 
 #### M2 — bateria primeiro
 

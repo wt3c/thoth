@@ -61,3 +61,57 @@ class TabNote:
     event: NoteEvent
     string: int  # 0 = corda mais grave da afinação
     fret: int
+
+
+#: Rótulo que o MuScriptor dá à bateria; nele, `pitch` é a peça GM, não altura.
+ROTULO_BATERIA = "drums"
+
+
+@dataclass(frozen=True, slots=True)
+class EventoPercussivo:
+    """Ataque de bateria: instante e peça GM (ADR-044).
+
+    Sem altura e sem duração. O MuScriptor fecha a nota de bateria logo depois do
+    ataque; isso transporta o instante, não mede sustentação, e um `NoteEvent`
+    faria as duas coisas parecerem dado.
+    """
+
+    instante_s: float
+    peca_gm: int
+    rotulo: str = ROTULO_BATERIA
+
+    def __post_init__(self) -> None:
+        if self.instante_s < 0:
+            raise ValueError(f"instante negativo: {self.instante_s}")
+        if not 0 <= self.peca_gm <= 127:
+            raise ValueError(f"peça GM fora de 0 a 127: {self.peca_gm}")
+
+
+@dataclass(frozen=True, slots=True)
+class Transcricao:
+    """Saída livre do transcritor: notas com altura e ataques de bateria, ordenados."""
+
+    notas: tuple[NoteEvent, ...]
+    ataques: tuple[EventoPercussivo, ...]
+
+    def __post_init__(self) -> None:
+        if any(n.instrument == ROTULO_BATERIA for n in self.notas):
+            raise ValueError(f"nota com rótulo {ROTULO_BATERIA!r}: bateria vai em `ataques`")
+        object.__setattr__(
+            self, "notas", tuple(sorted(self.notas, key=lambda n: (n.onset_s, n.pitch)))
+        )
+        object.__setattr__(
+            self, "ataques",
+            tuple(sorted(self.ataques, key=lambda a: (a.instante_s, a.peca_gm))),
+        )
+
+    @classmethod
+    def do_muscriptor(cls, notas: list[NoteEvent]) -> Transcricao:
+        """Separa na borda o que o MuScriptor entrega junto como nota."""
+        return cls(
+            notas=tuple(n for n in notas if n.instrument != ROTULO_BATERIA),
+            ataques=tuple(
+                EventoPercussivo(n.onset_s, n.pitch)
+                for n in notas if n.instrument == ROTULO_BATERIA
+            ),
+        )

@@ -228,3 +228,21 @@ def test_sem_buraco_nao_ha_segunda_passada(tmp_path: Path) -> None:
 
     assert len(log.read_text().splitlines()) == 1
     assert {n.pitch for n in notas} == {30}
+
+
+@pytest.mark.slow
+def test_taxonomia_do_escopo_multi_instrumento_existe_no_motor() -> None:
+    """Os rótulos que os perfis do ADR-044 aceitam precisam existir no motor fixado.
+
+    Uma troca de nome no MuScriptor faria um perfil filtrar tudo em silêncio.
+    """
+    from thoth.domain.instrumentos import PERFIS
+
+    saida = subprocess.run(
+        [*MuscriptorTranscriber().binary, "list-instruments"],
+        check=True, capture_output=True, text=True,
+    ).stdout
+    observados = set(saida.split())
+    esperados = set().union(*(p.rotulos for p in PERFIS.values()))
+
+    assert esperados <= observados, f"faltam {esperados - observados}; motor: {sorted(observados)}"

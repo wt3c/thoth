@@ -10,8 +10,15 @@ from __future__ import annotations
 import pretty_midi
 import pytest
 
-from thoth.domain.models import NoteEvent
-from thoth.services.evaluation import Scores, avaliar, notas_do_midi
+from thoth.domain.models import EventoPercussivo, NoteEvent
+from thoth.services.evaluation import (
+    Prf,
+    Scores,
+    avaliar,
+    avaliar_bateria,
+    avaliar_polifonico,
+    notas_do_midi,
+)
 
 
 def _nota(pitch: int, inicio: float, dur: float = 0.4) -> NoteEvent:
@@ -109,3 +116,96 @@ def test_sem_nota_casada_a_duracao_nao_tem_o_que_medir() -> None:
     assert avaliar(REFERENCIA, []).duracao_ratio is None
     deslocada = [_nota(n.pitch, n.onset_s + 0.09) for n in REFERENCIA]
     assert avaliar(REFERENCIA, deslocada).duracao_ratio is None
+
+
+# --- Polifonia e bateria (ADR-044) -------------------------------------------------
+
+ACORDES = [
+    _nota(p, t) for t in (0.0, 1.0) for p in (40, 47, 52, 56, 59, 64)
+]
+
+
+def test_polifonico_identico_pontua_um_em_ataque_e_nota() -> None:
+    s = avaliar_polifonico(ACORDES, list(ACORDES))
+
+    assert s.ataque == Prf(1.0, 1.0, 1.0)
+    assert s.nota == Prf(1.0, 1.0, 1.0)
+    assert (s.n_ref, s.n_est) == (12, 12)
+
+
+def test_polifonico_conta_cada_nota_do_acorde_e_nao_so_o_instante() -> None:
+    """Um acorde de seis notas transcrito com duas perde revocação, não só precisão."""
+    duas_por_acorde = [n for n in ACORDES if n.pitch in (40, 64)]
+
+    s = avaliar_polifonico(ACORDES, duas_por_acorde)
+
+    assert s.nota.precisao == 1.0
+    assert s.nota.revocacao == round(4 / 12, 3)
+
+
+def test_polifonico_altura_errada_mantem_ataque_e_derruba_nota() -> None:
+    meio_tom_acima = [_nota(n.pitch + 1, n.onset_s) for n in ACORDES]
+
+    s = avaliar_polifonico(ACORDES, meio_tom_acima)
+
+    assert s.ataque.f1 == 1.0
+    assert s.nota.f1 == 0.0
+
+
+def test_polifonico_nao_cobra_duracao() -> None:
+    curtas = [_nota(n.pitch, n.onset_s, dur=0.05) for n in ACORDES]
+
+    assert avaliar_polifonico(ACORDES, curtas).nota.f1 == 1.0
+
+
+def test_polifonico_recusa_referencia_vazia_e_zera_estimativa_vazia() -> None:
+    with pytest.raises(ValueError):
+        avaliar_polifonico([], ACORDES)
+    assert avaliar_polifonico(ACORDES, []).nota == Prf(0.0, 0.0, 0.0)
+
+
+GROOVE = [
+    EventoPercussivo(t, p)
+    for t, pecas in [(0.0, (36, 42)), (0.5, (38, 42)), (1.0, (36, 42)), (1.5, (38, 42))]
+    for p in pecas
+]
+
+
+def test_bateria_identica_pontua_um_micro_e_macro() -> None:
+    s = avaliar_bateria(GROOVE, list(GROOVE))
+
+    assert s.micro == Prf(1.0, 1.0, 1.0)
+    assert s.macro_f1 == 1.0
+    assert set(s.por_peca) == {36, 38, 42}
+
+
+def test_bateria_troca_de_peca_conta_como_erro() -> None:
+    """Caixa lida como bumbo: o instante está certo, a peça não."""
+    trocada = [EventoPercussivo(a.instante_s, 36 if a.peca_gm == 38 else a.peca_gm)
+               for a in GROOVE]
+
+    s = avaliar_bateria(GROOVE, trocada)
+
+    assert s.por_peca[38].revocacao == 0.0
+    assert s.por_peca[36].precisao == 0.5
+    assert s.por_peca[42] == Prf(1.0, 1.0, 1.0)
+    assert s.micro.f1 < 1.0
+
+
+def test_bateria_ataque_deslocado_alem_de_50_ms_erra() -> None:
+    deslocado = [EventoPercussivo(a.instante_s + 0.06, a.peca_gm) for a in GROOVE]
+
+    assert avaliar_bateria(GROOVE, deslocado).micro.f1 == 0.0
+    dentro = [EventoPercussivo(a.instante_s + 0.04, a.peca_gm) for a in GROOVE]
+    assert avaliar_bateria(GROOVE, dentro).micro.f1 == 1.0
+
+
+def test_macro_ignora_peca_ausente_da_referencia_mas_micro_a_cobra() -> None:
+    """Peça só na estimativa não tem revocação definida: não vira zero no macro."""
+    com_prato = [*GROOVE, EventoPercussivo(0.0, 49)]
+
+    s = avaliar_bateria(GROOVE, com_prato)
+
+    assert 49 not in s.por_peca
+    assert s.macro_f1 == 1.0
+    assert s.micro.precisao == round(8 / 9, 3)

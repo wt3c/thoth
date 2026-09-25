@@ -25,8 +25,9 @@ import numpy as np
 import pretty_midi
 from mir_eval.onset import f_measure
 from mir_eval.transcription import match_notes, precision_recall_f1_overlap
+from mir_eval.util import match_events
 
-from thoth.domain.models import NoteEvent
+from thoth.domain.models import EventoPercussivo, NoteEvent
 
 #: Padrão do mir_eval e da literatura de AMT.
 TOLERANCIA_S = 0.05
@@ -117,3 +118,99 @@ def avaliar(
     return Scores(round(float(onset_f1), 3), round(float(nota_f1), 3),
                   len(referencia), len(estimativa), round(float(offset_f1), 3),
                   _razao_de_duracao(ref_iv, ref_hz, val_iv, val_hz, tolerancia_s))
+
+
+# --- Polifonia e bateria (ADR-044) -------------------------------------------------
+
+
+@dataclass(frozen=True, slots=True)
+class Prf:
+    precisao: float
+    revocacao: float
+    f1: float
+
+
+_ZERO = Prf(0.0, 0.0, 0.0)
+
+
+def _prf(acertos: int, n_ref: int, n_est: int) -> Prf:
+    p = acertos / n_est if n_est else 0.0
+    r = acertos / n_ref if n_ref else 0.0
+    f = 2 * p * r / (p + r) if p + r else 0.0
+    return Prf(round(p, 3), round(r, 3), round(f, 3))
+
+
+@dataclass(frozen=True, slots=True)
+class ScoresPolifonicos:
+    """Piano e guitarra: cada nota do acorde conta. Duração não é cobrada."""
+
+    ataque: Prf
+    nota: Prf
+    n_ref: int
+    n_est: int
+
+
+def avaliar_polifonico(
+    referencia: Sequence[NoteEvent],
+    estimativa: Sequence[NoteEvent],
+    *,
+    tolerancia_s: float = TOLERANCIA_S,
+) -> ScoresPolifonicos:
+    """Precisão, revocação e F1 de ataque (cego para altura) e de nota (ataque + altura).
+
+    O casamento é um para um: seis notas no mesmo instante precisam de seis
+    estimadas, e não de um ataque só, como no `f_measure` de onsets do `avaliar`.
+    """
+    if not referencia:
+        raise ValueError("referência vazia: não há o que avaliar")
+    if not estimativa:
+        return ScoresPolifonicos(_ZERO, _ZERO, len(referencia), 0)
+    ref_iv, ref_hz = _arrays(referencia)
+    est_iv, est_hz = _arrays(estimativa)
+    # Casar só por instante: altura igual para todas neutraliza o critério de altura.
+    uma_altura = np.full(len(referencia), 440.0), np.full(len(estimativa), 440.0)
+    ataques = match_notes(ref_iv, uma_altura[0], est_iv, uma_altura[1],
+                          onset_tolerance=tolerancia_s, offset_ratio=None)
+    notas = match_notes(ref_iv, ref_hz, est_iv, est_hz,
+                        onset_tolerance=tolerancia_s, offset_ratio=None)
+    n_ref, n_est = len(referencia), len(estimativa)
+    return ScoresPolifonicos(_prf(len(ataques), n_ref, n_est), _prf(len(notas), n_ref, n_est),
+                             n_ref, n_est)
+
+
+@dataclass(frozen=True, slots=True)
+class ScoresBateria:
+    """Ataque certo na peça certa, por peça GM. Sem métrica de duração."""
+
+    micro: Prf
+    #: Média do F1 das peças **presentes na referência**. Peça só na estimativa não
+    #: tem revocação definida; ela pesa no micro, como falso positivo, e não aqui.
+    macro_f1: float
+    por_peca: dict[int, Prf]
+    n_ref: int
+    n_est: int
+
+
+def avaliar_bateria(
+    referencia: Sequence[EventoPercussivo],
+    estimativa: Sequence[EventoPercussivo],
+    *,
+    tolerancia_s: float = TOLERANCIA_S,
+) -> ScoresBateria:
+    if not referencia:
+        raise ValueError("referência vazia: não há o que avaliar")
+
+    def instantes(eventos: Sequence[EventoPercussivo], peca: int) -> np.ndarray:
+        return np.array(sorted(a.instante_s for a in eventos if a.peca_gm == peca))
+
+    por_peca: dict[int, Prf] = {}
+    acertos_total = 0
+    for peca in sorted({a.peca_gm for a in referencia} | {a.peca_gm for a in estimativa}):
+        ref, est = instantes(referencia, peca), instantes(estimativa, peca)
+        acertos = len(match_events(ref, est, tolerancia_s)) if len(ref) and len(est) else 0
+        acertos_total += acertos
+        if len(ref):
+            por_peca[peca] = _prf(acertos, len(ref), len(est))
+    macro = round(float(np.mean([s.f1 for s in por_peca.values()])), 3)
+    return ScoresBateria(_prf(acertos_total, len(referencia), len(estimativa)), macro,
+                         por_peca, len(referencia), len(estimativa))

@@ -545,6 +545,13 @@ o motor for o MuScriptor. Não gastar Fase 4 tentando gerar tablatura de guitarr
 `other`, junto com teclados e sopros. Mesmo que o motor melhorasse, o separador
 não entrega guitarra isolada.
 
+### Emenda (2026-09-25) — reaberto como experimento pelo ADR-044
+
+O "fora de escopo enquanto o motor for o MuScriptor" deixa de ser veredito fechado:
+o ADR-044, aceito nesta data, transforma guitarra, piano e bateria numa sequência de
+medições com saída negativa permitida. O limite medido aqui continua valendo até que
+uma medição do ADR-044 diga `seguir` para um instrumento; o caminho do baixo não muda.
+
 ---
 
 ## ADR-012 — Custo de tablatura: o que separa iniciante de experiente
@@ -2829,7 +2836,7 @@ transições de estado.
 
 ## ADR-044 — expansão por partes: bateria, piano e guitarra polifônica
 
-**Data:** 2026-09-25 · **Status:** Proposto · **Revisa, se aceito:** ADR-003, ADR-008,
+**Data:** 2026-09-25 · **Status:** aceito em 2026-09-25 · **Revisa:** ADR-003, ADR-008,
 ADR-010, ADR-011, ADR-014 e ADR-035
 
 ### Contexto e evidência disponível
@@ -3020,3 +3027,85 @@ sem player alphaTab conta como suporte suficiente para piano?** A recomendação
 **sim** — MusicXML é representação nativa e editável para piano; forçar GP5 seria
 otimizar para o player com risco de corromper a música. Se a resposta for não, piano
 deve permanecer fora de escopo caso o spike de GP5 falhe.
+
+### Decisão do usuário (2026-09-25)
+
+Aceito, com a recomendação: MusicXML sem GP5 e sem player conta como suporte
+suficiente para piano **se** o spike de GP5 falhar. Ordem de trabalho ajustada na
+aceitação: a medição vem antes das mudanças de contrato. Tipos de domínio, perfis,
+gerador de fixtures e avaliador entram primeiro, sem mexer na assinatura de
+`Transcriber`, `Separator`, `FretAssigner` ou `Exporter`; esses ports só mudam para o
+instrumento que receber `seguir`. Refatorar o caminho do baixo por um instrumento que
+pode terminar em `manter fora de escopo` seria risco sem retorno.
+
+### Critério de veredito (fixado em 2026-09-25, antes de qualquer medição)
+
+Os números vêm do caminho do baixo nas mesmas condições sintéticas: nota F1 **0,968**
+no `misto` com separação, o nível que virou produto, e **0,682** sem separação, o
+nível que o ADR-010 julgou insuficiente. A métrica é a nota F1 para piano e guitarra
+e a F1 micro para bateria. Vale a fixture `-mix`, na melhor condição entre a mix
+direta e o stem; a versão isolada só aparece como teto, sem entrar no veredito.
+
+| veredito | F1 na fixture `-mix` |
+|---|---|
+| `seguir` | ≥ 0,90 |
+| `ajustar` | de 0,68 até abaixo de 0,90 |
+| `manter fora de escopo` | < 0,68 |
+
+A fixture sintética é otimista por construção. Por isso `seguir` aqui é condição
+necessária, não suficiente: a qualidade em música real continua pertencendo à Camada 3.
+Estes limites não mudam depois que a medição rodar; se forem revistos, é por emenda
+que diga o motivo.
+
+### Veredito (2026-09-25) — medido em `tests/integration/test_multi_instrumento.py`
+
+`small`, `muscriptor@0.3.0`, `demucs@4.1.0 htdemucs_ft` com `--two-stems <stem do
+perfil>` chamado direto no teste, porque o `DemucsSeparator` só separa o baixo e o port
+não muda antes de um `seguir`. Transcrição filtrada pelos rótulos do perfil, como o
+pipeline faz com o baixo. Nota F1 para piano e guitarra; F1 micro para bateria.
+
+| perfil | isolada | mix direta | stem | melhor `-mix` | veredito |
+|---|---|---|---|---|---|
+| bateria | 0,529 | **0,867** | 0,529 | 0,867 | `ajustar` |
+| piano acústico | 0,923 | 0,696 | **0,879** | 0,879 | `ajustar` |
+| piano elétrico | 0,000 | **0,676** | 0,000 | 0,676 | `manter fora de escopo` |
+| guitarra acústica | 0,981 | 0,705 | **0,981** | 0,981 | `seguir` |
+| guitarra limpa | 0,927 | 0,889 | **0,990** | 0,990 | `seguir` |
+| guitarra distorcida | 0,981 | 0,972 | **0,981** | 0,981 | `seguir` |
+
+Referência: 48 ataques de bateria, 34 notas de piano, 53 de guitarra. Tempo de CPU por
+execução: de 12 s a 169 s, com o Demucs.
+
+O que a tabela não mostra sozinha:
+
+- **Bateria: os tons nunca aparecem.** F1 0 nas peças 45, 48 e 50 em todas as
+  condições; a virada inteira some. Bumbo, caixa e chimbal ficam entre 0,55 e 1,00. O
+  stem e a isolada dão exatamente o mesmo resultado (20 ataques, precisão 0,900), e a
+  mix direta rende mais (42 ataques): **para bateria, separar piora**, ao contrário do
+  baixo. O que `ajustar` precisa investigar é a revocação sem contexto e os tons, não
+  a mistura.
+- **Piano elétrico: o zero é rótulo, não nota.** Isolado, o MuScriptor chama as 37
+  notas de `clean_electric_guitar`; no stem, chama 32 de `acoustic_piano`. Só a mix
+  direta usa `electric_piano`. O critério filtra por rótulo e foi fixado antes; somar
+  `acoustic_piano` e `electric_piano` num perfil é uma mudança de critério, e exige
+  emenda própria com o motivo, não um ajuste deste veredito. A 0,004 do limite, a
+  diferença para `ajustar` é uma nota.
+- **Guitarra: a separação é o que qualifica.** A acústica vai de 0,705 na mix direta a
+  0,981 no stem; o padrão é o mesmo do baixo no ADR-010. As três guitarras usam o
+  mesmo MIDI e diferem só no programa GM, por isso os números de acústica e distorcida
+  coincidem.
+
+`seguir` continua sendo condição necessária, não suficiente (fixture sintética, 53
+notas). A comparação com o teto do ADR-011, pedida no M4, fica para quando a guitarra
+for a etapa ativa. Os valores do teste são medição deste checkpoint, como no
+`test_regressao_fase0.py`: servem para detectar regressão e não são meta de qualidade.
+A ordem bateria → piano → guitarra do plano não muda por este veredito sem decisão do
+usuário.
+
+### Decisão do usuário (2026-09-25) — guitarra primeiro
+
+Com o veredito, a ordem passa a ser **guitarra → bateria → piano acústico**. A guitarra
+é o único perfil com `seguir`; bateria e piano acústico ficam em `ajustar` e só voltam
+depois da investigação que o veredito pede (tons e revocação da bateria; mistura no
+piano). O piano elétrico fica fora de escopo até uma emenda que justifique mudar o
+critério de rótulo.
