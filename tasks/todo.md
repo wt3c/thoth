@@ -5,7 +5,7 @@
 
 ## Próxima sessão — o que está aberto (fechado em 2026-09-24)
 
-Estado: verificação de entrega verde (342 passed na suíte padrão, ruff e mypy limpos; varredura `slow`
+Estado: verificação de entrega verde (343 passed na suíte padrão, ruff e mypy limpos; varredura `slow`
 de beams 32767/0). As nove músicas reexportadas em `out/` em 2026-09-24 com o conserto
 de beams: **0 mal-formados**. Conferir `git status -sb` — o push fica a pedido.
 
@@ -19,7 +19,8 @@ Nada do que resta é barato: tudo depende de material externo ou de sessão manu
 ### 1. Bloqueados em material externo
 
 - ~~Validar o limiar de oitava fora do Equus~~ — feito em 2026-09-25 com as três tabs
-  alinhadas ao stem (emenda do ADR-030): não se sustenta; discriminador novo é pesquisa.
+  alinhadas ao stem. A primeira medição pegou o módulo quebrado; remedido (segunda
+  emenda do ADR-030): separa fraco (AUC 0,75), alarma de 8 a 27%. Diagnóstico, não triagem.
 - Tab clássica **humana** para conferir oitava e notas — só por download seu (`.gp5` do
   UG Pro ou Songsterr Plus). Automatizar o Songsterr está fora (emenda do ADR-007:
   `robots.txt` e `ai.txt` deles). A da SOJA é `aiGenerated: true` e não serve.
@@ -149,8 +150,15 @@ A avaliação **não depende de saber tocar** (ADR-006).
       ADR-030): **não se sustenta** — alarma 31–39% das notas que a tab confirma
       (8,7% no Equus), 4–5% dos avisos são erro real, e nenhum limiar de 0,2 a 1,0
       separa. O limiar fica; o aviso deixa de valer como lista curta
-- [ ] Discriminador de oitava que separe fora do Equus — o `f0 / 2·f0` não separa
-      (emenda do ADR-030) e não vê o erro para cima (10 de 97). Pesquisa, sem urgência
+- [x] **A janela do ADR-029 tinha quebrado a detecção** (emenda do ADR-029): no Equus
+      caiu de 12 para 2 das 12, e o pico zero (faixa de 41 Hz entre dois pontos da FFT)
+      virava nota certa em suspeita. FFT completada com zeros + janela com piso de 0,3 s:
+      8 de 12, 4 de 127 alarmes. Calibração travada em `tests/integration/test_oitava_equus.py`
+      (`slow`, pula sem `~/thoth-fase0`). Remedido nas tabs: segunda emenda do ADR-030
+- [ ] Discriminador de oitava que separe melhor fora do Equus — o `f0 / 2·f0` separa
+      fraco (AUC 0,75, segunda emenda do ADR-030) e não vê o erro para cima (5 de 97).
+      Candidatos já medidos e descartados: ímpares/pares, `3f0/(2f0+4f0)`, meios-harmônicos.
+      Pesquisa, sem urgência
 - [x] `MuscriptorTranscriber` atrás do `Protocol Transcriber` — subprocesso via
       `uvx` (torch fora do projeto), `small` + livre + `--detect-tempo false`.
       7 testes: 6 de parsing puro + 1 contra o modelo real (`slow`).

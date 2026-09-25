@@ -11,14 +11,14 @@ erradas conhecidas, criando 12 alarmes. A razão `f0 / 2·f0` é interna à nota
 imune a isso: se a nota for mesmo `p`, as duas parciais coexistem; se for
 `p+12`, o que chamamos de `f0` é só o piso abaixo da fundamental real.
 
-Limiar 0,40, calibrado nos dados reais de *Equus* (Fase 0): pega **12 de 12**
-notas erradas conhecidas e sinaliza 11 de 127 notas concordantes (8,7%), das
-quais 6 estão em `pitch <= 28` — registro em que a fundamental é fisicamente
-fraca, então lá o alarme é esperado.
+Limiar 0,40, calibrado nos dados reais de *Equus* (Fase 0) e travado em
+`tests/integration/test_oitava_equus.py`: pega **8 de 12** notas erradas conhecidas e
+sinaliza 4 de 127 concordantes (3,1%). Com 0,6 s fixos pegava 12 de 12, mas alarmava o
+dobro no Equus e 50% mais em *And Plague Flowers* (emenda do ADR-029).
 
-**Fora do Equus o limiar não se sustenta** (emenda do ADR-030): contra três tabs
-alinhadas ao stem, alarma de 31 a 39% das notas que a tab confirma, e nenhum limiar de 0,2 a
-1,0 separa. O aviso é diagnóstico da nota, não triagem.
+**Fora do Equus a separação é fraca** (emendas do ADR-030): contra três tabs alinhadas
+ao stem, alarma de 8 a 27% das notas que a tab confirma e pega de um terço a dois
+terços das oitavas abaixo. O aviso é diagnóstico da nota, não triagem.
 
 A oitava acima é **ranqueada, não afirmada** (ADR-030): a mesma razão é medida para
 `pitch + 12`, e a sugestão só sai quando ela explica o áudio melhor que a altura
@@ -43,6 +43,12 @@ from thoth.domain.models import NoteEvent
 
 #: Meio-tom para cada lado — tolera desafinação e vibrato sem varrer a nota vizinha.
 _LARGURA = 2 ** (1 / 24)
+#: A FFT é completada até 2 s: pontos a cada 0,5 Hz, quatro dentro da faixa de 41 Hz.
+_PONTOS_DA_FFT_S = 2
+#: Piso da janela: nota curta é lida por 0,3 s, invadindo o vizinho se preciso. Com a
+#: duração da nota (0,14 s é típico) a parcial não se destaca do ruído grave e o Equus
+#: caiu de 12 para 3 das 12 notas erradas; com o piso, 8 de 12 (emenda do ADR-029).
+_JANELA_MINIMA_S = 0.3
 
 
 @dataclass(frozen=True, slots=True)
@@ -92,11 +98,11 @@ def verificar_oitavas(
     """Devolve as notas cuja fundamental não se sustenta acima do piso de ruído.
 
     `janela_s` é o **teto** da janela: a análise para no `offset_s` da nota, para
-    não medir o vizinho (ADR-029). O teto de 0,6 s dá ~1,7 Hz de resolução — o
-    suficiente para separar 30,9 Hz de 61,7 Hz, as duas hipóteses do caso medido
-    na Fase 0; nota de 0,2 s dá 5 Hz, que ainda separa as duas. Abaixo de 50 ms a
-    função não opina. `limiar` é a razão `f0 / 2·f0` abaixo da qual a nota é
-    suspeita; ver o módulo para a calibração.
+    não medir o vizinho (ADR-029), mas nunca antes de 0,3 s — mais curto que isso, a
+    parcial não se destaca do ruído grave e a nota errada passa (emenda do ADR-029).
+    Só a nota que chega a menos de 50 ms do fim do arquivo fica sem opinião. `limiar`
+    é a razão `f0 / 2·f0` abaixo da qual a nota é suspeita; ver o módulo para a
+    calibração.
     """
     if not notes:
         return []
@@ -110,14 +116,19 @@ def verificar_oitavas(
             inicio = int(nota.onset_s * taxa)
             # A janela para no fim da nota: 0,6 s fixos invadiam a nota seguinte, e a
             # fundamental do vizinho fazia a nota errada passar por certa (ADR-029).
-            duracao = min(janela_s, max(0.0, nota.offset_s - nota.onset_s))
+            # Mas não antes de 0,3 s, ou a nota curta não tem resolução (emenda).
+            duracao = min(janela_s, max(_JANELA_MINIMA_S, nota.offset_s - nota.onset_s))
             quadros = min(int(duracao * taxa), max(0, total - inicio))
-            if quadros < taxa // 20:  # menos de 50 ms: não dá resolução, não opina
+            if quadros < taxa // 20:  # menos de 50 ms até o fim do arquivo: não opina
                 continue
 
             trecho = _trecho_mono(w, inicio, quadros)
-            espectro = np.abs(np.fft.rfft(trecho * np.hanning(len(trecho))))
-            frequencias = np.fft.rfftfreq(len(trecho), 1 / taxa)
+            # Completar com zeros não muda a resolução (quem decide é a duração da nota),
+            # só adensa os pontos: sem isso a faixa de meio-tom em volta de 41 Hz podia
+            # cair entre dois pontos, o pico saía 0 e a nota certa virava suspeita.
+            pontos = max(len(trecho), _PONTOS_DA_FFT_S * taxa)
+            espectro = np.abs(np.fft.rfft(trecho * np.hanning(len(trecho)), n=pontos))
+            frequencias = np.fft.rfftfreq(pontos, 1 / taxa)
             f0 = _frequencia(nota.pitch)
             fundamental = _pico_na_banda(espectro, frequencias, f0)
             segundo_harmonico = _pico_na_banda(espectro, frequencias, f0 * 2)

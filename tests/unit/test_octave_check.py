@@ -174,3 +174,23 @@ def test_a_sugestao_vem_com_a_razao_que_a_sustenta(b1_real: Path) -> None:
 
     assert aviso.suggested_pitch == B1
     assert aviso.suggested_ratio > aviso.fundamental_ratio
+
+
+def test_nota_certa_de_qualquer_duracao_nao_gera_aviso(tmp_path: Path) -> None:
+    """A faixa de meio-tom em volta de 41 Hz tem 2,4 Hz; a FFT de 0,3 s espaça 3,3 Hz.
+
+    Sem ponto da FFT dentro da faixa o pico saía 0, a razão saía 0 e a nota certa virava
+    suspeita — 70 a 86% dos alarmes em nota certa de *Fear* e *And Plague Flowers*
+    (segunda emenda do ADR-030). Varre durações para não depender de uma que calhe.
+    """
+    e1 = 440 * 2 ** ((28 - 69) / 12)
+    wav = _tom(tmp_path / "e1.wav", (e1, 2 * e1, 3 * e1, 4 * e1))
+    duracoes = [round(0.06 + 0.02 * i, 2) for i in range(28)]  # 0,06 a 0,60 s
+
+    avisadas = [
+        d for d in duracoes
+        if verificar_oitavas(wav, [NoteEvent(28, 0.2, 0.2 + d, "electric_bass")])
+    ]
+
+    assert avisadas == [], f"E1 limpo avisado nas durações {avisadas}"
+

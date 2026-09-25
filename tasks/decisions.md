@@ -1359,6 +1359,60 @@ nenhuma — nem CLI, nem API, nem página de estudo:
 - O custo de memória passa a ser uma janela, não a música: ~0,2 MB para 0,5 s. Medido
   no teste: pico abaixo de 2 MB onde antes eram 26,5 MB.
 
+### Emenda (2026-09-25) — a janela da nota quebrou a detecção
+
+A consequência "a calibração não foi refeita nota a nota" escondia o defeito. Refeita a
+conta da Fase 0 (mesmos arquivos, mesmo pareamento: 127 notas em que stem e mix
+concordam, 12 em que o stem diz B0 e a mix diz B1), no stem, com limiar 0,40:
+
+| Versão do módulo | pega (de 12) | alarme (de 127) |
+|---|---|---|
+| 0,6 s fixos (antes deste ADR) | 12 | 11 (8,7%) |
+| janela da nota (este ADR) | 2 | 41 (32,3%) |
+| janela da nota, FFT completada com zeros | 3 | 1 (0,8%) |
+| **duração com piso de 0,3 s (esta emenda)** | **8** | **4 (3,1%)** |
+
+Dois defeitos, um em cada linha:
+
+1. **Pico zero.** A FFT de um trecho de 0,3 s tem pontos a cada 3,3 Hz; a faixa de
+   meio-tom em volta de 41 Hz tem 2,4 Hz. A faixa podia cair entre dois pontos, o pico
+   saía 0, e a nota certa virava suspeita — 42 das 139 notas do Equus. Correção:
+   completar a FFT com zeros até 2 s (pontos a cada 0,5 Hz). Não muda a resolução, só
+   põe ponto dentro da faixa. Teste: `test_nota_certa_de_qualquer_duracao_nao_gera_aviso`,
+   que falhou em 6 das 28 durações.
+2. **Janela curta demais.** A consequência acima dizia que 0,2 s "dão 5 Hz de bin, que
+   ainda separam" — confundia espaçamento de ponto com resolução, e de todo jeito a
+   resolução não é o que falha. A nota errada típica do Equus dura 0,14 s, e a razão
+   dela **cai** quando a janela cresce (0,72 → 0,28 → 0,09 com 0,14 / 0,3 / 0,6 s): o
+   pico de uma parcial cresce com a duração, o ruído grave só com a raiz dela. Em 0,14 s
+   o 30,9 Hz que falta é coberto por ruído e a nota passa.
+
+**Decisão:** a janela é `min(0,6 s, max(0,3 s, duração da nota))`. Nota com 0,3 s ou
+mais continua parando no próprio fim — o caso do vizinho que motivou este ADR segue
+coberto pelo teste dele; a nota mais curta que isso é lida por 0,3 s, invadindo o
+vizinho. As alternativas, todas com a FFT completada, medidas no Equus e nas três tabs
+do ADR-042 (pega/alarme):
+
+| Janela | Equus | *And Plague Flowers* | *Fear*: alarme | *Dance*: alarme |
+|---|---|---|---|---|
+| piso 0,25 s | 5/12 · 1,6% | 21/66 · 10,3% | 26,3% | 7,3% |
+| **piso 0,3 s** | **8/12 · 3,1%** | **25/66 · 10,9%** | 27,4% | 8,1% |
+| piso 0,4 s | 7/12 · 3,9% | 24/66 · 12,1% | 26,4% | 10,2% |
+| até a próxima nota de outra altura, piso 0,3 s | 8/12 · 3,1% | 22/66 · 10,5% | 28,5% | 5,3% |
+| 0,6 s fixos | 12/12 · 7,1% | 25/66 · 15,9% | 29,3% | 4,1% |
+
+Os 0,6 s fixos pegam tudo no Equus, mas em *And Plague Flowers* alarmam 50% mais para
+a mesma detecção. Estender até a próxima nota de outra altura não ganha nada que
+pague a regra a mais.
+
+- A calibração agora é teste: `tests/integration/test_oitava_equus.py` (`slow`) refaz o
+  pareamento da Fase 0 e trava 8/12 e 4/127, sem folga. Os arquivos ficam em
+  `~/thoth-fase0`, fora do repositório; sem eles, o teste pula. Foi a falta disto que
+  deixou a detecção cair de 12 para 2 sem ninguém ver.
+- A suíte padrão não tem teste que distinga o piso. Tom sintético limpo é resolvido
+  mesmo em 0,06 s, e tom com ronco grave aleatório separa pouco (26 contra 32 avisos em
+  40 sementes, 0,12 s contra 0,3 s). Quem prova o piso é o teste do Equus.
+
 ## ADR-030 — a oitava acima é ranqueada, não afirmada (B8)
 
 **Data:** 2026-09-23 · **Status:** aceito
@@ -1442,6 +1496,41 @@ contra 8,7%.
 lista curta fora do Equus**: marca um terço das notas, e 95% do que marca está certo
 segundo a tab. Vale como diagnóstico da nota isolada, não como triagem. Um
 discriminador que separe é pesquisa, aberta no todo.
+
+### Emenda (2026-09-25, tarde) — remedido com o módulo corrigido
+
+A emenda acima mediu um módulo quebrado: a janela do ADR-029 com o defeito do pico zero
+(ver a emenda do ADR-029). Nela, 70% dos alarmes em nota concordante de *Fear* e 86%
+dos de *And Plague Flowers* eram pico zero, não medição. Remedido com o módulo corrigido
+(FFT completada, janela com piso de 0,3 s), limiar 0,40. A rotulagem foi refeita (tab a
+±0,1 s, janelas conclusivas, "abaixo" e "acima" só quando toda nota da tab com a mesma
+classe de altura está do mesmo lado), por isso as contagens diferem um pouco da tabela
+acima:
+
+| Música | concordam | alarme | pega "abaixo" | pega "acima" | AUC "abaixo" |
+|---|---|---|---|---|---|
+| *Fear Is the Key* | 731 | 27,4% (antes 37,9%) | 11 de 18 | 4 de 19 | 0,75 |
+| *And Plague Flowers* | 2224 | 10,9% (antes 27,6%) | 25 de 66 | 1 de 78 | 0,75 |
+| *Dance of Death* | 246 | 8,1% (antes 10,6%) | sem caso | sem caso | — |
+| Equus (calibração) | 127 | 3,1% | 8 de 12 | — | — |
+
+- **"Nenhum limiar separa" não se sustenta.** A separação é fraca, mas existe (AUC 0,75
+  nas duas músicas com caso). O limiar troca alarme por detecção: em *And Plague
+  Flowers*, 0,3 alarma 7% e pega 17 de 66; 0,4 alarma 11% e pega 25; 0,5 alarma 19% e
+  pega 34.
+- **Em *Fear* o registro grave explica mais da metade**: 113 dos 200 alarmes estão em
+  `pitch <= 28`, onde a fundamental irradia pouco (o que a calibração original já
+  previa).
+- **A sugestão acerta**: sai `pitch + 12` em 9 dos 11 "abaixo" pegos em *Fear* e em 25
+  dos 25 em *And Plague Flowers*.
+- **O erro para cima continua invisível**: 5 de 97.
+- **O que se marca continua sendo quase tudo nota certa**: 15 de 215 avisos em *Fear* e
+  26 de 268 em *And Plague Flowers* são erro segundo a tab, porque o erro de oitava é
+  raro (2 a 3% das notas).
+
+**Decisão:** limiar em 0,40, travado no Equus pelo teste da emenda do ADR-029. O aviso
+continua diagnóstico da nota, não triagem: a lista caiu para um décimo das notas em
+*And Plague Flowers*, mas nove em cada dez avisos ainda são nota certa.
 
 ## ADR-031 — a grafia do acidente segue o tom, com margem (B9)
 
