@@ -27,6 +27,7 @@ from thoth.domain.models import Transcricao
 from thoth.services.evaluation import (
     avaliar_bateria,
     avaliar_polifonico,
+    confusao_bateria,
     revocacao_por_acorde,
 )
 
@@ -118,6 +119,11 @@ def test_mede_perfil(perfil: str, condicao: str, tmp_path: Path) -> None:
             f"micro P {b.micro.precisao:.3f} R {b.micro.revocacao:.3f} F1 {b.micro.f1:.3f} "
             f"macro {b.macro_f1:.3f} ref={b.n_ref} est={b.n_est} peças[{pecas}]"
         )
+        confusao = confusao_bateria(ref.ataques, do_perfil.ataques)
+        resultado += " confusão[" + " ".join(
+            f"{r if r is not None else '-'}→{e if e is not None else '-'}:{n}"
+            for (r, e), n in sorted(confusao.items(), key=lambda x: (x[0][0] or 0, x[0][1] or 0))
+        ) + "]"
     else:
         s = avaliar_polifonico(ref.notas, do_perfil.notas)
         f1 = s.nota.f1

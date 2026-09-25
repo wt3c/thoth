@@ -3283,3 +3283,54 @@ Camada 3, como já dizia o veredito. Se aparecer lá, o sinal esperado é `acord
 e revocação baixa nos acordes grandes, que agora têm onde ser lidos.
 
 Piso novo: `MEDIDO_SEIS_NOTAS`, com uma nota de folga no stem, como a `FOLGA_DEMUCS`.
+
+### Emenda (2026-09-25) — bateria peça a peça: os tons trocam de número e os pedaços de 5 s perdem ataques
+
+Item 1 do M2. `confusao_bateria` (em `services/evaluation.py`) primeiro casa a peça
+certa e depois pareia o que sobra por instante, sem olhar a peça. O
+`test_multi_instrumento.py` imprime a matriz resultante. Números da mesma rodada do
+veredito (a isolada e o stem dão o mesmo resultado):
+
+| referência → estimada | isolada / stem | mix direta |
+|---|---|---|
+| bumbo 36 | 3 certos, 5 perdidos | 6 certos, 2 perdidos |
+| caixa 38 | 3 certos, 4 perdidos | 7 certos |
+| chimbal 42 | 11 certos, 17 perdidos | 25 certos, 3 perdidos |
+| prato 49 | 1 certo, 1 perdido | 1 certo, 1 perdido |
+| tom 50 | → 45 | → 36 (e um 48 a mais) |
+| tom 48 | → 45 | → 47 |
+| tom 45 | perdido | perdido |
+
+**Os tons não somem: saem com o número de outro tom.** Nos três ataques que a
+fixture tem, o instante está certo e a peça, errada. O código de inferência do
+MuScriptor não reduz as peças a menos classes; se o modelo junta os tons, isso vem
+do treino e não dá para verificar daqui. Três ataques não bastam para medir os tons;
+é preciso uma fixture própria.
+
+**A revocação baixa é da borda dos pedaços, não da falta de contexto.** O MuScriptor
+corta o áudio em pedaços de 5 s (`_SEGMENT_DURATION`), e cada pedaço gera sua
+sequência de eventos. Diagnóstico, fora do repositório, com a mesma fixture e o mesmo
+motor:
+
+- isolada: nenhum ataque em 0–5 s; em 5–10 s, quase todos; em 10 s, nada;
+- a mesma isolada com **2,5 s de silêncio na frente**: 46 de 48 ataques devolvidos,
+  contra 20. Só a posição do áudio em relação aos pedaços mudou;
+- mix direta: o pedaço 0–5 s funciona, mas os ataques exatamente em 0 s, 5 s e 10 s
+  se perdem.
+
+O que se repete é **o ataque exatamente no início de um pedaço**: ele se perde e, na
+bateria isolada, às vezes leva o pedaço inteiro junto. Toda fixture do projeto
+começa com um ataque em 0,0 s, e o baixo tem notas em 5 s ou 10 s em quatro das seis
+fixtures. A nota simples que a guitarra perde nas nove medições é compatível com isso
+(a primeira nota é um mi em 0,0 s), mas não foi confirmada. Em música real, o áudio
+raramente começa num ataque, mas as bordas em 5 s, 10 s, … caem em qualquer lugar.
+
+Com isso, o que o veredito da bateria pede para investigar é:
+
+1. **Borda dos pedaços:** medir o efeito e decidir uma correção. A correção mexe na
+   entrada do transcritor e, portanto, no caminho do baixo; exige uma decisão
+   própria, com os pisos do baixo medidos de novo.
+2. **Os tons:** uma fixture só de tons, para medir se o erro é sistemático.
+
+A chimbal perdida junto do prato (5,333 s nas duas condições) é outro efeito,
+pequeno: um ataque por prato.

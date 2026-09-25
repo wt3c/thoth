@@ -17,6 +17,7 @@ Duas métricas, porque uma só engana:
 
 from __future__ import annotations
 
+from collections import Counter
 from collections.abc import Sequence
 from dataclasses import dataclass
 from pathlib import Path
@@ -250,3 +251,41 @@ def avaliar_bateria(
     macro = round(float(np.mean([s.f1 for s in por_peca.values()])), 3)
     return ScoresBateria(_prf(acertos_total, len(referencia), len(estimativa)), macro,
                          por_peca, len(referencia), len(estimativa))
+
+
+def confusao_bateria(
+    referencia: Sequence[EventoPercussivo],
+    estimativa: Sequence[EventoPercussivo],
+    *,
+    tolerancia_s: float = TOLERANCIA_S,
+) -> dict[tuple[int | None, int | None], int]:
+    """`{(peça da referência, peça estimada): ataques}`; `None` é perdida ou a mais.
+
+    Primeiro casa a peça certa, com o mesmo casamento do `avaliar_bateria`; só o que
+    sobra é pareado por instante, cego para a peça. Assim, num bumbo com chimbal em
+    que o bumbo virou caixa, o chimbal continua acerto e só o bumbo é troca.
+    """
+
+    def casar(ref: list[int], est: list[int]) -> list[tuple[int, int]]:
+        if not ref or not est:
+            return []
+        instantes_ref = np.array([referencia[i].instante_s for i in ref])
+        instantes_est = np.array([estimativa[j].instante_s for j in est])
+        return [(ref[a], est[b]) for a, b in match_events(instantes_ref, instantes_est,
+                                                             tolerancia_s)]
+
+    pares: list[tuple[int, int]] = []
+    for peca in {a.peca_gm for a in referencia} & {a.peca_gm for a in estimativa}:
+        pares += casar([i for i, a in enumerate(referencia) if a.peca_gm == peca],
+                       [j for j, a in enumerate(estimativa) if a.peca_gm == peca])
+    usados_ref, usados_est = {i for i, _ in pares}, {j for _, j in pares}
+    pares += casar([i for i in range(len(referencia)) if i not in usados_ref],
+                   [j for j in range(len(estimativa)) if j not in usados_est])
+    usados_ref, usados_est = {i for i, _ in pares}, {j for _, j in pares}
+
+    contagem: Counter[tuple[int | None, int | None]] = Counter(
+        (referencia[i].peca_gm, estimativa[j].peca_gm) for i, j in pares
+    )
+    contagem.update((a.peca_gm, None) for i, a in enumerate(referencia) if i not in usados_ref)
+    contagem.update((None, a.peca_gm) for j, a in enumerate(estimativa) if j not in usados_est)
+    return dict(contagem)

@@ -17,6 +17,7 @@ from thoth.services.evaluation import (
     avaliar,
     avaliar_bateria,
     avaliar_polifonico,
+    confusao_bateria,
     notas_do_midi,
     revocacao_por_acorde,
 )
@@ -237,3 +238,40 @@ def test_macro_ignora_peca_ausente_da_referencia_mas_micro_a_cobra() -> None:
     assert 49 not in s.por_peca
     assert s.macro_f1 == 1.0
     assert s.micro.precisao == round(8 / 9, 3)
+
+
+# --- Matriz de confusão da bateria (M2) ---------------------------------------------
+
+
+def test_confusao_identica_so_tem_a_diagonal() -> None:
+    assert confusao_bateria(GROOVE, list(GROOVE)) == {(36, 36): 2, (38, 38): 2, (42, 42): 4}
+
+
+def test_confusao_mostra_para_onde_foi_a_peca_trocada() -> None:
+    """Tom lido como caixa no mesmo instante: troca, não perda mais falso positivo."""
+    ref = [EventoPercussivo(0.0, 48), EventoPercussivo(0.5, 38)]
+    est = [EventoPercussivo(0.01, 38), EventoPercussivo(0.5, 38)]
+
+    assert confusao_bateria(ref, est) == {(48, 38): 1, (38, 38): 1}
+
+
+def test_confusao_separa_perdida_de_ataque_a_mais() -> None:
+    ref = [EventoPercussivo(0.0, 36), EventoPercussivo(1.0, 45)]
+    est = [EventoPercussivo(0.0, 36), EventoPercussivo(2.0, 49)]
+
+    assert confusao_bateria(ref, est) == {(36, 36): 1, (45, None): 1, (None, 49): 1}
+
+
+def test_confusao_em_ataque_simultaneo_casa_a_peca_certa_antes_de_parear_a_troca() -> None:
+    """Bumbo e chimbal juntos, com o bumbo lido como caixa: o chimbal não é troca."""
+    ref = [EventoPercussivo(0.0, 36), EventoPercussivo(0.0, 42)]
+    est = [EventoPercussivo(0.0, 42), EventoPercussivo(0.0, 38)]
+
+    assert confusao_bateria(ref, est) == {(42, 42): 1, (36, 38): 1}
+
+
+def test_confusao_nao_pareia_troca_alem_da_tolerancia() -> None:
+    ref = [EventoPercussivo(0.0, 48)]
+    est = [EventoPercussivo(0.06, 38)]
+
+    assert confusao_bateria(ref, est) == {(48, None): 1, (None, 38): 1}

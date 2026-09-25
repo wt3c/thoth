@@ -368,10 +368,12 @@ Pré-requisito invisível até agora: a Fase 5 só existe se houver o que o
 
 #### M2 — bateria primeiro
 
-- [ ] Medir bumbo, caixa, chimbal, tons e prato, incluindo ataques simultâneos;
+- [x] Medir bumbo, caixa, chimbal, tons e prato, incluindo ataques simultâneos;
       pronto quando o teste `slow` contra o MuScriptor e o Demucs reais publicar F1
       micro/macro por peça e matriz de confusão GM, ou encerrar bateria com veredito
       negativo documentado.
+      → `confusao_bateria`; tons trocam de número; revocação perdida na borda dos
+      pedaços de 5 s do MuScriptor (emenda do ADR-044 de 2026-09-25).
 - [ ] Implementar quantização de ataques sem inventar sustain; pronto quando dois hits
       no mesmo tique virarem um acorde percussivo e peças diferentes não forem
       descartadas pela `monofonizar` do baixo.
