@@ -72,6 +72,13 @@ original num canal, transcrição no outro, para ouvir se o ritmo descola. Opç�
 `--afinacao` (`4`, `5`, `6`, `drop-d`), `--digitacao` (`iniciante`, `experiente`), `--bpm` e
 `--tom`; `uv run thoth transcribe --help` lista todas.
 
+`--instrumento` (`guitarra-limpa`, `guitarra-distorcida`, `guitarra-acustica`) transcreve
+uma guitarra, com acordes, a partir do stem `other` (ADR-044). Os arquivos levam o perfil no
+nome — `<título>.guitarra-limpa.gp5`, `.musicxml`, `.aural.wav` — e o stem e o playback saem
+como `.outros.wav` e `.sem-outros.wav`: nada do baixo é sobrescrito. A afinação vem do
+perfil, e `--afinacao` só vale para o baixo. O relatório separa as notas de outra guitarra, as
+de outra família que vazaram para o stem e os acordes que não cabem no braço.
+
 Leva cerca de 2,5× a duração do áudio em CPU. Sem `--bpm`, o andamento é estimado do mix
 e **anunciado** — confira ouvindo (ADR-019). O `auralizar` precisa das notas já em cache,
 então só roda depois de um `transcribe`; o `comparar` também. O `comparar` diz a

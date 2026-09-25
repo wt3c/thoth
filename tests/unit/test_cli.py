@@ -448,3 +448,98 @@ def test_transcribe_avisa_quando_a_auralizacao_falha(tmp_path: Path, monkeypatch
     assert resultado.exit_code == 0, resultado.output
     assert "auralização" in resultado.output
     assert "soundfont" in resultado.output
+
+
+def test_instrumento_chega_ao_pipeline_com_o_atribuidor_de_acordes(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """A guitarra leva a afinação do perfil: a CLI não manda a do baixo por padrão."""
+    from thoth.services.acordes import ViterbiAcordes
+
+    recebido: dict[str, object] = {}
+
+    def espiao(ref: str, out: Path, **kw: object):
+        recebido.update(kw)
+        raise typer.Exit(code=0)
+
+    monkeypatch.setattr(pipeline, "transcrever", espiao)
+
+    runner.invoke(
+        app,
+        ["transcribe", "x.mp3", "--instrumento", "guitarra-limpa", "--digitacao", "experiente"],
+    )
+
+    assert recebido["instrumento"] == "guitarra-limpa"
+    assert recebido["tuning"] is None
+    assert isinstance(recebido["atribuidor_de_acordes"], ViterbiAcordes)
+    assert recebido["atribuidor_de_acordes"].custos is PADRAO
+
+
+def test_sem_instrumento_o_baixo_segue_com_a_afinacao_de_sempre(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from thoth.domain.models import TUNING_BASS_4
+
+    recebido: dict[str, object] = {}
+
+    def espiao(ref: str, out: Path, **kw: object):
+        recebido.update(kw)
+        raise typer.Exit(code=0)
+
+    monkeypatch.setattr(pipeline, "transcrever", espiao)
+
+    runner.invoke(app, ["transcribe", "x.mp3"])
+
+    assert recebido["instrumento"] == "baixo"
+    assert recebido["tuning"] == TUNING_BASS_4
+
+
+@pytest.mark.parametrize(
+    ("argumentos", "citado"),
+    [
+        (["--instrumento", "bateria"], "guitarra-limpa"),
+        (["--instrumento", "guitarra-limpa", "--afinacao", "5"], "--afinacao"),
+    ],
+)
+def test_instrumento_sem_partitura_ou_afinacao_de_baixo_na_guitarra_sao_recusados(
+    argumentos: list[str], citado: str
+) -> None:
+    resultado = runner.invoke(app, ["transcribe", "x.mp3", *argumentos])
+
+    assert resultado.exit_code == 2
+    assert citado in resultado.output
+
+
+def test_a_guitarra_relata_rotulo_contaminacao_e_acorde_impossivel(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Três causas, três linhas: somadas, não se saberia se o erro é do modelo ou do stem."""
+    from thoth.domain.models import AcordeImpossivel, NoteEvent
+    from thoth.services.pipeline import Resultado
+
+    asset = AudioAsset(wav=tmp_path / "mix.wav", source_id="abc", title="t", duration_s=1.0)
+    notas = (NoteEvent(40, 61.0, 61.5, "g"), NoteEvent(41, 61.0, 61.5, "g"))
+    monkeypatch.setattr(
+        pipeline, "transcrever",
+        lambda *a, **k: Resultado(
+            asset=asset, stem=tmp_path / "other.wav", artefatos={}, notas=7,
+            rotulos={}, descartadas=[], fora_do_braco=[], bpm=90, avisos_de_oitava=[],
+            instrumento="guitarra-limpa",
+            erro_de_rotulo={"distorted_electric_guitar": 3},
+            contaminacao={"acoustic_piano": 5},
+            acordes_impossiveis=[AcordeImpossivel(notas, "2 notas na mesma corda")],
+        ),
+    )
+
+    resultado = runner.invoke(
+        app, ["transcribe", "x.mp3", "--bpm", "90", "--instrumento", "guitarra-limpa"]
+    )
+
+    assert resultado.exit_code == 0, resultado.output
+    assert "7 notas de guitarra-limpa" in resultado.output
+    assert "erro de rótulo" in resultado.output
+    assert "3 distorted_electric_guitar" in resultado.output
+    assert "contaminação do stem" in resultado.output
+    assert "5 acoustic_piano" in resultado.output
+    assert "1 acorde(s) impossível(is)" in resultado.output
+    assert "1:01 40 41: 2 notas na mesma corda" in resultado.output

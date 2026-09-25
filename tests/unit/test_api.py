@@ -15,7 +15,14 @@ from fastapi.testclient import TestClient
 
 from tests.sintetico import SOUNDFONT, renderizar
 from thoth.api.app import LIMITE_DE_JOBS, Job, Pedido, criar_app, descartar_antigos
-from thoth.domain.models import TUNING_BASS_DROP_D, AudioAsset, NoteEvent
+from thoth.domain.models import (
+    TUNING_BASS_4,
+    TUNING_BASS_DROP_D,
+    AcordeImpossivel,
+    AudioAsset,
+    NoteEvent,
+)
+from thoth.services.acordes import ViterbiAcordes
 from thoth.services.fretboard import PADRAO
 from thoth.services.octave_check import OctaveWarning
 from thoth.services.pipeline import Resultado
@@ -111,6 +118,83 @@ def test_afinacao_desconhecida_e_recusada_na_entrada(tmp_path: Path) -> None:
     resposta = _cliente(tmp_path).post("/jobs", json={"ref": "x.mp3", "afinacao": "7"})
 
     assert resposta.status_code == 422
+
+
+def test_instrumento_de_guitarra_chega_ao_pipeline_com_a_afinacao_do_perfil(
+    tmp_path: Path,
+) -> None:
+    """`tuning=None`: a afinação da guitarra vem do perfil, não da lista do baixo."""
+    recebido: dict[str, object] = {}
+
+    def espiao(ref: str, out_dir: Path, **kw: object) -> Resultado:
+        recebido.update(kw)
+        return _resultado_falso(out_dir)
+
+    resposta = _cliente(tmp_path, espiao).post(
+        "/jobs", json={"ref": "x.mp3", "instrumento": "guitarra-limpa"}
+    )
+
+    assert resposta.status_code == 202, resposta.text
+    assert recebido["instrumento"] == "guitarra-limpa"
+    assert recebido["tuning"] is None
+    assert isinstance(recebido["atribuidor_de_acordes"], ViterbiAcordes)
+
+
+def test_sem_instrumento_o_pedido_e_de_baixo_na_afinacao_padrao(tmp_path: Path) -> None:
+    recebido: dict[str, object] = {}
+
+    def espiao(ref: str, out_dir: Path, **kw: object) -> Resultado:
+        recebido.update(kw)
+        return _resultado_falso(out_dir)
+
+    _cliente(tmp_path, espiao).post("/jobs", json={"ref": "x.mp3"})
+
+    assert recebido["instrumento"] == "baixo"
+    assert recebido["tuning"] == TUNING_BASS_4
+
+
+@pytest.mark.parametrize(
+    "corpo",
+    [
+        {"instrumento": "bateria"},
+        {"instrumento": "violino"},
+        {"instrumento": "guitarra-limpa", "afinacao": "drop-d"},
+    ],
+)
+def test_instrumento_sem_exportador_ou_afinacao_de_baixo_na_guitarra_sao_recusados(
+    tmp_path: Path, corpo: dict[str, str]
+) -> None:
+    resposta = _cliente(tmp_path).post("/jobs", json={"ref": "x.mp3", **corpo})
+
+    assert resposta.status_code == 422, resposta.text
+
+
+def test_job_de_guitarra_relata_as_tres_causas_de_nota_fora(tmp_path: Path) -> None:
+    acorde = (
+        NoteEvent(40, 12.0, 12.4, "clean_electric_guitar"),
+        NoteEvent(41, 12.06, 12.4, "clean_electric_guitar"),
+    )
+    impossivel = AcordeImpossivel(acorde, "duas notas só cabem na mesma corda")
+    cliente = _cliente(
+        tmp_path,
+        lambda ref, out_dir, **kw: replace(
+            _resultado_falso(out_dir),
+            instrumento="guitarra-limpa",
+            erro_de_rotulo={"acoustic_guitar": 3},
+            contaminacao={"acoustic_piano": 2},
+            acordes_impossiveis=[impossivel],
+        ),
+    )
+
+    criado = cliente.post("/jobs", json={"ref": "x.mp3", "instrumento": "guitarra-limpa"})
+    job = cliente.get(f"/jobs/{criado.json()['id']}").json()
+
+    assert job["instrumento"] == "guitarra-limpa"
+    assert job["erro_de_rotulo"] == {"acoustic_guitar": 3}
+    assert job["contaminacao"] == {"acoustic_piano": 2}
+    assert job["acordes_impossiveis"] == [
+        {"onset_s": 12.0, "alturas": [40, 41], "motivo": "duas notas só cabem na mesma corda"}
+    ]
 
 
 def test_artefato_volta_com_os_bytes_do_arquivo(tmp_path: Path) -> None:

@@ -15,8 +15,9 @@ from rich.text import Text
 from thoth.adapters.ingest import resolver_fonte
 from thoth.adapters.separation import localizar_stems
 from thoth.api.app import criar_app
-from thoth.domain.models import AFINACOES
+from thoth.domain.models import AFINACOES, AcordeImpossivel
 from thoth.services import pipeline
+from thoth.services.acordes import ViterbiAcordes
 from thoth.services.alinhamento_audio import alinhar_ao_stem
 from thoth.services.auralizacao import auralizar as _auralizar
 from thoth.services.cache_notas import ler
@@ -221,8 +222,11 @@ def transcribe(
     tom: str = typer.Option(
         "", help="Tom, p.ex. 'Bb maior' ou 'f menor'. Vazio: estimado das notas (ADR-031)."
     ),
-    afinacao: str = typer.Option(
-        "4", help=f"Afinação, por nome: {', '.join(AFINACOES)}."
+    instrumento: str = typer.Option(
+        "baixo", help=f"Parte a transcrever: {', '.join(pipeline.INSTRUMENTOS)} (ADR-044)."
+    ),
+    afinacao: str | None = typer.Option(
+        None, help=f"Afinação do baixo, por nome: {', '.join(AFINACOES)}. Padrão: 4."
     ),
     digitacao: str = typer.Option(
         "iniciante", help=f"Perfil de digitação: {', '.join(DIGITACOES)} (ADR-006)."
@@ -238,7 +242,14 @@ def transcribe(
         except ValueError as erro:
             raise typer.BadParameter(str(erro), param_hint="--tom") from erro
 
-    cordas = _escolher(AFINACOES, afinacao, "--afinacao")
+    _escolher(pipeline.INSTRUMENTOS, instrumento, "--instrumento")
+    # As afinações do catálogo são de baixo; a guitarra usa a do perfil (ADR-044).
+    if instrumento != "baixo" and afinacao is not None:
+        raise typer.BadParameter(
+            f"só vale para o baixo; {instrumento} usa a afinação padrão",
+            param_hint="--afinacao",
+        )
+    cordas = _escolher(AFINACOES, afinacao or "4", "--afinacao") if instrumento == "baixo" else None
     custos = _escolher(DIGITACOES, digitacao, "--digitacao")
     # O tempo por estágio é o que faltava: a separação e a transcrição levam
     # minutos cada, e uma frase solta antes da chamada não dizia em qual delas se
@@ -255,8 +266,10 @@ def transcribe(
             out,
             bpm=bpm,
             tuning=cordas,
+            instrumento=instrumento,
             cache_dir=cache,
             assigner=ViterbiFretAssigner(custos=custos),
+            atribuidor_de_acordes=ViterbiAcordes(custos=custos),
             progresso=etapas,
         )
         etapas.encerrar()
@@ -279,7 +292,17 @@ def transcribe(
 
     if r.tonalidade:
         _diz(_tom(r.tonalidade))
-    _diz(f"{r.notas} notas de baixo em {r.rotulos}", "bold")
+    _diz(f"{r.notas} notas de {r.instrumento} em {r.rotulos}", "bold")
+    # Três causas, três linhas: somadas, não se saberia se o erro é do modelo, que
+    # trocou uma guitarra pela outra, ou do stem, que trouxe outro instrumento.
+    if r.erro_de_rotulo:
+        _diz(f"fora da parte por erro de rótulo: {_contagem(r.erro_de_rotulo)}", "yellow")
+    if r.contaminacao:
+        _diz(f"fora da parte por contaminação do stem: {_contagem(r.contaminacao)}", "yellow")
+    if r.acordes_impossiveis:
+        _diz(f"{len(r.acordes_impossiveis)} acorde(s) impossível(is):", "yellow")
+        for acorde in r.acordes_impossiveis:
+            _diz(f"  {_acorde_impossivel(acorde)}", "yellow")
     if r.descartadas:
         _diz(f"{len(r.descartadas)} descartada(s): simultâneas ou fora do braço", "yellow")
     for trecho in r.trechos_sem_baixo:
@@ -323,6 +346,17 @@ def _grafia(tonalidade: Tonalidade) -> str:
 def _minutos(segundos: float) -> str:
     minutos, resto = divmod(int(segundos), 60)
     return f"{minutos}:{resto:02d}"
+
+
+def _contagem(rotulos: Mapping[str, int]) -> str:
+    return ", ".join(f"{n} {r}" for r, n in sorted(rotulos.items()))
+
+
+def _acorde_impossivel(acorde: AcordeImpossivel) -> str:
+    """Onde ouvir e o que o modelo ouviu; o motivo diz por que não cabe."""
+    inicio = min(n.onset_s for n in acorde.notas)
+    alturas = " ".join(str(n.pitch) for n in sorted(acorde.notas, key=lambda n: n.pitch))
+    return f"{_minutos(inicio)} {alturas}: {acorde.motivo}"
 
 
 def _aviso_sem_baixo(trecho: TrechoSemBaixo) -> str:

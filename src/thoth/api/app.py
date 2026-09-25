@@ -26,11 +26,12 @@ from typing import Any, Protocol
 from fastapi import BackgroundTasks, FastAPI, HTTPException
 from fastapi.responses import FileResponse, PlainTextResponse
 from fastapi.staticfiles import StaticFiles
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, Field, field_validator, model_validator
 
-from thoth.domain.models import AFINACOES
-from thoth.domain.ports import FretAssigner
+from thoth.domain.models import AFINACOES, AcordeImpossivel
+from thoth.domain.ports import AtribuidorDeAcordes, FretAssigner
 from thoth.services import pipeline
+from thoth.services.acordes import ViterbiAcordes
 from thoth.services.fretboard import DIGITACOES, ViterbiFretAssigner
 from thoth.services.octave_check import OctaveWarning
 from thoth.services.pipeline import Resultado
@@ -55,10 +56,12 @@ class Executor(Protocol):
         out_dir: Path,
         *,
         bpm: int | None,
-        tuning: tuple[int, ...],
+        tuning: tuple[int, ...] | None,
         cache_dir: Path,
         tom: str | None,
         assigner: FretAssigner,
+        instrumento: str,
+        atribuidor_de_acordes: AtribuidorDeAcordes,
     ) -> Resultado: ...
 
 
@@ -67,6 +70,9 @@ class Pedido(BaseModel):
 
     Afinação e digitação vêm por **nome**, não por contagem de cordas: drop D tem
     quatro, como a padrão, e nenhuma corda afinada igual (ADR-028).
+
+    `instrumento` escolhe o perfil (ADR-044). A afinação da guitarra vem do perfil:
+    `afinacao` só vale para o baixo, e vazia nele é a de quatro cordas.
     """
 
     ref: str = Field(..., description="Caminho do áudio ou URL do YouTube.")
@@ -74,7 +80,12 @@ class Pedido(BaseModel):
     tom: str | None = Field(
         None, description="Tom, p.ex. 'Bb maior'. Vazio: estimado das notas (ADR-031)."
     )
-    afinacao: str = Field("4", description=f"Uma de: {', '.join(AFINACOES)}.")
+    instrumento: str = Field(
+        "baixo", description=f"Uma de: {', '.join(pipeline.INSTRUMENTOS)}."
+    )
+    afinacao: str | None = Field(
+        None, description=f"Só para o baixo; uma de: {', '.join(AFINACOES)}. Vazia: '4'."
+    )
     digitacao: str = Field("iniciante", description=f"Uma de: {', '.join(DIGITACOES)}.")
 
     @field_validator("tom")
@@ -84,12 +95,27 @@ class Pedido(BaseModel):
             tom_de_texto(valor)  # levanta ValueError, que o Pydantic vira 422
         return valor
 
+    @field_validator("instrumento")
+    @classmethod
+    def _instrumento_conhecido(cls, valor: str) -> str:
+        if valor not in pipeline.INSTRUMENTOS:
+            raise ValueError(f"{valor!r} não existe; há {', '.join(pipeline.INSTRUMENTOS)}")
+        return valor
+
     @field_validator("afinacao")
     @classmethod
-    def _afinacao_conhecida(cls, valor: str) -> str:
-        if valor not in AFINACOES:
+    def _afinacao_conhecida(cls, valor: str | None) -> str | None:
+        if valor is not None and valor not in AFINACOES:
             raise ValueError(f"{valor!r} não existe; há {', '.join(AFINACOES)}")
         return valor
+
+    @model_validator(mode="after")
+    def _afinacao_so_no_baixo(self) -> Pedido:
+        if self.afinacao is not None and self.instrumento != "baixo":
+            raise ValueError(
+                f"afinacao só vale para o baixo; {self.instrumento} usa a do perfil"
+            )
+        return self
 
     @field_validator("digitacao")
     @classmethod
@@ -97,6 +123,13 @@ class Pedido(BaseModel):
         if valor not in DIGITACOES:
             raise ValueError(f"{valor!r} não existe; há {', '.join(DIGITACOES)}")
         return valor
+
+
+def _afinacao(pedido: Pedido) -> tuple[int, ...] | None:
+    """Guitarra: `None`, e o pipeline usa a do perfil."""
+    if pedido.instrumento != "baixo":
+        return None
+    return AFINACOES[pedido.afinacao or "4"]
 
 
 @dataclass(slots=True)
@@ -157,18 +190,32 @@ def _tom(tonalidade: Tonalidade | None) -> dict[str, Any] | None:
     }
 
 
+def _acorde_impossivel(acorde: AcordeImpossivel) -> dict[str, Any]:
+    return {
+        "onset_s": round(min(n.onset_s for n in acorde.notas), 2),
+        "alturas": sorted(n.pitch for n in acorde.notas),
+        "motivo": acorde.motivo,
+    }
+
+
 def _resumo(job: Job) -> dict[str, Any]:
     r = job.resultado
     return {
         "id": job.id,
         "status": job.status,
         "ref": job.pedido.ref,
+        "instrumento": job.pedido.instrumento,
         "bpm": r.bpm if r else job.pedido.bpm,
         "erro": job.erro,
         "titulo": r.asset.title if r else None,
         "notas": r.notas if r else None,
         "rotulos": r.rotulos if r else None,
         "descartadas": len(r.descartadas) if r else None,
+        "erro_de_rotulo": r.erro_de_rotulo if r else None,
+        "contaminacao": r.contaminacao if r else None,
+        "acordes_impossiveis": [_acorde_impossivel(a) for a in r.acordes_impossiveis]
+        if r
+        else None,
         "fora_do_braco": len(r.fora_do_braco) if r else None,
         "trechos_sem_baixo": [asdict(t) for t in r.trechos_sem_baixo] if r else None,
         "avisos_de_oitava": [_oitava(a) for a in r.avisos_de_oitava] if r else None,
@@ -198,21 +245,24 @@ def criar_app(
     web_dir: Path = WEB_PADRAO,
 ) -> FastAPI:
     estado = _Estado(out_dir, cache_dir, executar or pipeline.transcrever)
-    app = FastAPI(title="Thoth", summary="Áudio → tablatura de contrabaixo.")
+    app = FastAPI(title="Thoth", summary="Áudio → tablatura de contrabaixo e guitarra.")
 
     def _rodar(job: Job) -> None:
         # Um por vez (ADR-027): esperar na fila é o que o pedido seguinte faz aqui.
         with estado.trava:
             job.status = "rodando"
+            custos = DIGITACOES[job.pedido.digitacao]
             try:
                 job.resultado = estado.executar(
                     job.pedido.ref,
                     estado.out_dir,
                     bpm=job.pedido.bpm,
-                    tuning=AFINACOES[job.pedido.afinacao],
+                    tuning=_afinacao(job.pedido),
                     cache_dir=estado.cache_dir,
                     tom=job.pedido.tom,
-                    assigner=ViterbiFretAssigner(custos=DIGITACOES[job.pedido.digitacao]),
+                    assigner=ViterbiFretAssigner(custos=custos),
+                    instrumento=job.pedido.instrumento,
+                    atribuidor_de_acordes=ViterbiAcordes(custos=custos),
                 )
                 job.status = "pronto"
             except Exception as erro:  # vira estado do job, não 500 do servidor

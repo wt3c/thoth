@@ -38,10 +38,10 @@ class AuralizacaoError(RuntimeError):
     """Falta uma ferramenta externa ou ela falhou."""
 
 
-def _midi(notas: list[NoteEvent], destino: Path) -> Path:
+def _midi(notas: list[NoteEvent], destino: Path, programa: int = BAIXO_GM) -> Path:
     """As notas já estão em tempo absoluto, então o andamento do MIDI é irrelevante."""
     pm = pretty_midi.PrettyMIDI()
-    instrumento = pretty_midi.Instrument(program=BAIXO_GM)
+    instrumento = pretty_midi.Instrument(program=programa)
     instrumento.notes.extend(
         pretty_midi.Note(velocity=100, pitch=n.pitch, start=n.onset_s, end=n.offset_s)
         for n in notas
@@ -128,7 +128,9 @@ def _ganhos(original: Path, rendido: Path) -> tuple[float, float]:
     return escala, ganho * escala
 
 
-def auralizar(original: Path, notas: list[NoteEvent], destino: Path) -> Path:
+def auralizar(
+    original: Path, notas: list[NoteEvent], destino: Path, programa: int = BAIXO_GM
+) -> Path:
     """WAV estéreo: original à esquerda, transcrição à direita.
 
     Ambos os canais são reduzidos a mono antes de ir cada um para o seu lado — o
@@ -140,7 +142,8 @@ def auralizar(original: Path, notas: list[NoteEvent], destino: Path) -> Path:
 
     destino.parent.mkdir(parents=True, exist_ok=True)
     with tempfile.TemporaryDirectory() as tmp:
-        rendido = _renderizar(_midi(notas, Path(tmp) / "notas.mid"), Path(tmp) / "notas.wav")
+        mid = _midi(notas, Path(tmp) / "notas.mid", programa)
+        rendido = _renderizar(mid, Path(tmp) / "notas.wav")
         g_esq, g_dir = _ganhos(original, rendido)
         # `apad` + `shortest` iguala o canal curto ao longo sem cortar nenhum dos dois.
         filtro = (

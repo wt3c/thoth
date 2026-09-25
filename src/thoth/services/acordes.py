@@ -46,6 +46,15 @@ def _agrupar(notas: list[NoteEvent]) -> list[list[NoteEvent]]:
     return grupos
 
 
+def inicios_de_acorde(notas: list[NoteEvent]) -> list[float]:
+    """Um ataque por acorde: o que o andamento e a fase devem medir (ADR-024).
+
+    Seis notas do mesmo acorde contadas uma a uma parecem cinco colisões na grade, e o
+    desdobramento dobraria o andamento à toa.
+    """
+    return [grupo[0].onset_s for grupo in _agrupar(notas)]
+
+
 def _digitacoes(
     acorde: list[NoteEvent], afinacao: tuple[int, ...], max_traste: int
 ) -> tuple[list[_Forma], str]:

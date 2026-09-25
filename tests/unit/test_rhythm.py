@@ -119,3 +119,22 @@ def test_a_nota_seguinte_ainda_corta_a_anterior() -> None:
     (_, primeira, _), _ = eventos(tabs, bpm=120)
 
     assert primeira == PPQ  # cortada na segunda, não em 2 s
+
+
+def test_unir_por_tique_leva_o_tique_inteiro_ao_primeiro_ataque() -> None:
+    """Acorde é o tique, não o relógio: 60 ms à parte ainda é a mesma semicolcheia."""
+    from thoth.services.rhythm import unir_por_tique
+
+    notas = [
+        NoteEvent(40, 0.0, 0.4, "g"),
+        NoteEvent(41, 0.06, 0.5, "g"),
+        NoteEvent(45, 0.7, 1.0, "g"),
+    ]
+
+    unidas = unir_por_tique(notas, 90)
+
+    assert [(n.pitch, n.onset_s, n.offset_s) for n in unidas] == [
+        (40, 0.0, 0.4),
+        (41, 0.0, 0.5),
+        (45, 0.7, 1.0),
+    ]

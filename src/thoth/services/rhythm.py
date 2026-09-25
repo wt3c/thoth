@@ -91,6 +91,20 @@ def monofonizar(
     return sorted(melhor.values(), key=lambda n: n.onset_s), descartadas
 
 
+def unir_por_tique(notes: Sequence[NoteEvent], bpm: float) -> list[NoteEvent]:
+    """Leva cada nota ao primeiro ataque do seu tique, término intacto.
+
+    É o `monofonizar` da guitarra: o acorde é medido **na grade**, e é o tique que
+    `acordes_em_ticks` recusa com corda repetida. Duas notas a 60 ms são dois acordes
+    para uma janela de 50 ms e um tique só para a semicolcheia; unidas antes do
+    posicionador, a digitação é decidida para o que o exportador vai escrever.
+    """
+    primeiro: dict[int, float] = {}
+    for nota in sorted(notes, key=lambda n: n.onset_s):
+        primeiro.setdefault(para_ticks(nota.onset_s, bpm), nota.onset_s)
+    return [replace(n, onset_s=primeiro[para_ticks(n.onset_s, bpm)]) for n in notes]
+
+
 def eventos(notes: Sequence[TabNote], bpm: float) -> list[tuple[int, int, TabNote]]:
     """`(início, duração, nota)` em ticks, sem sobreposição.
 

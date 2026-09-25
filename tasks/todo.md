@@ -418,9 +418,23 @@ Pré-requisito invisível até agora: a Fase 5 só existe se houver o que o
 - [x] MusicXML: emitir partitura + tablatura de guitarra, clave correta, afinação e
       acordes; pronto quando XML cru, round-trip e MuseScore real preservarem as
       posições escolhidas, inclusive uma digitação válida alternativa.
-- [ ] Integrar os três perfis de guitarra na CLI/API pelo stem `other`; pronto quando o
+- [x] Integrar os três perfis de guitarra na CLI/API pelo stem `other`; pronto quando o
       relatório separar erro de rótulo, contaminação do stem e acorde impossível, sem
       fundir os três rótulos numa única parte.
+      - [x] Pipeline: `instrumento` (padrão `baixo`, caminho intacto); guitarra pelo stem
+            do perfil, filtro pelos rótulos do perfil, notas do mesmo tique unidas antes
+            do `ViterbiAcordes` (senão o exportador recusa depois dos minutos de CPU),
+            andamento pelo primeiro ataque de cada acorde, sem readmissão, monofonização
+            nem conferência de oitava.
+      - [x] Relatório: `erro_de_rotulo` (outras guitarras), `contaminacao` (outras
+            famílias no stem) e `acordes_impossiveis`, vazios no baixo.
+      - [x] Nada do baixo é sobrescrito: arquivos e cache de notas levam o perfil no
+            nome (`<nome>.guitarra-limpa.gp5`, `notas.guitarra-limpa.jsonl`); chaves de
+            `artefatos` continuam `gp5`/`musicxml`; stem e playback como `outros` e
+            `sem-outros`. Auralização com o programa GM do perfil.
+      - [x] CLI `--instrumento` e API `instrumento`; `--afinacao` só vale para o baixo;
+            perfis sem exportador (bateria, piano) recusados antes do download.
+      - [x] Ponta a ponta `slow` com `guitarra-limpa-mix`, Demucs e MuScriptor reais.
 
 #### M5 — compatibilidade e verificação de entrega
 

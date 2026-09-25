@@ -135,3 +135,18 @@ def test_nao_estoura_ao_igualar(original: Path, tmp_path: Path) -> None:
     audio, _ = sf.read(str(saida))
 
     assert np.abs(audio).max() <= 1.0
+
+
+def test_o_midi_leva_o_programa_pedido(tmp_path: Path) -> None:
+    """A guitarra auralizada com timbre de baixo confundiria a comparação de ouvido."""
+    import pretty_midi
+
+    from thoth.services.auralizacao import BAIXO_GM, _midi
+
+    notas = [NoteEvent(52, 0.0, 0.5, "clean_electric_guitar")]
+
+    padrao = pretty_midi.PrettyMIDI(str(_midi(notas, tmp_path / "a.mid")))
+    guitarra = pretty_midi.PrettyMIDI(str(_midi(notas, tmp_path / "b.mid", programa=27)))
+
+    assert [i.program for i in padrao.instruments] == [BAIXO_GM]
+    assert [i.program for i in guitarra.instruments] == [27]

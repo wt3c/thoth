@@ -3188,3 +3188,44 @@ deslocamento da mão medido pelo menor traste pisado. O mi maior sai na forma ab
   pautas; e o MuseScore real conservando uma digitação válida alternativa (E3 A3 D4
   na casa 12 das três cordas graves), que prova que ele lê a nossa corda e traste.
   Com a escrita da digitação desligada de propósito, três testes falham.
+
+### Emenda (2026-09-25) — guitarra na CLI e na API
+
+- **`instrumento`** (CLI `--instrumento`, API `instrumento`), padrão `baixo`. Aceita
+  os perfis de baixo e de guitarra (`pipeline.INSTRUMENTOS`). Bateria e piano ainda
+  não têm exportador e são recusados **antes do download**: o erro não pode custar
+  a ingestão.
+- **O baixo não é sobrescrito.** A guitarra vai para a mesma pasta, então tudo o que
+  ela grava leva o perfil no nome: `<nome>.guitarra-limpa.gp5`, `.musicxml` e
+  `.aural.wav`, e `cache/<id>/notas.guitarra-limpa.jsonl`. O baixo continua com os
+  nomes de sempre. As chaves de `artefatos` continuam `gp5` e `musicxml`. Stem e
+  playback da guitarra saem como `outros` e `sem-outros`: o stem `other` do Demucs,
+  que é o que a guitarra usa, contém mais do que ela. A auralização usa o programa
+  GM do perfil.
+- **Notas do mesmo tique são unidas antes do posicionamento** (`rhythm.unir_por_tique`).
+  O `ViterbiAcordes` agrupa por uma janela de 50 ms; a grade de semicolcheia agrupa
+  por tique. Dois grupos a 60 ms um do outro podiam, cada um, ter posição válida no
+  braço e mesmo assim cair no mesmo tique e na mesma corda. O exportador recusava
+  essa forma só no fim, depois dos minutos de CPU. Com a união, o conflito vira
+  `acordes_impossiveis`: é relatado, e a execução não cai (ADR-014).
+- **Andamento pelo primeiro ataque de cada acorde** (`acordes.inicios_de_acorde`).
+  Contando as seis notas de um acorde, cada uma entrava como colisão na grade e o
+  desdobramento do ADR-024 dobrava o andamento sem motivo.
+- **A guitarra fica sem readmissão, monofonização e conferência de oitava.** As três
+  foram medidas no baixo e pressupõem uma nota por vez; na guitarra, um acorde é o
+  próprio sinal.
+- **O relatório tem três campos**, vazios no baixo:
+  - `erro_de_rotulo`: outras guitarras que o modelo ouviu;
+  - `contaminacao`: outras famílias presentes no stem;
+  - `acordes_impossiveis`: acordes que não cabem no braço, com onset, alturas e
+    motivo.
+
+  Os três rótulos de guitarra nunca se fundem numa parte só.
+- **`afinacao` só vale para o baixo.** A guitarra usa a afinação do perfil. Mandar
+  `afinacao` numa guitarra dá erro, na CLI e na API (422), e não é ignorado em
+  silêncio. A página web não mudou: ela sempre pede baixo.
+- **Verificado:** `guitarra-limpa-mix` passou pelo pipeline inteiro, com Demucs e
+  MuScriptor reais, e deu nota F1 0,990: o mesmo valor do stem cru. Posicionar e
+  exportar não perderam nota nenhuma. Nenhum acorde impossível; os acordes de cinco
+  e seis notas ficaram cada um num beat só no GP5. Mix, `outros` e `sem-outros` saem
+  como três arquivos distintos, e nenhum artefato do baixo foi gerado.

@@ -125,3 +125,11 @@ def test_propriedades_de_qualquer_posicionamento(acordes: list[list[int]]) -> No
 
 def _chave(n: NoteEvent) -> tuple[float, int]:
     return (n.onset_s, n.pitch)
+
+
+def test_inicios_de_acorde_conta_um_ataque_por_acorde() -> None:
+    from thoth.services.acordes import inicios_de_acorde
+
+    notas = [*_acorde((40, 47, 52), 0.0), NoteEvent(45, 0.02, 0.4, ROTULO), *_acorde((45,), 0.5)]
+
+    assert inicios_de_acorde(notas) == [0.0, 0.5]
