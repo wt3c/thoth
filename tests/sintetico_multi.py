@@ -18,6 +18,8 @@ from thoth.domain.models import EventoPercussivo, NoteEvent, Transcricao
 
 #: Peças GM: bumbo, caixa, chimbal fechado, tons grave/médio/agudo, prato de ataque.
 BUMBO, CAIXA, CHIMBAL, TOM_GRAVE, TOM_MEDIO, TOM_AGUDO, PRATO = 36, 38, 42, 45, 48, 50, 49
+#: Os seis tons do GM, do surdo grave ao tom agudo.
+TONS = (41, 43, 45, 47, 48, 50)
 
 Evento = tuple[tuple[int, ...], float, float]  # alturas simultâneas, início, duração
 
@@ -122,6 +124,16 @@ def _piano_distrator() -> pretty_midi.Instrument:
     )
 
 
+def _tons() -> list[Evento]:
+    """Oito voltas pelos seis tons em colcheias, um por vez. Cada volta gira a ordem e
+    alterna o sentido, para nenhum tom ter sempre o mesmo vizinho (emenda do ADR-044)."""
+    sequencia: list[tuple[int, ...]] = []
+    for volta in range(8):
+        ordem = TONS[volta % len(TONS) :] + TONS[: volta % len(TONS)]
+        sequencia += [(t,) for t in (ordem[::-1] if volta % 2 else ordem)]
+    return [(pecas, t, 0.1 / 0.9) for pecas, t, _ in _em_semiminimas(sequencia, TEMPO / 2)]
+
+
 def _bateria_distratora() -> pretty_midi.Instrument:
     return _instrumento(0, _bateria(), bateria=True, velocidade=80)
 
@@ -148,6 +160,9 @@ FIXTURES_MULTI: dict[str, FixtureMulti] = {
     if perfil != "baixo"
     for condicao in ("isolada", "mix")
 }
+#: Só tons, sem distrator: a fixture geral tem três ataques deles, pouco para ver a troca.
+FIXTURES_MULTI["bateria-tons"] = FixtureMulti("bateria", pretty_midi.PrettyMIDI(initial_tempo=BPM))
+FIXTURES_MULTI["bateria-tons"].midi.instruments.append(_instrumento(0, _tons(), bateria=True))
 
 
 def referencia(fixture: FixtureMulti) -> Transcricao:

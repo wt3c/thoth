@@ -9,6 +9,7 @@ rótulo do instrumento (ADR-008).
 from __future__ import annotations
 
 import shutil
+from collections import Counter
 from pathlib import Path
 
 import numpy as np
@@ -49,6 +50,18 @@ def test_referencia_da_bateria_so_tem_ataques() -> None:
     assert {a.peca_gm for a in ref.ataques} >= {36, 38, 42, 45, 49}
     instantes = [a.instante_s for a in ref.ataques]
     assert len(instantes) > len(set(instantes)), "precisa de ataques simultâneos"
+
+
+def test_fixture_de_tons_tem_os_seis_tons_gm_sozinhos() -> None:
+    """Emenda do ADR-044: os tons saem com o número de outro tom, mas a fixture geral
+    só tem três ataques deles. Cada tom aqui toca sozinho, para a troca ter dono."""
+    ref = referencia(FIXTURES_MULTI["bateria-tons"])
+
+    contagem = Counter(a.peca_gm for a in ref.ataques)
+    assert set(contagem) == {41, 43, 45, 47, 48, 50}
+    assert min(contagem.values()) >= 8
+    instantes = [a.instante_s for a in ref.ataques]
+    assert len(instantes) == len(set(instantes)), "nenhum ataque simultâneo"
 
 
 def test_referencia_do_piano_so_tem_o_piano_e_cobre_a_extensao() -> None:

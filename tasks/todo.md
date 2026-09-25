@@ -376,7 +376,9 @@ Pré-requisito invisível até agora: a Fase 5 só existe se houver o que o
       pedaços de 5 s do MuScriptor (emenda do ADR-044 de 2026-09-25).
       → Borda medida (ADR-045): 0,1 s de silêncio na frente leva a bateria de 0,529
       a 0,901, mas troca o rótulo de baixo, guitarra e piano; fica só na bateria
-      (`silencio_inicial_s`, padrão 0). Falta a fixture só de tons.
+      (`silencio_inicial_s`, padrão 0).
+      → Fixture só de tons: 45 de 48 ataques achados, quase todos como 43 ou 36;
+      o modelo não separa os tons (emenda do ADR-044, F1 micro 0,109).
 - [ ] Implementar quantização de ataques sem inventar sustain; pronto quando dois hits
       no mesmo tique virarem um acorde percussivo e peças diferentes não forem
       descartadas pela `monofonizar` do baixo.

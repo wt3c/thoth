@@ -155,3 +155,37 @@ def test_mede_perfil(perfil: str, condicao: str, tmp_path: Path) -> None:
         piso_seis = MEDIDO_SEIS_NOTAS[(perfil, condicao)] - (condicao == "mix-stem")
         print(f"SEIS NOTAS {perfil} {condicao}: {seis}/24 piso={piso_seis}")
         assert seis >= piso_seis, f"acordes de seis notas regrediram: {seis} < {piso_seis}"
+
+
+#: F1 micro da fixture só de tons (emenda do ADR-044), com `SILENCIO_BATERIA`. O modelo
+#: acha 45 dos 48 ataques, mas dá a quase todos o número 43 ou 36: não separa os tons.
+MEDIDO_TONS = 0.109
+
+
+def test_mede_tons(tmp_path: Path) -> None:
+    """A troca de tons da fixture geral vem de três ataques; aqui cada tom toca oito vezes."""
+    audio = renderizar_multi("bateria-tons", tmp_path)
+    bruto = MuscriptorTranscriber(model="small", silencio_inicial_s=SILENCIO_BATERIA).transcribe(
+        audio
+    )
+    rotulos = Counter(n.instrument for n in bruto)
+    do_perfil = Transcricao.do_muscriptor(
+        [n for n in bruto if n.instrument in PERFIS["bateria"].rotulos]
+    )
+    ref = referencia(FIXTURES_MULTI["bateria-tons"])
+
+    b = avaliar_bateria(ref.ataques, do_perfil.ataques)
+    pecas = " ".join(f"{p}:{s.f1:.3f}" for p, s in sorted(b.por_peca.items()))
+    confusao = " ".join(
+        f"{r if r is not None else '-'}→{e if e is not None else '-'}:{n}"
+        for (r, e), n in sorted(
+            confusao_bateria(ref.ataques, do_perfil.ataques).items(),
+            key=lambda x: (x[0][0] or 0, x[0][1] or 0),
+        )
+    )
+    print(
+        f"\nMEDIDO bateria tons: micro F1 {b.micro.f1:.3f} macro {b.macro_f1:.3f} "
+        f"ref={b.n_ref} est={b.n_est} peças[{pecas}] confusão[{confusao}] "
+        f"rótulos={dict(rotulos)} piso={MEDIDO_TONS} margem={b.micro.f1 - MEDIDO_TONS:+.3f}"
+    )
+    assert b.micro.f1 >= MEDIDO_TONS, f"tons regrediram: {b.micro.f1} < {MEDIDO_TONS}"

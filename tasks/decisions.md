@@ -3335,6 +3335,37 @@ Com isso, o que o veredito da bateria pede para investigar é:
 A chimbal perdida junto do prato (5,333 s nas duas condições) é outro efeito,
 pequeno: um ataque por prato.
 
+
+### Emenda (2026-09-25) — fixture só de tons: o modelo não separa os tons
+
+Item 2 da emenda anterior. A fixture `bateria-tons` (em `tests/sintetico_multi.py`)
+toca os seis tons do GM (41, 43, 45, 47, 48, 50), um por vez, oito vezes cada, em
+colcheias; cada volta gira a ordem e alterna o sentido. O `test_mede_tons` roda o
+`small` com o silêncio do ADR-045. Resultado, igual em duas rodadas:
+
+| tom da referência | 36 | 43 | 45 | perdido |
+|---|---|---|---|---|
+| 41 | 3 | 5 | | |
+| 43 | 3 | 4 | | 1 |
+| 45 | | 5 | 2 | 1 |
+| 47 | 2 | 5 | | 1 |
+| 48 | 2 | 6 | | |
+| 50 | 2 | 5 | 1 | |
+
+Mais 17 ataques sem par na referência (15 como 45, 2 como 36). F1 micro 0,109,
+macro 0,061.
+
+**O instante está certo; a peça, não.** O modelo acha 45 dos 48 ataques, mas dá o
+número 43 a 30 deles e o 36 (bumbo) a 12. Nenhum dos seis tons é reconhecido como
+ele mesmo com regularidade: só 43 (4 de 8) e 45 (2 de 8) acertam alguma vez. A troca
+da fixture geral (50→45, 48→45) não era um mapeamento fixo entre tons vizinhos: é o
+modelo sem distinção entre eles.
+
+Consequência para o M2: remapear números não corrige nada, porque não há mapa
+consistente. A bateria escreve o que o modelo devolver; na partitura, os tons
+aparecem com a altura errada, e isso fica registrado como limite do modelo, não
+como defeito do Thoth. O piso do `test_mede_tons` é o valor medido, sem folga.
+
 ---
 
 ## ADR-045 — silêncio na frente do áudio: só na bateria, porque troca o rótulo dos outros
