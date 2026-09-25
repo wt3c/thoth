@@ -5,7 +5,7 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Protocol
 
-from thoth.domain.models import AudioAsset, NoteEvent, TabNote
+from thoth.domain.models import AudioAsset, NoteEvent, Posicionamento, TabNote
 
 
 class AudioSource(Protocol):
@@ -32,6 +32,19 @@ class FretAssigner(Protocol):
     def assign(
         self, notes: list[NoteEvent], tuning: tuple[int, ...], max_fret: int = 24
     ) -> list[TabNote]: ...
+
+
+class AtribuidorDeAcordes(Protocol):
+    """Notas com acordes → posições, para instrumento de cordas polifônico (ADR-044).
+
+    Separado do `FretAssigner` de propósito: aquele pressupõe linha monofônica, e o
+    baixo não pode herdar polifonia por acidente. O acorde impossível volta em
+    `impossiveis`, não como exceção: não pode custar a música inteira (ADR-014).
+    """
+
+    def posicionar(
+        self, notas: list[NoteEvent], afinacao: tuple[int, ...], max_traste: int = 24
+    ) -> Posicionamento: ...
 
 
 class Exporter(Protocol):

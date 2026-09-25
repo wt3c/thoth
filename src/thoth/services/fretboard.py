@@ -77,6 +77,13 @@ INICIANTE = Custos(traste_alto=1.2, corda_solta=3.0, deslocamento=1.5, troca_cor
 DIGITACOES: dict[str, Custos] = {"iniciante": INICIANTE, "experiente": PADRAO}
 
 
+def custo_de_emissao(custos: Custos, fret: int) -> float:
+    """Quanto custa *estar* num traste. Comum à linha do baixo e aos acordes (ADR-044)."""
+    custo = custos.traste_alto * fret
+    custo += custos.acima_da_janela * max(0, fret - PRIMEIRA_POSICAO)
+    return custo - (custos.corda_solta if fret == 0 else 0.0)
+
+
 def _posicoes(pitch: int, tuning: tuple[int, ...], max_fret: int) -> list[tuple[int, int]]:
     return [
         (corda, pitch - solta)
@@ -102,9 +109,7 @@ class ViterbiFretAssigner:
     custos: Custos = field(default=INICIANTE)
 
     def _emissao(self, fret: int) -> float:
-        custo = self.custos.traste_alto * fret
-        custo += self.custos.acima_da_janela * max(0, fret - PRIMEIRA_POSICAO)
-        return custo - (self.custos.corda_solta if fret == 0 else 0.0)
+        return custo_de_emissao(self.custos, fret)
 
     def _transicao(self, de: _Estado, para: tuple[int, int]) -> float:
         corda_a, _, mao = de

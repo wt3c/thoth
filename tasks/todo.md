@@ -407,7 +407,8 @@ Pré-requisito invisível até agora: a Fase 5 só existe se houver o que o
 - [ ] Medir separadamente guitarra acústica, elétrica limpa e distorcida, com notas
       simples, díades e acordes de até seis notas; pronto com teste `slow`, tabela por
       condição e comparação explícita com o teto do ADR-011, ou veredito negativo.
-- [ ] Implementar atribuição de acordes ao braço por teste de propriedade; pronto
+- [x] Implementar atribuição de acordes ao braço por teste de propriedade
+      (`services/acordes.py`, emenda do ADR-044 de 2026-09-25); pronto
       quando toda nota preservar a altura, cada acorde usar cordas distintas, nenhum
       traste exceder o máximo e a falha em acorde impossível for relatada, não
       monofonizada.

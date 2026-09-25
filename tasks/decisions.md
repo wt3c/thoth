@@ -3109,3 +3109,22 @@ Com o veredito, a ordem passa a ser **guitarra → bateria → piano acústico**
 depois da investigação que o veredito pede (tons e revocação da bateria; mistura no
 piano). O piano elétrico fica fora de escopo até uma emenda que justifique mudar o
 critério de rótulo.
+
+### Emenda (2026-09-25) — posicionamento de acordes
+
+Contrato novo `AtribuidorDeAcordes` em `domain/ports.py`, implementado por
+`services/acordes.py::ViterbiAcordes`; o `FretAssigner` do baixo não muda. Três escolhas,
+nenhuma medida ainda em música real:
+
+- **Acorde** = notas que começam a menos de 50 ms umas das outras, a mesma tolerância
+  com que o avaliador casa ataques.
+- **Alcance da mão** = no máximo 4 trastes entre as casas pisadas; corda solta não
+  conta. Não há limite de dedos: pestana pisa várias cordas com um dedo só.
+- **Acorde impossível sai inteiro**, com motivo (mais notas que cordas, altura fora
+  do braço, sem digitação no alcance). Uma nota espúria do transcritor derruba o
+  acorde todo; na fixture com separação a precisão foi 1,000, e se isso mudar em
+  música real o relatório de impossíveis é onde aparece.
+
+Os custos são os `Custos` do baixo (`INICIANTE` por padrão), somados por nota, com o
+deslocamento da mão medido pelo menor traste pisado. O mi maior sai na forma aberta
+0-2-2-1-0-0, e os 16 eventos da fixture de guitarra são posicionados sem impossível.

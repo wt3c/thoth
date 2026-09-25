@@ -63,6 +63,25 @@ class TabNote:
     fret: int
 
 
+@dataclass(frozen=True, slots=True)
+class AcordeImpossivel:
+    """Acorde que não cabe no braço, relatado inteiro (ADR-014, ADR-044).
+
+    Reduzir a uma nota só esconderia o erro; descartar em silêncio também.
+    """
+
+    notas: tuple[NoteEvent, ...]
+    motivo: str
+
+
+@dataclass(frozen=True, slots=True)
+class Posicionamento:
+    """O que o atribuidor de acordes devolve: o que coube e o que não coube."""
+
+    tab: tuple[TabNote, ...]
+    impossiveis: tuple[AcordeImpossivel, ...]
+
+
 #: Rótulo que o MuScriptor dá à bateria; nele, `pitch` é a peça GM, não altura.
 ROTULO_BATERIA = "drums"
 
