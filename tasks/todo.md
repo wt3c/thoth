@@ -18,9 +18,8 @@ Nada do que resta é barato: tudo depende de material externo ou de sessão manu
 
 ### 1. Bloqueados em material externo
 
-- Validar o limiar de oitava **fora do Equus** — depende do `.gp5` de *Equus*, download
-  manual do UG (ADR-007). Sem referência não se sabe quanto das taxas por faixa (jorge
-  1,9%, sade 12,9%, neo 15,8%) é erro real.
+- ~~Validar o limiar de oitava fora do Equus~~ — feito em 2026-09-25 com as três tabs
+  alinhadas ao stem (emenda do ADR-030): não se sustenta; discriminador novo é pesquisa.
 - Tab clássica **humana** para conferir oitava e notas — só por download seu (`.gp5` do
   UG Pro ou Songsterr Plus). Automatizar o Songsterr está fora (emenda do ADR-007:
   `robots.txt` e `ai.txt` deles). A da SOJA é `aiGenerated: true` e não serve.
@@ -141,10 +140,13 @@ A avaliação **não depende de saber tocar** (ADR-006).
       material real. Fixture sintética passada pelo Demucs não é material real,
       então isto não condena o limiar; é mais uma amostra de que a taxa de
       alarme depende forte do material
-- [ ] Validar o limiar **fora do Equus** — ele foi calibrado nas mesmas 12 notas
-      em que foi medido. Taxa de alarme por faixa: jorge 1,9%, sade 12,9%,
-      neo 15,8%; sem referência não dá para saber quanto disso é erro real.
-      Depende do `.gp5` de *Equus* (ADR-007), a baixar manualmente do UG.
+- [x] Validar o limiar **fora do Equus** — ele foi calibrado nas mesmas 12 notas
+      em que foi medido. Feito com as três tabs alinhadas ao stem (emenda do
+      ADR-030): **não se sustenta** — alarma 31–39% das notas que a tab confirma
+      (8,7% no Equus), 4–5% dos avisos são erro real, e nenhum limiar de 0,2 a 1,0
+      separa. O limiar fica; o aviso deixa de valer como lista curta
+- [ ] Discriminador de oitava que separe fora do Equus — o `f0 / 2·f0` não separa
+      (emenda do ADR-030) e não vê o erro para cima (10 de 97). Pesquisa, sem urgência
 - [x] `MuscriptorTranscriber` atrás do `Protocol Transcriber` — subprocesso via
       `uvx` (torch fora do projeto), `small` + livre + `--detect-tempo false`.
       7 testes: 6 de parsing puro + 1 contra o modelo real (`slow`).

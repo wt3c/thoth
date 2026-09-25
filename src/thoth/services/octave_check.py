@@ -16,6 +16,10 @@ notas erradas conhecidas e sinaliza 11 de 127 notas concordantes (8,7%), das
 quais 6 estão em `pitch <= 28` — registro em que a fundamental é fisicamente
 fraca, então lá o alarme é esperado.
 
+**Fora do Equus o limiar não se sustenta** (emenda do ADR-030): contra três tabs
+alinhadas ao stem, alarma de 31 a 39% das notas que a tab confirma, e nenhum limiar de 0,2 a
+1,0 separa. O aviso é diagnóstico da nota, não triagem.
+
 A oitava acima é **ranqueada, não afirmada** (ADR-030): a mesma razão é medida para
 `pitch + 12`, e a sugestão só sai quando ela explica o áudio melhor que a altura
 transcrita. Quando nenhuma das duas se sustenta, o aviso sai sem alternativa — que é
@@ -23,8 +27,8 @@ a informação honesta, e não um palpite com cara de correção.
 
 Isto **sinaliza para conferência**, não corrige: gravação com corte de graves
 pode atenuar uma fundamental legítima, e o próprio B0 de um baixo real irradia
-pouco em 30,9 Hz. A saída é uma lista curta para a Camada 3 conferir contra
-tablatura de referência (ADR-007), não uma correção automática.
+pouco em 30,9 Hz. A saída é para conferir contra tablatura de referência
+(ADR-007), não uma correção automática — e, fora do Equus, não é curta (acima).
 """
 
 from __future__ import annotations

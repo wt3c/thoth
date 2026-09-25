@@ -1409,6 +1409,40 @@ calculado.
 - A página ganhou teste que a dirige (`-m navegador`, 4 passed): a suíte padrão não
   olha para o `index.html`, e foi exatamente essa a armadilha paga no ADR-028.
 
+### Emenda (2026-09-25) — o limiar de 0,40 fora do Equus
+
+O limiar foi calibrado nas 12 notas erradas do Equus e nunca tinha sido conferido fora
+dele. Com as três tabs alinhadas ao stem (ADR-042), dá para conferir: nota da
+transcrição com nota da tab a ±0,1 s, só nas janelas conclusivas, razão `f0 / 2·f0`
+medida para todas (`limiar=inf`). "Abaixo" é o Thoth uma oitava abaixo da tab — o erro
+para o qual o aviso existe.
+
+| Música | notas com par | alarme entre as que concordam | pega "abaixo" | avisos que eram erro |
+|---|---|---|---|---|
+| *Fear Is the Key* | 755 | 38,6% | 15 de 18 | 15 de 296 (5%) |
+| *And Plague Flowers* | 2137 | 30,6% | 24 de 50 | 24 de 644 (4%) |
+| *Dance of Death* (1 janela) | 246 | 10,6% | sem caso | 0 de 26 |
+| Equus (calibração) | 139 | 8,7% | 12 de 12 | 12 de 23 |
+
+- **Nenhum limiar separa.** De 0,2 a 1,0, alarme e acerto sobem juntos: em *Fear*, 0,2
+  ainda alarma 28,7% das concordantes e pega 12 de 18. Não é questão de ajuste.
+- **O registro grave não explica.** Em *And Plague Flowers*, 528 dos 614 alarmes em
+  nota concordante estão acima de `pitch` 28; em *Fear*, 142 de 277.
+- **A sugestão acerta pouco**: bate com a tab em 15 dos 18 "abaixo" de *Fear* e em 21
+  dos 50 de *And Plague Flowers*.
+- **O erro para cima passa**: das 97 notas em que o Thoth ficou uma oitava acima da tab,
+  10 foram sinalizadas. O discriminador foi feito para o erro para baixo, e não vê o
+  outro.
+
+A tab é de comunidade e *And Plague Flowers* é um cover: parte do que conta como alarme
+falso pode ser erro da tab. Não o bastante para mudar o quadro — de 30 a 39% de alarme
+contra 8,7%.
+
+**Decisão:** o limiar fica — a varredura não oferece outro melhor —, mas o aviso **não é
+lista curta fora do Equus**: marca um terço das notas, e 95% do que marca está certo
+segundo a tab. Vale como diagnóstico da nota isolada, não como triagem. Um
+discriminador que separe é pesquisa, aberta no todo.
+
 ## ADR-031 — a grafia do acidente segue o tom, com margem (B9)
 
 **Data:** 2026-09-23 · **Status:** aceito
