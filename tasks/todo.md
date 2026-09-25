@@ -415,7 +415,7 @@ Pré-requisito invisível até agora: a Fase 5 só existe se houver o que o
 - [x] GP5: emitir acordes no mesmo beat, afinação de guitarra e programa GM do perfil;
       pronto quando gravação → releitura preservar alturas, cordas, trastes, ataques e
       simultaneidade, com abertura por leitor independente.
-- [ ] MusicXML: emitir partitura + tablatura de guitarra, clave correta, afinação e
+- [x] MusicXML: emitir partitura + tablatura de guitarra, clave correta, afinação e
       acordes; pronto quando XML cru, round-trip e MuseScore real preservarem as
       posições escolhidas, inclusive uma digitação válida alternativa.
 - [ ] Integrar os três perfis de guitarra na CLI/API pelo stem `other`; pronto quando o

@@ -3169,3 +3169,22 @@ deslocamento da mão medido pelo menor traste pisado. O mi maior sai na forma ab
   com três campos no exportador — basta para baixo e guitarra, que têm corda e
   traste. A `ParteMusical` entra quando bateria ou piano chegarem aos exportadores,
   que são os que não cabem nessa assinatura.
+
+### Emenda (2026-09-25) — MusicXML de guitarra com acordes
+
+- `MusicXmlExporter(familia="guitarra", programa_gm=...)`: partitura em clave de Sol
+  8vb (a guitarra soa uma oitava abaixo do escrito, como o baixo) e tablatura de seis
+  linhas com `staff-tuning`. Notas do mesmo tique saem como **acorde** nas duas pautas,
+  pelo mesmo `rhythm.acordes_em_ticks` do GP5, com a mesma recusa de "mesma corda".
+  Acorde sem nome sob a pauta; nota solta com nome.
+- **O music21 10.5 escreve corda e traste só na primeira nota de um acorde**
+  (`noteToNotations` aplica as articulações não-dedilhado ao índice 0). As outras
+  sairiam sem corda e o leitor escolheria uma por conta própria. Por isso a digitação
+  da guitarra é escrita depois, no XML (`_com_digitacao`), andando o cursor do
+  MusicXML — mesmo padrão da afinação (`_com_afinacao`). O baixo continua com as
+  articulações do music21, sem mudança.
+- **Verificado:** XML cru nota por nota (altura, instante, corda, traste, ligadura) na
+  fixture `guitarra-limpa-isolada` inteira; releitura pelo music21 com acordes nas duas
+  pautas; e o MuseScore real conservando uma digitação válida alternativa (E3 A3 D4
+  na casa 12 das três cordas graves), que prova que ele lê a nossa corda e traste.
+  Com a escrita da digitação desligada de propósito, três testes falham.

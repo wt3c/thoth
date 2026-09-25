@@ -6,7 +6,11 @@ nenhum leitor desenhava — o MuseScore abria a partitura e a tablatura ficava
 implícita no arquivo.
 
 A clave é `Bass8vb` porque o baixo é instrumento transpositor: soa uma oitava
-abaixo do escrito. Com clave de Fá comum, tudo sairia uma oitava acima.
+abaixo do escrito. Com clave de Fá comum, tudo sairia uma oitava acima. A guitarra
+(`familia="guitarra"`, ADR-044) também soa uma oitava abaixo: clave de Sol 8vb, e
+notas do mesmo tique saem como acorde nas duas pautas. O music21 10.5 só escreve
+corda e traste na primeira nota de um acorde, então a digitação da guitarra é
+escrita depois, no XML (`_com_digitacao`), como a afinação.
 
 Ao contrário do GP5, aqui não decomponho figuras à mão — o `makeNotation` do
 music21 resolve ligaduras e pausas a partir dos offsets.
@@ -17,11 +21,13 @@ from __future__ import annotations
 from copy import deepcopy
 from dataclasses import dataclass
 from pathlib import Path
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Literal
+from xml.etree import ElementTree
 
 from music21 import (
     articulations,
     beam,
+    chord,
     clef,
     instrument,
     key,
@@ -37,7 +43,10 @@ from music21 import (
 from thoth.domain.models import TabNote
 from thoth.domain.ports import Exporter
 from thoth.services.notas import nome_da_nota
-from thoth.services.rhythm import PPQ, eventos
+from thoth.services.rhythm import PPQ, acordes_em_ticks, eventos
+
+#: `(início, duração, acorde)` em ticks; no baixo o acorde tem sempre uma nota.
+Posicionadas = list[tuple[int, int, tuple[TabNote, ...]]]
 
 
 @dataclass(frozen=True, slots=True)
@@ -51,12 +60,21 @@ class MusicXmlExporter:
     armadura: int | None = None
     """Armadura estimada, ou `None` — que é o que a partitura tinha até o ADR-031.
     Armadura errada é pior que armadura nenhuma, então quem estima decide antes."""
+    familia: Literal["baixo", "guitarra"] = "baixo"
+    """O baixo segue monofônico, em `Bass8vb`; a guitarra empilha acordes em `Treble8vb`."""
+    programa_gm: int = 33
+    """Programa GM da guitarra, do perfil. O baixo continua como `ElectricBass`."""
 
     def export(self, notes: list[TabNote], out: Path, tuning: tuple[int, ...]) -> Path:
         if not notes:
             raise ValueError("sem notas para exportar")
 
-        posicionadas = list(eventos(notes, self.bpm))
+        guitarra = self.familia == "guitarra"
+        posicionadas: Posicionadas = (
+            acordes_em_ticks(notes, self.bpm)
+            if guitarra
+            else [(ini, dur, (tab,)) for ini, dur, tab in eventos(notes, self.bpm)]
+        )
         partitura = self._pauta(posicionadas, tuning, tablatura=False)
         tablatura = self._pauta(posicionadas, tuning, tablatura=True)
 
@@ -74,12 +92,15 @@ class MusicXmlExporter:
 
         out.parent.mkdir(parents=True, exist_ok=True)
         pronto.write("musicxml", fp=str(out))
-        out.write_text(_com_afinacao(out.read_text(), tuning), encoding="utf-8")
+        xml = _com_afinacao(out.read_text(), tuning)
+        if guitarra:
+            xml = _com_digitacao(xml, posicionadas, len(tuning))
+        out.write_text(xml, encoding="utf-8")
         return out
 
     def _pauta(
         self,
-        posicionadas: list[tuple[int, int, TabNote]],
+        posicionadas: Posicionadas,
         tuning: tuple[int, ...],
         *,
         tablatura: bool,
@@ -92,15 +113,28 @@ class MusicXmlExporter:
             # O music21 10.5 não emite `staff-details`; quem escreve é `_com_afinacao`.
             parte.insert(0, layout.StaffLayout(staffLines=len(tuning)))
         else:
-            parte.insert(0, instrument.ElectricBass())
-            parte.insert(0, clef.Bass8vbClef())
+            if self.familia == "guitarra":
+                parte.insert(0, instrument.instrumentFromMidiProgram(self.programa_gm))
+                parte.insert(0, clef.Treble8vbClef())
+            else:
+                parte.insert(0, instrument.ElectricBass())
+                parte.insert(0, clef.Bass8vbClef())
             parte.insert(0, tempo.MetronomeMark(number=round(self.bpm)))
             if self.armadura is not None:
                 parte.insert(0, key.KeySignature(self.armadura))
 
-        for inicio, duracao, tab in posicionadas:
+        for inicio, duracao, acorde in posicionadas:
+            if len(acorde) > 1:
+                # Acorde não leva nome nem técnica aqui: seis nomes empilhados seriam
+                # ruído, e a corda de cada nota entra no XML (`_com_digitacao`).
+                c = chord.Chord([t.event.pitch for t in acorde], quarterLength=duracao / PPQ)
+                parte.insert(inicio / PPQ, c)
+                continue
+            (tab,) = acorde
             n = note.Note(tab.event.pitch, quarterLength=duracao / PPQ)
-            if tablatura:
+            if tablatura and self.familia == "guitarra":
+                pass  # a digitação entra no XML, igual à do acorde
+            elif tablatura:
                 n.articulations = [
                     # MusicXML numera as cordas como o GP: 1 = mais aguda.
                     articulations.StringIndication(len(tuning) - tab.string),
@@ -221,6 +255,68 @@ def _com_afinacao(xml: str, tuning: tuple[int, ...]) -> str:
     if fecha not in xml:  # pragma: no cover — o music21 sempre abre com attributes
         raise ValueError("MusicXML sem bloco <attributes>")
     return xml.replace(fecha, detalhes + fecha, 1)
+
+
+def _com_digitacao(xml: str, posicionadas: Posicionadas, cordas: int) -> str:
+    """Escreve `<technical><string/><fret/>` em cada nota da pauta 2 (guitarra).
+
+    O music21 10.5 põe a técnica só na primeira nota do acorde; as outras sairiam
+    sem corda e o leitor escolheria uma por conta própria. Aqui o cursor do
+    MusicXML é andado à mão (`duration`, `chord`, `backup`, `forward`), e cada
+    nota — inclusive a continuação ligada — acha a sua pela altura dentro do
+    acorde que soa naquele instante.
+    """
+    cabecalho = xml[: xml.index("<score-partwise")]
+    raiz = ElementTree.fromstring(xml[len(cabecalho) :])
+    divisoes = int(raiz.findtext(".//divisions") or 1)
+    inicio_do_compasso = 0
+    for compasso in raiz.iter("measure"):
+        cursor = fim = anterior = inicio_do_compasso
+        usadas: set[int] = set()
+        for el in compasso:
+            if el.tag == "backup":
+                cursor -= int(el.findtext("duration") or 0)
+            elif el.tag == "forward":
+                cursor += int(el.findtext("duration") or 0)
+            elif el.tag == "note":
+                if el.find("chord") is None:
+                    anterior = cursor
+                    cursor += int(el.findtext("duration") or 0)
+                    usadas = set()
+                altura = el.find("pitch")
+                if el.findtext("staff") == "2" and altura is not None:
+                    tab = _tab_em(posicionadas, anterior * PPQ // divisoes, altura, usadas)
+                    _anotar(el, cordas - tab.string, tab.fret)
+            fim = max(fim, cursor)
+        inicio_do_compasso = fim
+    return cabecalho + ElementTree.tostring(raiz, encoding="unicode")
+
+
+def _tab_em(
+    posicionadas: Posicionadas, tique: int, altura: ElementTree.Element, usadas: set[int]
+) -> TabNote:
+    natural = pitch.Pitch(f"{altura.findtext('step')}{altura.findtext('octave')}").midi
+    midi = natural + int(altura.findtext("alter") or 0)
+    for inicio, duracao, acorde in posicionadas:
+        if inicio <= tique < inicio + duracao:
+            for tab in acorde:
+                # Duas cordas na mesma altura (uníssono) ficam uma para cada nota.
+                if tab.event.pitch == midi and id(tab) not in usadas:
+                    usadas.add(id(tab))
+                    return tab
+    raise ValueError(f"nota {midi} no tique {tique} sem posição no braço")  # pragma: no cover
+
+
+def _anotar(nota: ElementTree.Element, corda: int, traste: int) -> None:
+    notacoes = nota.find("notations")
+    if notacoes is None:
+        notacoes = ElementTree.Element("notations")
+        # `notations` vem antes de `lyric` e `play` na ordem do MusicXML.
+        depois = [i for i, filho in enumerate(nota) if filho.tag in ("lyric", "play")]
+        nota.insert(depois[0] if depois else len(nota), notacoes)
+    tecnica = ElementTree.SubElement(notacoes, "technical")
+    ElementTree.SubElement(tecnica, "string").text = str(corda)
+    ElementTree.SubElement(tecnica, "fret").text = str(traste)
 
 
 if TYPE_CHECKING:  # pragma: no cover — trava a assinatura contra o Protocol
