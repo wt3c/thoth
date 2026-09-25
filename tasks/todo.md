@@ -31,9 +31,9 @@ Nada do que resta é barato: tudo depende de material externo ou de sessão manu
 > exige ouvido treinado precisa virar medição ou fica declarado como não verificado.
 
 - ~~Tocar e cursor~~ — virou teste `navegador` em 2026-09-25 (ver Fase 5).
-- Passada perceptual (auralização) sobre o corpus de `tasks/corpus.md`, F1 por grupo.
-  **Sem caminho hoje:** exige ouvido treinado, que o usuário não tem. Só sai do lugar
-  se virar medição (ex.: tab humana de cada música do corpus, como no ADR-042).
+- ~~Passada perceptual (auralização) sobre o corpus, F1 por grupo~~ — encerrada como
+  requisito inválido: auralização não tem referência e não produz F1. A cobertura e
+  o limite estão registrados acima e na emenda do ADR-020.
 
 ### 3. Aberto sem urgência
 
@@ -73,8 +73,10 @@ A avaliação **não depende de saber tocar** (ADR-006).
 ### Camada 2 — perceptual assistida (dispensa treino)
 - [x] Auralização: original em um canal, MIDI no outro (`thoth auralizar`,
       ADR-020). Se descolar, qualquer ouvido percebe
-- [ ] Rodar a auralização sobre o corpus de `tasks/corpus.md` — **reportar F1
-      por grupo**, nunca um número agregado (Grupo A é otimista por construção)
+- [x] ~~Rodar a auralização sobre o corpus e reportar F1 por grupo~~ — auditoria
+      encerrada em 2026-09-25: 2/4 arquivos validados no Grupo A, 2/2 no B e 2/2 no C;
+      F1 não é definido em nenhum grupo porque o corpus tem zero referências. Não foi
+      agregado nem substituído por zero (emenda do ADR-020)
 
 ### Camada 3 — referência externa (ADR-007)
 - [x] Tabs humanas escolhidas: três `.gp5` da comunidade do UG, baixados à mão
@@ -297,7 +299,128 @@ Pré-requisito invisível até agora: a Fase 5 só existe se houver o que o
 
 - [ ] Sync do cursor via Spotify `currently-playing`
 - [x] Containerfile + compose (CPU) — ADR-040, job real verificado dentro do contêiner
-- [ ] Multi-instrumento: guitarra polifônica, piano, bateria
+
+### Multi-instrumento: guitarra polifônica, piano e bateria — plano (ADR-044)
+
+> Uma parte-alvo por execução; o baixo continua sendo o padrão. Ordem recomendada:
+> contrato e medição comum → bateria → piano → guitarra. Nenhuma etapa autoriza
+> áudio ou tablatura de terceiros no repositório.
+
+#### M0 — aceitar o recorte antes de implementar
+
+- [ ] Aceitar ou rejeitar o ADR-044; pronto quando o status deixar de ser `Proposto` e
+      estiver decidido se piano sem GP5 nativo ainda conta como suporte completo.
+- [ ] Congelar em teste a taxonomia do MuScriptor 0.3.0 para o escopo: piano
+      (`acoustic_piano`, `electric_piano`), guitarra (`acoustic_guitar`,
+      `clean_electric_guitar`, `distorted_electric_guitar`) e `drums`; pronto quando
+      uma mudança de nome no motor falhar com a lista observada impressa.
+- [ ] Criar perfis de instrumento no domínio sem misturar rótulos por conveniência;
+      pronto quando cada perfil declarar família, rótulos aceitos, stem, programa GM e
+      afinação opcional, e guitarra limpa/acústica/distorcida puderem ser selecionadas
+      separadamente.
+
+#### M1 — contrato de domínio e régua comum, por TDD
+
+- [ ] Testar primeiro e introduzir `EventoPercussivo`, `Transcricao` e `ParteMusical`:
+      nota com altura continua sendo `NoteEvent`; ataque de bateria guarda instante e
+      peça GM, sem fingir altura ou sustentação; pronto com testes de igualdade,
+      ordenação e validação de cada modelo.
+- [ ] Generalizar `Transcriber` para devolver a transcrição livre completa e remover o
+      seletor opcional do contrato; pronto quando nenhum caminho usar `--instruments`
+      e notas mais ataques de bateria sobreviverem ao parsing real do JSONL.
+- [ ] Manter `Separator.separate()` retornando stems nomeados, mas retirar do contrato a
+      suposição de “baixo”; pronto quando os perfis resolverem `bass`, `drums` ou
+      `other` e um stem ausente produzir erro explícito antes da transcrição.
+- [ ] Preservar o `FretAssigner` monofônico do baixo e criar um contrato distinto para
+      acordes de guitarra; pronto quando o tipo impedir piano e bateria de passarem por
+      atribuição de corda e impedir o baixo de herdar polifonia por acidente.
+- [ ] Generalizar `Exporter` para receber uma `ParteMusical`, não apenas
+      `list[TabNote] + tuning`; pronto quando exportadores falsos provarem por teste que
+      piano e bateria não exigem afinação e que baixo/guitarra não perdem posições.
+- [ ] Gerar, em código versionado, fixtures MIDI de pelo menos 8 s, isoladas e em mix,
+      para cada instrumento; pronto quando `fluidsynth` real renderizar WAVs
+      normalizados, os MIDI forem a referência e nenhum `.mid`, `.wav`, `.gp5` ou
+      `.musicxml` gerado aparecer no índice do Git.
+- [ ] Estender o avaliador: piano/guitarra com precisão, revocação e F1 de ataque e de
+      nota sem cobrar offset; bateria com F1 micro e macro por peça GM a 50 ms, sem
+      métrica de duração; pronto com testes contra `mir_eval` real e casos que
+      demonstrem erro de altura, troca de peça e ataque deslocado.
+- [ ] Medir cada fixture em três condições — isolada, mix direta e stem do Demucs
+      (`drums` para bateria; `other` para piano/guitarra) — com decodificação livre;
+      pronto com tabela de tempo de CPU, contagem por rótulo, precisão, revocação e F1,
+      sempre imprimindo medido e piso lado a lado.
+- [ ] Registrar o veredito por instrumento antes do respectivo exportador; pronto
+      quando a medição disser `seguir`, `ajustar` ou `manter fora de escopo`, sem usar
+      avaliação auditiva do usuário e sem promover a primeira rodada a piso por
+      simples conveniência.
+
+#### M2 — bateria primeiro
+
+- [ ] Medir bumbo, caixa, chimbal, tons e prato, incluindo ataques simultâneos;
+      pronto quando o teste `slow` contra o MuScriptor e o Demucs reais publicar F1
+      micro/macro por peça e matriz de confusão GM, ou encerrar bateria com veredito
+      negativo documentado.
+- [ ] Implementar quantização de ataques sem inventar sustain; pronto quando dois hits
+      no mesmo tique virarem um acorde percussivo e peças diferentes não forem
+      descartadas pela `monofonizar` do baixo.
+- [ ] GP5: escrever faixa nativa de percussão (`isPercussionTrack`, canal MIDI 10) e
+      peças simultâneas no mesmo beat; pronto com gravação → releitura preservando
+      peça, tique e simultaneidade, além de abertura por leitor independente.
+- [ ] MusicXML: escrever pauta não afinada, clave de percussão e
+      `Unpitched`/`PercussionChord` com mapa GM explícito; pronto quando XML cru,
+      round-trip do music21 e importação real no MuseScore preservarem peça, tique e
+      simultaneidade.
+- [ ] Integrar `--instrumento bateria` na CLI/API sem alterar o default; pronto com
+      teste ponta a ponta que usa o stem `drums`, entrega os dois formatos e não gera
+      tablatura de cordas.
+
+#### M3 — piano depois
+
+- [ ] Medir piano acústico e elétrico separadamente, com acordes de duas mãos,
+      inversões, notas repetidas e extremos A0/C8; pronto com teste `slow` e tabela por
+      rótulo/condição, ou veredito negativo documentado.
+- [ ] MusicXML: escrever piano em sistema de duas pautas, acordes verdadeiros e vozes
+      quando as durações sobrepuserem; pronto quando round-trip e MuseScore real
+      preservarem todas as alturas, ataques, durações quantizadas, clave e pauta.
+- [ ] Fazer o spike de GP5 antes de prometer o formato: cobrir A0, C8, acorde de dez
+      notas e duas vozes; pronto quando PyGuitarPro e um leitor independente
+      preservarem tudo sem cordas/trastes fictícios visíveis. Se falhar, o teste deve
+      exigir erro “GP5 não suportado para piano” e o MusicXML será o artefato canônico.
+- [ ] Integrar `--instrumento piano-acustico|piano-eletrico`; pronto com teste ponta a
+      ponta pelo stem `other`, diagnóstico de contaminação por outros instrumentos e
+      ausência de qualquer chamada ao atribuidor de trastes.
+
+#### M4 — guitarra polifônica por último
+
+- [ ] Medir separadamente guitarra acústica, elétrica limpa e distorcida, com notas
+      simples, díades e acordes de até seis notas; pronto com teste `slow`, tabela por
+      condição e comparação explícita com o teto do ADR-011, ou veredito negativo.
+- [ ] Implementar atribuição de acordes ao braço por teste de propriedade; pronto
+      quando toda nota preservar a altura, cada acorde usar cordas distintas, nenhum
+      traste exceder o máximo e a falha em acorde impossível for relatada, não
+      monofonizada.
+- [ ] GP5: emitir acordes no mesmo beat, afinação de guitarra e programa GM do perfil;
+      pronto quando gravação → releitura preservar alturas, cordas, trastes, ataques e
+      simultaneidade, com abertura por leitor independente.
+- [ ] MusicXML: emitir partitura + tablatura de guitarra, clave correta, afinação e
+      acordes; pronto quando XML cru, round-trip e MuseScore real preservarem as
+      posições escolhidas, inclusive uma digitação válida alternativa.
+- [ ] Integrar os três perfis de guitarra na CLI/API pelo stem `other`; pronto quando o
+      relatório separar erro de rótulo, contaminação do stem e acorde impossível, sem
+      fundir os três rótulos numa única parte.
+
+#### M5 — compatibilidade e verificação de entrega
+
+- [ ] Preservar o caminho atual do baixo byte a byte nas fixtures existentes; pronto
+      quando os pisos atuais, contagens de descarte e artefatos de round-trip não
+      mudarem ao deixar `--instrumento` ausente.
+- [ ] Adaptar a página apenas para formatos realmente suportados; pronto com teste
+      `navegador` verificando seleção, artefatos e mensagem explícita quando o alvo não
+      tiver GP5 — sem exigir julgamento musical.
+- [ ] Rodar `uv run pytest -n auto`, `uv run ruff check src/ tests/`,
+      `uv run mypy src/`, `uv run pytest -m "slow and not network"` e, se a página
+      mudar, `uv run pytest -m navegador`; pronto somente com saídas e números
+      registrados, sem afirmar que a suíte padrão exercitou modelo, Demucs ou navegador.
 
 ## Pendências para o Welington
 

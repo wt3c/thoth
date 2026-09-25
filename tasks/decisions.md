@@ -870,6 +870,35 @@ sobre áudio de verdade: confere que os dois canais existem e diferem, que a
 duração bate com a do original e que o canal da direita tem mais energia durante
 uma nota do que no intervalo entre notas.
 
+### Emenda (2026-09-25) — auralização não produz F1
+
+O item da Camada 2 pedia rodar o corpus e reportar F1 por grupo. A auditoria mostrou
+que as duas partes não formam uma mesma medição: a auralização compara sinais para
+localizar descolamento perceptualmente, mas não fornece os eventos de referência que
+definem verdadeiros positivos, falsos positivos e falsos negativos. `avaliar` recusa
+uma referência vazia; tratá-la como F1 zero confundiria dado ausente com transcrição
+totalmente errada.
+
+Resultado separado como manda `tasks/corpus.md`:
+
+| grupo | faixas no corpus | auralizações validadas | notas estimadas | duração | F1 |
+|---|---:|---:|---:|---:|---|
+| A | 4 | 2 | 1.651 | 624,216 s | não definido: 0 referências |
+| B | 2 | 2 | 1.837 | 1.034,310 s | não definido: 0 referências |
+| C | 2 | 2 | 4.377 | 1.223,373 s | não definido: 0 referências |
+
+Os seis WAVs são estéreo a 44,1 kHz e cobrem a duração completa do respectivo
+mix. Faltam no acervo local dois integrantes do Grupo A (`74oJcmcsy1o` e
+`dlvxhf2GCA4`). A tentativa de baixar o primeiro em 2026-09-25 falhou na resolução
+DNS antes de receber bytes; o sandbox da mesma rodada bloqueou o `fluidsynth` ao
+inicializar PulseAudio, então os seis arquivos de 2026-09-24 foram validados, não
+regenerados.
+
+**Consequência.** Camada 2 continua útil para localizar descolamento, mas não é uma
+métrica. F1 por grupo só passa a existir quando cada faixa do grupo tiver uma
+referência de eventos independente; isso pertence à Camada 3. Até lá, o valor é
+"não definido", nunca zero e nunca um agregado do corpus.
+
 ## ADR-021 — O andamento é refinado pelas notas, junto com a fase da grade
 
 **Data:** 2026-09-22 · **Status:** aceito
@@ -2663,3 +2692,331 @@ Os números por janela reproduzem os do script de medição.
 - Três tabs, todas de comunidade. A margem de 10 pontos saiu de três pares de música
   errada.
 
+---
+
+## ADR-043 — sincronização do cursor com a reprodução do Spotify
+
+**Data:** 2026-09-25 · **Status:** Proposto · **Revisa, se aceito:** ADR-001 e o contrato de rede/secrets do `AGENTS.md`
+
+### Contexto
+
+A Fase 6 prevê sincronizar o cursor da página de estudo com o endpoint de reprodução
+atual do Spotify (`currently-playing`). O ADR-001 já limita essa integração à posição
+de reprodução: o Spotify nunca seria fonte de áudio. Mesmo assim, a funcionalidade não
+cabe no contrato atual sem uma decisão explícita do usuário:
+
+- acrescenta tráfego para a autorização e para a Web API do Spotify, enquanto hoje a
+  rede só é permitida para o `yt-dlp` e para a obtenção inicial dos pesos no
+  HuggingFace;
+- exige registrar um aplicativo OAuth e guardar tokens de usuário, enquanto hoje o
+  projeto não tem secrets nem configuração de credenciais;
+- a posição reportada pertence à faixa do catálogo do Spotify, que pode não ser a
+  mesma gravação usada para gerar a tablatura. Introdução, versão ao vivo, edição,
+  silêncio inicial ou masterização diferentes produzem um cursor precisamente
+  sincronizado com a faixa errada.
+
+Este ADR é somente uma proposta. Ele **não autoriza** rede nova, cadastro de
+aplicativo, credencial, dependência ou implementação.
+
+### Autenticação e armazenamento propostos
+
+Se a integração for autorizada, usar **Authorization Code com PKCE**, aberto no
+navegador e concluído por callback em endereço de loopback fixo. PKCE evita distribuir
+um `client_secret`; o callback deve conferir `state`, e o verificador PKCE deve existir
+somente em memória. O menor escopo previsto é `user-read-currently-playing`.
+
+- `access_token` e `refresh_token` são secrets. A recomendação é guardá-los somente no
+  chaveiro do sistema operacional (Secret Service/KWallet na estação), fora do
+  repositório, de `cache/`, de `out/`, de logs e da imagem do contêiner.
+- O identificador do aplicativo não é secret, mas pertence ao cadastro pessoal do
+  usuário. A proposta é recebê-lo no primeiro login e guardá-lo junto aos dados da
+  integração no chaveiro, sem criar `.env` ou arquivo de configuração paralelo.
+- Não haveria fallback para token em texto puro. Sem chaveiro disponível, a integração
+  ficaria desabilitada e pediria novo login em uma sessão compatível.
+- Revogação, logout e expiração devem apagar o item do chaveiro. Nenhum token deve
+  aparecer em exceção, telemetria, fixture ou teste.
+
+Isso altera explicitamente a afirmação “o projeto não tem secrets”: o núcleo do Thoth
+continuaria sem secrets, mas o adaptador opcional do Spotify passaria a ter uma
+credencial pessoal local. Aceitar este ADR exigiria emendar o `AGENTS.md` antes de
+implementar, delimitando essa exceção e autorizando HTTPS apenas aos serviços de OAuth
+e Web API do Spotify.
+
+### Latência e precisão de `progress_ms`
+
+`progress_ms` deve ser tratado como uma **amostra remota**, não como relógio contínuo.
+Entre duas amostras, a posição visual pode ser extrapolada pelo relógio monotônico
+local apenas enquanto `is_playing` permanecer verdadeiro. Uma resposta nova corrige a
+âncora; troca de faixa, busca, pausa, retorno sem conteúdo e dispositivo indisponível
+interrompem a extrapolação.
+
+Proposta inicial para medir, não garantia de produto:
+
+- consultar no máximo uma vez por segundo, com recuo ao receber limitação da API;
+- registrar duração de ida e volta e estimar a âncora no meio do intervalo da
+  requisição, sem fingir que `progress_ms` corresponde exatamente ao instante de
+  chegada;
+- medir, numa sessão real, o erro absoluto do cursor após pelo menos 60 amostras,
+  informando mediana, percentil 95, maior correção e quantidade de respostas vazias ou
+  limitadas;
+- só aceitar correções suaves se a medição mostrar erro estável. Busca, pausa e troca
+  de faixa exigem salto imediato, não interpolação estética que esconda estado velho.
+
+O limite inferior do erro inclui atraso de rede, atraso de propagação do estado do
+player e intervalo entre consultas. A Web API não oferece, nesse endpoint, um relógio
+compartilhado com o navegador do Thoth. Portanto, não se promete precisão em
+milissegundos antes da medição. Além disso, qualquer diferença entre a gravação do
+Spotify e a fonte transcrita domina toda essa conta; a integração deve recusar a
+sincronização quando a identidade e a duração da faixa não tiverem sido confirmadas.
+
+### Alternativas
+
+1. **Manter a reprodução local do alphaTab.** Já funciona, não usa rede, usa o mesmo
+   artefato da tablatura e tem cursor medido no teste de navegador. É a referência de
+   menor risco e deve continuar sendo o padrão.
+2. **Ler o Spotify Desktop por MPRIS.** Na estação Linux, pode fornecer faixa, estado e
+   posição pelo barramento local, sem OAuth nem armazenamento de token no Thoth. É
+   específico do sistema operacional, depende do cliente desktop e ainda exige medir
+   a precisão, mas preserva melhor o contrato atual.
+3. **Consultar `currently-playing` pela Web API.** Funciona com reprodução em outro
+   dispositivo e é a opção mais portável, ao custo de OAuth, secret local, rede,
+   limitação de requisições e precisão ainda não medida.
+4. **Usar o Web Playback SDK.** Colocaria a própria reprodução do Spotify no navegador,
+   mas amplia o acoplamento ao serviço, à autenticação e ao SDK remoto. Não resolve a
+   diferença entre a faixa do catálogo e a fonte transcrita e é desproporcional ao
+   objetivo de mover o cursor.
+5. **Alinhamento acústico em tempo real.** Comparar o áudio tocado com o mix local
+   poderia absorver versões com pequenos deslocamentos, mas exigiria captura de áudio,
+   processamento contínuo e nova validação musical. É outro projeto, não uma variante
+   deste item.
+
+### Recomendação
+
+Manter o alphaTab como padrão e **não implementar a Web API enquanto as perguntas
+abaixo não forem respondidas**. Se o objetivo for acompanhar o Spotify Desktop na
+estação Athena, fazer primeiro um spike MPRIS, por ser reversível e não introduzir
+credencial nem nova rede no aplicativo. Se o requisito for acompanhar qualquer
+dispositivo Spotify, aceitar explicitamente a exceção de rede/secrets e então usar um
+adaptador opcional atrás de um `Protocol` de posição de reprodução, com OAuth PKCE e
+chaveiro do sistema.
+
+Mesmo no caminho Web API, a primeira entrega deve ser uma medição isolada: autenticar,
+coletar as amostras e quantificar latência e erro. Integrar o cursor só depois de a
+medição demonstrar precisão útil e de existir uma regra verificável que associe a faixa
+do Spotify à fonte transcrita. O teste real deve usar conta e aplicativo de
+desenvolvimento do usuário, ficar marcado `network` e nunca rodar com credencial de
+produção ou token versionado; testes rápidos podem cobrir somente a extrapolação e as
+transições de estado.
+
+### Perguntas que bloqueiam a decisão
+
+1. O alvo é apenas o Spotify Desktop na estação Athena, ou também reprodução em celular,
+   navegador e outros dispositivos? Se for apenas a estação, MPRIS atende ao objetivo
+   sem OAuth?
+2. O usuário autoriza acrescentar ao contrato acesso HTTPS aos serviços de OAuth e Web
+   API do Spotify e um secret pessoal no chaveiro do sistema?
+3. O usuário aceita registrar e administrar um aplicativo no painel de desenvolvedor do
+   Spotify, incluindo o endereço de callback de loopback?
+4. Como a faixa será associada à transcrição: seleção manual por job, metadados
+   normalizados mais duração, ou exigência de uma gravação previamente confirmada? O que
+   a interface deve fazer quando título, artista ou duração divergirem?
+5. Qual erro de cursor é útil para estudo: até 250 ms, até 500 ms ou outro limite? Sem
+   esse critério, a medição não tem veredito.
+6. A integração precisa funcionar dentro do contêiner? O chaveiro e o callback OAuth
+   pertencem ao host; suportá-los no contêiner muda substancialmente a proposta.
+
+---
+
+## ADR-044 — expansão por partes: bateria, piano e guitarra polifônica
+
+**Data:** 2026-09-25 · **Status:** Proposto · **Revisa, se aceito:** ADR-003, ADR-008,
+ADR-010, ADR-011, ADR-014 e ADR-035
+
+### Contexto e evidência disponível
+
+O ADR-011 limitou o produto ao baixo por medição, não por preferência: na guitarra
+neo-soul apareceram **208 notas e 7–8 simultâneas**, e a qualidade publicada do
+MuScriptor cai de onset F1 **60,4 para 51,8** quando há sobreposição dentro do mesmo
+instrumento. Além disso, o `htdemucs_ft` só oferece `bass`, `drums`, `vocals` e
+`other`; guitarra e piano dividem `other` entre si e com os demais instrumentos.
+
+A Fase 6 pode reabrir esse limite, mas não pode presumir que “há um rótulo” significa
+“há transcrição utilizável”. Inspeção da instalação local fixada em MuScriptor 0.3.0,
+na tabela `MT3_FULL_PLUS_GROUP_NAMES`, confirma seis rótulos relevantes:
+
+| alvo | rótulos que o MuScriptor já emite | semântica da saída |
+|---|---|---|
+| piano | `acoustic_piano`, `electric_piano` | notas MIDI com início e fim |
+| guitarra | `acoustic_guitar`, `clean_electric_guitar`, `distorted_electric_guitar` | notas MIDI, inclusive simultâneas |
+| bateria | `drums` | ataques; a peça é o número MIDI de percussão |
+
+O MuScriptor continua emitindo somente MIDI/JSON/JSONL, não partitura nem tablatura
+(ADR-003). Para bateria, o fluxo interno cria início e fim separados por **10 ms**;
+isso serve para transportar o ataque, não é sustentação medida. A flag
+`--instruments` continua proibida como seletor: ela condiciona o decoder e já piorou
+a saída (ADR-008). Cada medição desta fase deve decodificar livre e filtrar depois.
+
+### Decisão proposta: uma parte-alvo por execução
+
+O primeiro recorte multi-instrumento não cria uma grade orquestral com todas as partes
+ao mesmo tempo. Cada job escolhe **uma parte-alvo**; sem escolha, continua produzindo
+baixo exatamente como hoje. Isso mantém relatório, cache, nomes e artefatos
+compreensíveis e permite medir um instrumento sem esconder erros atrás dos outros.
+
+Os três rótulos de guitarra também não serão fundidos. Guitarra acústica, elétrica
+limpa e elétrica distorcida serão perfis selecionáveis da mesma família. Somá-los
+silenciosamente pode transformar uma troca de rótulo ou duas guitarras reais num
+acorde impossível de mais de seis notas.
+
+O mapeamento inicial de stem é:
+
+| família | stem do Demucs | limitação que deve aparecer no relatório |
+|---|---|---|
+| baixo | `bass` | comportamento atual |
+| bateria | `drums` | stem dedicado |
+| piano | `other` | divide áudio com guitarra, teclados e sopros |
+| guitarra | `other` | não existe stem dedicado no `htdemucs_ft` |
+
+Separar continua sendo hipótese a medir por alvo, e não dogma herdado do baixo. Para
+cada fixture serão comparadas a versão isolada, a mix direta e o stem correspondente.
+Se `other` piorar piano ou guitarra, o perfil poderá transcrever a mix; a decisão será
+do número medido e ficará como emenda deste ADR.
+
+### Domínio e ports
+
+`NoteEvent` continua representando evento com altura. Ataque de bateria não tem altura
+musical nem duração inferida, então ganha `EventoPercussivo`, com instante, peça GM e
+rótulo. O resultado bruto do transcritor passa a ser uma `Transcricao` com duas
+coleções: notas e ataques percussivos. O parser converte `instrument == "drums"` na
+borda; o domínio não precisa saber que o MuScriptor codifica peça de bateria no campo
+chamado `pitch`.
+
+Uma `ParteMusical` liga os eventos a um perfil de instrumento e, quando aplicável, às
+posições de corda/traste. O perfil declara família, rótulos aceitos, stem, programa GM,
+afinação opcional e capacidades de formato. Isso substitui condicionais espalhadas por
+CLI, pipeline e exportadores.
+
+Mudanças propostas nos contratos:
+
+- `Transcriber.transcribe(audio)` devolve `Transcricao` completa. Sai o parâmetro
+  opcional `instrument`: o decoder é sempre livre, e a seleção pertence ao serviço.
+- `Separator.separate(audio, out_dir)` mantém `dict[str, Path]`, porque já representa
+  os stems disponíveis; apenas deixa de prometer que o consumidor sempre quer baixo.
+- o `FretAssigner` atual permanece monofônico e específico do caminho de baixo. Um
+  segundo `Protocol` atribui **acordes** de guitarra, garantindo cordas distintas no
+  mesmo ataque. Piano e bateria não implementam nenhum dos dois.
+- `Exporter.export()` recebe uma `ParteMusical`, não `list[TabNote]` e `tuning`
+  obrigatórios. As fachadas GP5 e MusicXML delegam a estratégias por família; não se
+  cria uma classe central com ramificações musicais de todos os instrumentos.
+
+O pipeline continua sendo o único lugar que ordena os estágios. `monofonizar` segue no
+baixo, mas não pode alcançar guitarra, piano ou bateria: nesses alvos, simultaneidade é
+conteúdo. Acorde impossível, peça desconhecida e nota fora da extensão são descartados
+somente com relato estruturado, preservando o princípio do ADR-014.
+
+### Exportação por família
+
+**Guitarra.** GP5 e MusicXML têm representação nativa de cordas e trastes. O trabalho
+novo é atribuir um acorde inteiro sem repetir corda e ensinar ritmo/exportadores a
+agrupar notas do mesmo tique num beat/acorde, em vez de chamar isso de colisão. O GP5
+usa a afinação e o programa GM do perfil; o MusicXML usa clave de Sol 8vb, pauta de
+notação e pauta de tablatura com `staff-tuning`. Round-trip deve afirmar altura,
+instante, corda, traste e simultaneidade.
+
+**Bateria.** GP5 usa faixa de percussão nativa (`isPercussionTrack=True`, canal MIDI
+10) e mais de uma peça no mesmo beat. MusicXML usa pauta não afinada, clave de
+percussão, `Unpitched` e `PercussionChord`, com mapa explícito entre número GM,
+instrumento e posição/cabeça na pauta. A duração gráfica mínima vem da grade; ela não
+será reportada como duração detectada. O round-trip afirma peça, instante e
+simultaneidade, nunca sustain.
+
+**Piano em MusicXML.** É o formato canônico: sistema de duas pautas, claves de Sol e
+Fá, `Chord` para ataques simultâneos e vozes quando durações se sobrepõem. A divisão
+entre pautas deve ser determinística e testada, mas não tenta inferir dedilhado ou mão
+humana. O round-trip afirma todas as alturas, instantes, durações quantizadas, vozes e
+pautas.
+
+**Piano em GP5 é condicional, não promessa.** O formato GP5 lido pelo PyGuitarPro
+guarda cada nota como corda + traste e limita a faixa a sete cordas, embora consiga
+declarar claves primária e secundária. Inventar uma afinação invisível pode produzir
+notação que parece certa e não sobreviver a acordes de oito a dez notas ou aos 88 sons
+do piano. Antes de implementar, um spike deve provar round-trip de A0, C8, acorde de
+dez notas e duas vozes, além de abrir num leitor independente sem exibir trastes
+fictícios. Se qualquer um falhar, `Gp5Exporter` recusará piano explicitamente e o job
+entregará MusicXML; fabricar um GP5 plausível fica proibido.
+
+Essa condição tem impacto na página: o alphaTab atual consome GP5. Sem GP5 de piano,
+o piano terá arquivo MusicXML para MuseScore, mas não player/cursor no navegador nesta
+fase. A interface deve explicar a capacidade ausente, não esconder o artefato nem
+converter MusicXML por serviço externo.
+
+### Medição e fixtures
+
+Áudio e artefatos gerados continuam fora do repositório. O que será versionado é o
+gerador MIDI determinístico, como `tests/sintetico.py`; cada estímulo terá ao menos
+**8 s**, porque o próprio baixo mudou de `acoustic_piano` para `electric_bass` entre
+2,9 s e 8,1 s (ADR-008). Port de fixture é cópia, e baseline só existe depois de
+reproduzir o número original (`tasks/lessons/workflow.md`).
+
+Cada família precisa de estímulo isolado e de mix com distratores:
+
+- **bateria:** bumbo, caixa, chimbal, tons e prato, com ataques isolados e simultâneos;
+- **piano:** acústico e elétrico separados, duas mãos, inversões, repetição e A0/C8;
+- **guitarra:** os três timbres separados, nota simples, díade e acordes de até seis
+  notas em afinação padrão.
+
+Para piano e guitarra serão publicados precisão, revocação e F1 de ataque e de nota
+com tolerância de **50 ms**, sem cobrar offset como critério. Para bateria serão F1
+micro e macro por peça GM, também a 50 ms, e matriz de confusão de peças; duração não
+se aplica. Toda tabela inclui tempo de CPU, notas/ataques de referência e estimados,
+contagem por rótulo e as três condições isolada/mix/stem.
+
+Os testes que chamam MuScriptor, Demucs, MuseScore ou leitor externo são `slow`; a
+seleção local correta é `uv run pytest -m "slow and not network"`. A suíte padrão
+continua rápida e não pode ser citada como prova dessas camadas. Teste de navegador
+usa o marcador `navegador`; nenhuma medição desta fase exige rede.
+
+A primeira rodada é **medição**, não piso escolhido depois de ver o resultado. Ela
+termina com `seguir`, `ajustar` ou `manter fora de escopo` por instrumento. Só um
+perfil com veredito `seguir` ganha pipeline/exportador; então a medição reproduzida no
+checkpoint fixado vira teste de regressão com o valor medido impresso ao lado do piso.
+
+### Ordem recomendada
+
+1. **Contrato e avaliadores comuns**, ainda com o baixo como único produto, para provar
+   retrocompatibilidade antes de abrir outro caminho.
+2. **Bateria**, porque tem stem dedicado, não exige atribuição de trastes e os dois
+   formatos têm representação percussiva nativa.
+3. **Piano**, porque exercita polifonia afinada sem o problema combinatório de escolher
+   cordas; MusicXML é nativo e o GP5 recebe um veredito cedo.
+4. **Guitarra**, por último: junta a degradação polifônica já medida, o stem `other`
+   compartilhado e o novo problema de atribuir acordes tocáveis ao braço.
+5. **CLI/API/UI e regressão do baixo**, somente para os perfis que passaram pela
+   medição; não criar opções que terminem em artefato musical não validado.
+
+### Alternativas descartadas
+
+- **Um único job com baixo, guitarra, piano e bateria.** Torna impossível atribuir uma
+  regressão ao transcritor, ao stem ou ao exportador e antecipa uma partitura completa
+  antes de cada parte ter qualidade medida.
+- **Reusar `TabNote` para tudo.** Piano ganharia cordas fictícias e bateria ganharia
+  altura/sustentação fictícias; o tipo deixaria o erro parecer válido.
+- **Monofonizar os novos alvos.** Em baixo é política de recuperação; em piano,
+  guitarra e bateria apaga o conteúdo que esta fase existe para suportar.
+- **Condicionar o MuScriptor com `--instruments`.** O ADR-008 já mediu que isso força
+  áudio alheio para o rótulo permitido.
+- **Validar por ouvido.** O usuário não é juiz de música; qualidade vem da referência
+  MIDI e das métricas, e abertura/renderização vêm de leitores reais.
+
+### Consequências e decisão pendente
+
+Se aceito, este ADR revisa o “fora de escopo enquanto o motor for MuScriptor” do
+ADR-011 para uma sequência de experimentos com saída negativa permitida. Ele não
+afirma hoje que nenhum dos três instrumentos funciona: afirma como essa conclusão será
+medida sem contaminar o caminho do baixo.
+
+Há uma decisão de produto para o usuário antes de implementar: **MusicXML sem GP5 e
+sem player alphaTab conta como suporte suficiente para piano?** A recomendação é
+**sim** — MusicXML é representação nativa e editável para piano; forçar GP5 seria
+otimizar para o player com risco de corromper a música. Se a resposta for não, piano
+deve permanecer fora de escopo caso o spike de GP5 falhe.
