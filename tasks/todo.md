@@ -155,10 +155,12 @@ A avaliação **não depende de saber tocar** (ADR-006).
       virava nota certa em suspeita. FFT completada com zeros + janela com piso de 0,3 s:
       8 de 12, 4 de 127 alarmes. Calibração travada em `tests/integration/test_oitava_equus.py`
       (`slow`, pula sem `~/thoth-fase0`). Remedido nas tabs: segunda emenda do ADR-030
-- [ ] Discriminador de oitava que separe melhor fora do Equus — o `f0 / 2·f0` separa
-      fraco (AUC 0,75, segunda emenda do ADR-030) e não vê o erro para cima (5 de 97).
-      Candidatos já medidos e descartados: ímpares/pares, `3f0/(2f0+4f0)`, meios-harmônicos.
-      Pesquisa, sem urgência
+- [x] Erro de oitava **para cima** — não é do Thoth: em 91 dos 95 casos medidos o áudio desmente a
+      tab (terceira emenda do ADR-030). Nada a detectar
+- [ ] Discriminador do erro **para baixo** que separe melhor que o `f0 / 2·f0` (AUC 0,75,
+      segunda emenda do ADR-030). Candidatos já medidos e descartados: ímpares/pares,
+      `3f0/(2f0+4f0)`, meios-harmônicos. Com 84 casos em duas músicas, diferença pequena
+      entre candidatos não se distingue de acaso: esperar mais tabs
 - [x] `MuscriptorTranscriber` atrás do `Protocol Transcriber` — subprocesso via
       `uvx` (torch fora do projeto), `small` + livre + `--detect-tempo false`.
       7 testes: 6 de parsing puro + 1 contra o modelo real (`slow`).

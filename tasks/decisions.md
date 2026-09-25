@@ -1532,6 +1532,34 @@ acima:
 continua diagnóstico da nota, não triagem: a lista caiu para um décimo das notas em
 *And Plague Flowers*, mas nove em cada dez avisos ainda são nota certa.
 
+### Emenda (2026-09-25, noite) — o "erro para cima" é, segundo o áudio, da tab
+
+As duas emendas acima dizem que o erro para cima passa (5 de 97 avisados). Procurando um
+discriminador para ele, a hipótese era física: se a nota soa em `p - 12`, os ímpares
+dela caem em 0,5·f0 e 1,5·f0 de `p`, onde uma nota `p` de verdade não tem nada.
+Nenhum candidato separou: AUC de 0,41 a 0,50 em *Fear* e de 0,57 a 0,65 em *And Plague
+Flowers*, comparando notas de mesma altura — a altura sozinha dá 0,88 e 0,70.
+
+O motivo está no áudio. Se a tab estivesse certa, a razão `f0 / 2·f0` **da nota da tab**
+(a energia em 0,5·f0 de `p` contra a em f0) seria parecida com a de uma nota
+concordante tocada naquela altura. Não é:
+
+| Música | casos | razão sob "tab certa" | concordantes naquela altura | casos compatíveis com a tab |
+|---|---|---|---|---|
+| *Fear Is the Key* | 19 | 0,07 | 0,33 | 0 |
+| *And Plague Flowers* | 76 | 0,17 | 0,58 | 4 |
+
+"Compatível" é a razão da nota ficar acima de 95% das concordantes naquela altura. Nas
+demais, a fundamental que a tab pede falta mais do que em qualquer nota real do mesmo
+registro, e a fundamental do Thoth é forte (mediana 1,71 em *Fear*, contra 0,60 das
+concordantes).
+
+**Decisão:** não há discriminador a construir para o erro para cima nestes dados — o
+áudio sustenta a altura do Thoth em quase todos os 97 casos, e o que diverge é a tab
+(escrita uma oitava abaixo do que soa, ou o baixista subiu a oitava). Consequência para
+quem ler o veredito do ADR-042: a contagem "oitava" mistura erro do Thoth com erro da
+tab, e para cima é quase só da tab. O que continua aberto é o erro para baixo (AUC 0,75).
+
 ## ADR-031 — a grafia do acidente segue o tom, com margem (B9)
 
 **Data:** 2026-09-23 · **Status:** aceito
