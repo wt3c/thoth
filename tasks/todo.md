@@ -404,9 +404,11 @@ Pré-requisito invisível até agora: a Fase 5 só existe se houver o que o
 
 #### M4 — guitarra polifônica por último
 
-- [ ] Medir separadamente guitarra acústica, elétrica limpa e distorcida, com notas
+- [x] Medir separadamente guitarra acústica, elétrica limpa e distorcida, com notas
       simples, díades e acordes de até seis notas; pronto com teste `slow`, tabela por
       condição e comparação explícita com o teto do ADR-011, ou veredito negativo.
+      → `revocacao_por_acorde`; acordes de 6 notas em 21–24 de 24, 23–24 no stem
+      (emenda do ADR-044 de 2026-09-25, comparação com o ADR-011).
 - [x] Implementar atribuição de acordes ao braço por teste de propriedade
       (`services/acordes.py`, emenda do ADR-044 de 2026-09-25); pronto
       quando toda nota preservar a altura, cada acorde usar cordas distintas, nenhum

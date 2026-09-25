@@ -18,6 +18,7 @@ from thoth.services.evaluation import (
     avaliar_bateria,
     avaliar_polifonico,
     notas_do_midi,
+    revocacao_por_acorde,
 )
 
 
@@ -162,6 +163,33 @@ def test_polifonico_recusa_referencia_vazia_e_zera_estimativa_vazia() -> None:
     with pytest.raises(ValueError):
         avaliar_polifonico([], ACORDES)
     assert avaliar_polifonico(ACORDES, []).nota == Prf(0.0, 0.0, 0.0)
+
+
+def test_revocacao_por_acorde_separa_pelo_tamanho_do_acorde_da_referencia() -> None:
+    """Uma nota perdida no acorde de seis não pode se esconder atrás da nota solta."""
+    ref = [*ACORDES[:6], _nota(45, 1.0)]
+    sem_a_mais_aguda = [n for n in ref if n.pitch != 64]
+
+    assert revocacao_por_acorde(ref, sem_a_mais_aguda) == {1: (1, 1), 6: (5, 6)}
+
+
+def test_revocacao_por_acorde_identica_casa_tudo() -> None:
+    assert revocacao_por_acorde(ACORDES, list(ACORDES)) == {6: (12, 12)}
+
+
+def test_ataques_a_menos_de_50_ms_sao_o_mesmo_acorde() -> None:
+    """A mesma tolerância com que o avaliador casa ataques e o `ViterbiAcordes` agrupa."""
+    rasgueado = [_nota(40, 0.0), _nota(47, 0.02), _nota(52, 0.04)]
+    separadas = [_nota(40, 0.0), _nota(47, 0.06)]
+
+    assert revocacao_por_acorde(rasgueado, rasgueado) == {3: (3, 3)}
+    assert revocacao_por_acorde(separadas, separadas) == {1: (2, 2)}
+
+
+def test_revocacao_por_acorde_recusa_referencia_vazia_e_zera_estimativa_vazia() -> None:
+    with pytest.raises(ValueError):
+        revocacao_por_acorde([], ACORDES)
+    assert revocacao_por_acorde(ACORDES, []) == {6: (0, 12)}
 
 
 GROOVE = [

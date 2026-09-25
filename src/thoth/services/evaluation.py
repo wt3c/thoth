@@ -178,6 +178,42 @@ def avaliar_polifonico(
                              n_ref, n_est)
 
 
+def revocacao_por_acorde(
+    referencia: Sequence[NoteEvent],
+    estimativa: Sequence[NoteEvent],
+    *,
+    tolerancia_s: float = TOLERANCIA_S,
+) -> dict[int, tuple[int, int]]:
+    """`{tamanho do acorde: (notas casadas, notas na referência)}` — o teto do ADR-011.
+
+    O acorde é o da **referência**: notas que começam a menos de `tolerancia_s` da
+    primeira do grupo, a mesma regra do `services/acordes.py`. Só revocação, porque
+    uma nota falsa não pertence a acorde nenhum da referência. O casamento é o mesmo
+    do `avaliar_polifonico`, um para um por ataque e altura.
+    """
+    if not referencia:
+        raise ValueError("referência vazia: não há o que avaliar")
+    ordem = sorted(range(len(referencia)), key=lambda i: referencia[i].onset_s)
+    grupos: list[list[int]] = []
+    for i in ordem:
+        if grupos and referencia[i].onset_s - referencia[grupos[-1][0]].onset_s < tolerancia_s:
+            grupos[-1].append(i)
+        else:
+            grupos.append([i])
+    casadas: set[int] = set()
+    if estimativa:
+        ref_iv, ref_hz = _arrays(referencia)
+        est_iv, est_hz = _arrays(estimativa)
+        pares = match_notes(ref_iv, ref_hz, est_iv, est_hz,
+                            onset_tolerance=tolerancia_s, offset_ratio=None)
+        casadas = {int(r) for r, _ in pares}
+    contagem: dict[int, tuple[int, int]] = {}
+    for grupo in grupos:
+        acertos, total = contagem.get(len(grupo), (0, 0))
+        contagem[len(grupo)] = (acertos + len(casadas.intersection(grupo)), total + len(grupo))
+    return dict(sorted(contagem.items()))
+
+
 @dataclass(frozen=True, slots=True)
 class ScoresBateria:
     """Ataque certo na peça certa, por peça GM. Sem métrica de duração."""

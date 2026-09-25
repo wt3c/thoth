@@ -3248,3 +3248,38 @@ deslocamento da mão medido pelo menor traste pisado. O mi maior sai na forma ab
     `#tab svg`, com a sessão viva por mais de 10 s);
   - o relato traz as três causas;
   - job sem GP5 mostra a mensagem e não abre os controles de estudo.
+
+### Emenda (2026-09-25) — revocação por tamanho de acorde e o teto do ADR-011
+
+Pedida no M4 e adiada no veredito "para quando a guitarra for a etapa ativa".
+`revocacao_por_acorde` (em `services/evaluation.py`) conta as notas acertadas por
+tamanho de acorde **da referência**, agrupado pela mesma janela de 50 ms do
+`ViterbiAcordes`. Só revocação: uma nota falsa não pertence a acorde nenhum. Mesma
+medição do veredito, `test_multi_instrumento.py`, notas acertadas ÷ notas da referência:
+
+| perfil | condição | 1 | 2 | 3 | 4 | 5 | 6 |
+|---|---|---|---|---|---|---|---|
+| acústica | isolada | 3/4 | 8/8 | 3/3 | 4/4 | 10/10 | 23/24 |
+| acústica | mix | 3/4 | 8/8 | 3/3 | 4/4 | 8/10 | 23/24 |
+| acústica | stem | 3/4 | 8/8 | 3/3 | 4/4 | 10/10 | 23/24 |
+| distorcida | isolada | 3/4 | 8/8 | 2/3 | 4/4 | 10/10 | 24/24 |
+| distorcida | mix | 3/4 | 8/8 | 3/3 | 4/4 | 10/10 | 24/24 |
+| distorcida | stem | 3/4 | 8/8 | 2/3 | 4/4 | 10/10 | 24/24 |
+| limpa | isolada | 3/4 | 8/8 | 2/3 | 4/4 | 10/10 | 24/24 |
+| limpa | mix | 3/4 | 8/8 | 3/3 | 4/4 | 9/10 | 21/24 |
+| limpa | stem | 3/4 | 8/8 | 3/3 | 4/4 | 10/10 | 24/24 |
+
+**Na fixture, a revocação não cai com o tamanho do acorde.** Com o stem do Demucs,
+os acordes de seis notas ficam em 23 ou 24 de 24. A perda que se repete nas nove
+medições é uma nota simples (3/4); a causa não foi investigada.
+
+**Isto não contradiz o ADR-011, e também não o derruba.** O teto de lá foi medido
+em música real: guitarra neo-soul com 7 a 8 notas simultâneas, *voicings* densos e
+notas sustentadas que se sobrepõem aos ataques seguintes. A fixture tem acordes
+tocados em bloco, uma semínima cada, de no máximo seis notas e sem sobreposição
+entre eles. Ou seja, mede o que o M4 pede (díades e acordes de até seis cordas), mas
+não o caso que o ADR-011 descreveu. A qualidade em música real continua sendo da
+Camada 3, como já dizia o veredito. Se aparecer lá, o sinal esperado é `acordes_impossiveis`
+e revocação baixa nos acordes grandes, que agora têm onde ser lidos.
+
+Piso novo: `MEDIDO_SEIS_NOTAS`, com uma nota de folga no stem, como a `FOLGA_DEMUCS`.

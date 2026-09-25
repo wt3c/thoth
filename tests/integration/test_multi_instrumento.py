@@ -24,7 +24,11 @@ from thoth.adapters.separation import DemucsSeparator
 from thoth.adapters.transcription.muscriptor import MuscriptorTranscriber
 from thoth.domain.instrumentos import PERFIS
 from thoth.domain.models import Transcricao
-from thoth.services.evaluation import avaliar_bateria, avaliar_polifonico
+from thoth.services.evaluation import (
+    avaliar_bateria,
+    avaliar_polifonico,
+    revocacao_por_acorde,
+)
 
 pytestmark = [
     pytest.mark.slow,
@@ -68,6 +72,21 @@ MEDIDO: dict[tuple[str, str], float] = {
 FOLGA_DEMUCS = 0.03
 
 
+#: Notas acertadas nos acordes de seis notas da guitarra, de 24 (M4, 2026-09-25): o
+#: teto do ADR-011 é a sobreposição de notas do mesmo instrumento, e é aqui que ele
+#: apareceria primeiro. Uma nota de folga onde há Demucs, como na `FOLGA_DEMUCS`.
+MEDIDO_SEIS_NOTAS: dict[tuple[str, str], int] = {
+    ("guitarra-acustica", "isolada"): 23,
+    ("guitarra-acustica", "mix"): 23,
+    ("guitarra-acustica", "mix-stem"): 23,
+    ("guitarra-distorcida", "isolada"): 24,
+    ("guitarra-distorcida", "mix"): 24,
+    ("guitarra-distorcida", "mix-stem"): 24,
+    ("guitarra-limpa", "isolada"): 24,
+    ("guitarra-limpa", "mix"): 21,
+    ("guitarra-limpa", "mix-stem"): 24,
+}
+
 def _audio(perfil: str, condicao: str, tmp_path: Path) -> Path:
     fixture = f"{perfil}-{'isolada' if condicao == 'isolada' else 'mix'}"
     wav = renderizar_multi(fixture, tmp_path)
@@ -106,6 +125,10 @@ def test_mede_perfil(perfil: str, condicao: str, tmp_path: Path) -> None:
             f"nota P {s.nota.precisao:.3f} R {s.nota.revocacao:.3f} F1 {s.nota.f1:.3f} "
             f"ataque F1 {s.ataque.f1:.3f} ref={s.n_ref} est={s.n_est}"
         )
+        por_acorde = revocacao_por_acorde(ref.notas, do_perfil.notas)
+        resultado += " acordes[" + " ".join(
+            f"{k}:{c}/{t}" for k, (c, t) in por_acorde.items()
+        ) + "]"
     piso = max(0.0, MEDIDO[(perfil, condicao)] - (FOLGA_DEMUCS if condicao == "mix-stem" else 0))
     print(
         f"\nMEDIDO {perfil} {condicao}: {resultado} {segundos:.0f}s rótulos={dict(rotulos)} "
@@ -114,3 +137,8 @@ def test_mede_perfil(perfil: str, condicao: str, tmp_path: Path) -> None:
 
     assert bruto, f"MuScriptor não devolveu nada para {perfil} {condicao}"
     assert f1 >= piso, f"{perfil} {condicao} regrediu: {f1} < {piso} medido no ADR-044"
+    if (perfil, condicao) in MEDIDO_SEIS_NOTAS:
+        seis = por_acorde[6][0]
+        piso_seis = MEDIDO_SEIS_NOTAS[(perfil, condicao)] - (condicao == "mix-stem")
+        print(f"SEIS NOTAS {perfil} {condicao}: {seis}/24 piso={piso_seis}")
+        assert seis >= piso_seis, f"acordes de seis notas regrediram: {seis} < {piso_seis}"
