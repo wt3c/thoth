@@ -230,6 +230,97 @@ def test_sem_buraco_nao_ha_segunda_passada(tmp_path: Path) -> None:
     assert {n.pitch for n in notas} == {30}
 
 
+# --- Silêncio na frente do áudio (ADR-045) ------------------------------------------
+
+#: Finge ser o MuScriptor que ouve de verdade: dá uma nota no primeiro instante com som
+#: do áudio que recebeu, mais as de `--extras` (instantes no áudio recebido).
+OUVINTE = """\
+import json, sys
+from pathlib import Path
+import numpy as np
+import soundfile as sf
+args = sys.argv[1:]
+y, sr = sf.read(args[args.index("transcribe") + 1], always_2d=True)
+t0 = float(np.flatnonzero(np.abs(y).max(axis=1) > 1e-4)[0] / sr)
+Path(args[args.index("--log") + 1]).write_text(f"{t0} {args[args.index('transcribe') + 1]}")
+eventos = [(t0, t0 + 0.3), *json.loads(args[args.index("--extras") + 1])]
+linhas = []
+for i, (ini, fim) in enumerate(eventos):
+    linhas.append({"type": "start", "pitch": 40 + i, "start_time": ini, "index": i,
+                   "instrument": "electric_bass"})
+    linhas.append({"type": "end", "end_time": fim, "start_event_index": i})
+Path(args[args.index("-o") + 1]).write_text("\\n".join(json.dumps(x) for x in linhas))
+"""
+
+
+#: O valor que a bateria usa (ADR-045); aqui só precisa ser maior que zero.
+SILENCIO = 0.1
+
+
+def _ouvinte(
+    tmp_path: Path, extras: list[tuple[float, float]], silencio: float = SILENCIO
+) -> MuscriptorTranscriber:
+    """O instante do primeiro som ouvido e o arquivo recebido ficam em `ouvido.txt`."""
+    import json
+    import sys
+
+    script = tmp_path / "ouvinte.py"
+    script.write_text(OUVINTE)
+    return MuscriptorTranscriber(
+        binary=(
+            sys.executable, str(script),
+            "--extras", json.dumps(extras), "--log", str(tmp_path / "ouvido.txt"),
+        ),
+        silencio_inicial_s=silencio,
+    )
+
+
+def _ouvido(tmp_path: Path) -> tuple[float, str]:
+    t0, caminho = (tmp_path / "ouvido.txt").read_text().split(" ", 1)
+    return float(t0), caminho
+
+
+def test_sem_silencio_o_modelo_recebe_o_arquivo_original(tmp_path: Path) -> None:
+    """ADR-045: o silêncio troca o rótulo do baixo (`walking` vira piano); o padrão é 0,
+    e com 0 o caminho do baixo é o de antes, sem nem regravar o áudio."""
+    stem = _stem(tmp_path, 10.0)
+
+    (nota,) = _ouvinte(tmp_path, [], silencio=0.0).transcribe(stem)
+
+    assert MuscriptorTranscriber().silencio_inicial_s == 0.0
+    assert _ouvido(tmp_path)[1] == str(stem)
+    assert nota.onset_s == pytest.approx(0.0, abs=1e-3)
+
+
+def test_modelo_recebe_silencio_na_frente_e_o_tempo_volta_ao_original(tmp_path: Path) -> None:
+    """ADR-045: o MuScriptor perde ataques de bateria no começo do áudio."""
+    (nota,) = _ouvinte(tmp_path, []).transcribe(_stem(tmp_path, 10.0))
+
+    assert _ouvido(tmp_path)[0] == pytest.approx(SILENCIO, abs=1e-3)
+    # O ouvinte deu a nota onde ouviu o primeiro som; descontado, é 0 no áudio original.
+    assert nota.onset_s == pytest.approx(0.0, abs=1e-3)
+    assert nota.offset_s == pytest.approx(0.3, abs=1e-3)
+
+
+def test_nota_inteira_dentro_do_silencio_e_descartada(tmp_path: Path) -> None:
+    """Som que não existe no áudio original não pode virar nota."""
+    extras = [(0.0, SILENCIO / 2)]
+
+    notas = _ouvinte(tmp_path, extras).transcribe(_stem(tmp_path, 10.0))
+
+    assert [n.pitch for n in notas] == [40]
+
+
+def test_nota_que_atravessa_o_fim_do_silencio_comeca_em_zero(tmp_path: Path) -> None:
+    extras = [(SILENCIO / 2, SILENCIO + 0.5)]
+
+    notas = _ouvinte(tmp_path, extras).transcribe(_stem(tmp_path, 10.0))
+
+    atravessa = next(n for n in notas if n.pitch == 41)
+    assert atravessa.onset_s == 0.0
+    assert atravessa.offset_s == pytest.approx(0.5, abs=1e-3)
+
+
 @pytest.mark.slow
 def test_taxonomia_do_escopo_multi_instrumento_existe_no_motor() -> None:
     """Os rótulos que os perfis do ADR-044 aceitam precisam existir no motor fixado.

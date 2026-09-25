@@ -45,9 +45,10 @@ PERFIS_NOVOS = sorted(p for p in PERFIS if p != "baixo")
 #: pelo mesmo motivo do `test_regressao_fase0.py`: renderização determinística, motor
 #: pregado, e com 34 a 53 eventos de referência a menor diferença já é um evento inteiro.
 MEDIDO: dict[tuple[str, str], float] = {
-    ("bateria", "isolada"): 0.529,
-    ("bateria", "mix"): 0.867,
-    ("bateria", "mix-stem"): 0.529,
+    # Com `SILENCIO_BATERIA` (ADR-045); sem ele, 0,529, 0,867 e 0,529.
+    ("bateria", "isolada"): 0.901,
+    ("bateria", "mix"): 0.926,
+    ("bateria", "mix-stem"): 0.901,
     ("guitarra-acustica", "isolada"): 0.981,
     ("guitarra-acustica", "mix"): 0.705,
     ("guitarra-acustica", "mix-stem"): 0.981,
@@ -71,6 +72,11 @@ MEDIDO: dict[tuple[str, str], float] = {
 #: em até 0,04 na amostra; o piano deu 0,879 e 0,892). Um evento de folga em 34, só
 #: onde há separação — emenda do ADR-044 (2026-09-25).
 FOLGA_DEMUCS = 0.03
+
+
+#: Silêncio na frente do áudio só para a bateria (ADR-045): nos outros perfis ele troca
+#: o rótulo — guitarra acústica e piano acústico vão a zero com qualquer valor medido.
+SILENCIO_BATERIA = 0.1
 
 
 #: Notas acertadas nos acordes de seis notas da guitarra, de 24 (M4, 2026-09-25): o
@@ -102,7 +108,8 @@ def _audio(perfil: str, condicao: str, tmp_path: Path) -> Path:
 def test_mede_perfil(perfil: str, condicao: str, tmp_path: Path) -> None:
     inicio = time.monotonic()
     audio = _audio(perfil, condicao, tmp_path)
-    bruto = MuscriptorTranscriber(model="small").transcribe(audio)
+    silencio = SILENCIO_BATERIA if PERFIS[perfil].familia == "bateria" else 0.0
+    bruto = MuscriptorTranscriber(model="small", silencio_inicial_s=silencio).transcribe(audio)
     segundos = time.monotonic() - inicio
 
     rotulos = Counter(n.instrument for n in bruto)

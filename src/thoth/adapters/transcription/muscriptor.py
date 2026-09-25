@@ -17,6 +17,9 @@ Decisões da Fase 0 embutidas aqui:
   anterior, e em *Eyrie* isso travou o modelo em vazio de 557 a 671 s com o baixo
   soando. O mesmo trecho sem o forcing sai transcrito. Desligar sempre custaria a
   qualidade na fronteira dos blocos (rótulo trocado) nas 13 de 14 músicas sem buraco.
+- **Silêncio na frente só por pedido** (ADR-045): recupera os ataques de bateria que
+  o modelo perde no começo do áudio, mas os primeiros instantes também decidem o
+  rótulo, e com 0,1 s o baixo `walking` inteiro sai como `acoustic_piano`.
 """
 
 from __future__ import annotations
@@ -124,6 +127,10 @@ class MuscriptorTranscriber:
     model: str = "small"
     device: str = "cpu"  # a estação não tem CUDA; ROCm não está no escopo
     binary: tuple[str, ...] = field(default=("uvx", "--python", "3.12", "muscriptor@0.3.0"))
+    #: Silêncio posto na frente do áudio, descontado das notas depois (ADR-045). Tira a
+    #: bateria de 0,529 para 0,901, mas troca o rótulo de outros instrumentos — o
+    #: baixo `walking` vira `acoustic_piano` com 0,1 s. Por isso o padrão é zero.
+    silencio_inicial_s: float = 0.0
 
     def _comando(self, audio: Path, saida: Path, *, prelude: bool = True) -> list[str]:
         return [
@@ -137,10 +144,26 @@ class MuscriptorTranscriber:
         ]
 
     def _passada(self, audio: Path, *, prelude: bool) -> list[NoteEvent]:
+        frente = self.silencio_inicial_s
         with tempfile.TemporaryDirectory() as tmp:
-            saida = Path(tmp) / "notas.jsonl"
-            rodar(self._comando(audio, saida, prelude=prelude))
-            return parse_jsonl(saida.read_text())
+            entrada, saida = audio, Path(tmp) / "notas.jsonl"
+            if frente:
+                entrada = Path(tmp) / "entrada.wav"
+                y, taxa = sf.read(audio, always_2d=True, dtype="float32")
+                zeros = np.zeros((round(frente * taxa), y.shape[1]), dtype="float32")
+                sf.write(entrada, np.concatenate([zeros, y]), taxa, subtype="FLOAT")
+            rodar(self._comando(entrada, saida, prelude=prelude))
+            # Nota que termina dentro do silêncio não existe no áudio original.
+            return [
+                NoteEvent(
+                    pitch=n.pitch,
+                    onset_s=max(0.0, n.onset_s - frente),
+                    offset_s=n.offset_s - frente,
+                    instrument=n.instrument,
+                )
+                for n in parse_jsonl(saida.read_text())
+                if n.offset_s > frente
+            ]
 
     def transcribe(self, audio: Path, instrument: str | None = None) -> list[NoteEvent]:
         notas = self._passada(audio, prelude=True)

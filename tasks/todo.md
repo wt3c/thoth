@@ -374,6 +374,9 @@ Pré-requisito invisível até agora: a Fase 5 só existe se houver o que o
       negativo documentado.
       → `confusao_bateria`; tons trocam de número; revocação perdida na borda dos
       pedaços de 5 s do MuScriptor (emenda do ADR-044 de 2026-09-25).
+      → Borda medida (ADR-045): 0,1 s de silêncio na frente leva a bateria de 0,529
+      a 0,901, mas troca o rótulo de baixo, guitarra e piano; fica só na bateria
+      (`silencio_inicial_s`, padrão 0). Falta a fixture só de tons.
 - [ ] Implementar quantização de ataques sem inventar sustain; pronto quando dois hits
       no mesmo tique virarem um acorde percussivo e peças diferentes não forem
       descartadas pela `monofonizar` do baixo.
@@ -386,7 +389,8 @@ Pré-requisito invisível até agora: a Fase 5 só existe se houver o que o
       simultaneidade.
 - [ ] Integrar `--instrumento bateria` na CLI/API sem alterar o default; pronto com
       teste ponta a ponta que usa o stem `drums`, entrega os dois formatos e não gera
-      tablatura de cordas.
+      tablatura de cordas. O transcritor da bateria usa `silencio_inicial_s=0.1`
+      (ADR-045); o dos outros perfis, não.
 
 #### M3 — piano depois
 

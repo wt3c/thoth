@@ -3334,3 +3334,81 @@ Com isso, o que o veredito da bateria pede para investigar é:
 
 A chimbal perdida junto do prato (5,333 s nas duas condições) é outro efeito,
 pequeno: um ataque por prato.
+
+---
+
+## ADR-045 — silêncio na frente do áudio: só na bateria, porque troca o rótulo dos outros
+
+**Data:** 2026-09-25 · **Status:** aceito · **Contexto:** emenda do ADR-044 de
+2026-09-25 ("os pedaços de 5 s perdem ataques"), item 1 da investigação pendente.
+
+### Problema
+
+O MuScriptor perde ataques que caem exatamente no início de um pedaço de 5 s, e na
+bateria isolada chega a perder o pedaço inteiro: 20 de 48 ataques. Duas correções
+candidatas: pôr silêncio na frente do áudio e descontar o tempo depois, ou transcrever
+duas vezes com os pedaços deslocados e juntar. As duas mexem na entrada do transcritor,
+que é também o caminho do baixo.
+
+### Medição
+
+`_passada` com a primeira passada (com *prelude*), `small`, `muscriptor@0.3.0`,
+`htdemucs_ft`. F1 de nota (baixo, guitarra, piano) e F1 micro (bateria) por segundos
+de silêncio na frente; entre parênteses, o rótulo que tomou o lugar do certo. O 0 s
+bate com os pisos já commitados (a guitarra acústica no stem deu 0,961 contra 0,981,
+dentro da folga do Demucs), então o modelo repete o resultado e a diferença vem do
+silêncio.
+
+| caso | 0 s | 0,1 s | 0,25 s | 0,5 s |
+|---|---|---|---|---|
+| baixo `walking`, cru | 0,968 | 0 (`acoustic_piano`) | 0 (`acoustic_piano`) | 0 (`acoustic_piano`) |
+| baixo `walking`, stem | 0,968 | 0 (`acoustic_piano`) | 1,000 | 0 (`acoustic_piano`) |
+| baixo `escala`, cru | 0,968 | 1,000 | 1,000 | 0 (`acoustic_guitar`) |
+| baixo `misto`, cru | 0,682 | 0,968 | 0,909 | 0 (`acoustic_piano`) |
+| baixo `misto`, stem | 0,968 | 1,000 | 1,000 | 1,000 |
+| guitarra acústica, stem | 0,961 | 0 (`acoustic_piano`) | 0 (`acoustic_piano`) | 0 (`acoustic_piano`) |
+| guitarra limpa, mix | 0,889 | 0 (`electric_bass`) | 0 | 0 |
+| piano acústico, isolada | 0,923 | 0 (`electric_bass`) | 0 | 0 |
+| **bateria, isolada** | 0,529 | **0,901** | 0,913 | 0,915 |
+| **bateria, mix** | 0,867 | **0,926** | 0,878 | 0,905 |
+| **bateria, stem** | 0,529 | **0,901** | 0,903 | 0,923 |
+
+`graves`, `groove16` e `oitavas` dão 1,000 em quase todas as células; a varredura
+completa ficou fora do repositório, como as anteriores.
+
+### O que a medição mostra
+
+**Os primeiros instantes do áudio decidem o rótulo.** A perda de ataque na borda
+existe, mas é o menor dos efeitos: 0,1 s de silêncio basta para o baixo `walking`
+inteiro sair como piano. Não há valor que sirva a todos — cada um zera pelo menos um
+caso. É o "rótulo depende de contexto" do ADR-008, agora com um gatilho concreto:
+**o começo do áudio**. Música real começa com introdução variada; esse risco vale para
+ela, e não foi medido lá.
+
+**A bateria é a exceção.** O rótulo `drums` não troca em nenhuma célula e o ganho é
+estável nos três valores: bumbo de 3 para 7 acertos, chimbal de 11 para 25 (isolada).
+Os tons continuam saindo com o número de outro tom — isso não é da borda.
+
+A segunda candidata (duas transcrições deslocadas) também foi descartada sem
+implementar: cada transcrição deslocada sofreria a mesma troca de rótulo, e ela
+dobra o custo de CPU.
+
+### Decisão
+
+- `MuscriptorTranscriber.silencio_inicial_s`, **padrão 0**. Com 0 o áudio vai ao modelo
+  sem ser regravado: o caminho do baixo é byte a byte o de antes, e o
+  `test_regressao_fase0.py` passou sem mudar piso.
+- A bateria usa **0,1 s** (`SILENCIO_BATERIA` no `test_multi_instrumento.py`): o menor
+  valor medido que ganha nas três condições. Os pisos dela sobem para 0,901 / 0,926 /
+  0,901. O pipeline passa a usar o valor quando a bateria ganhar CLI (M2, item 5).
+- Nota que termina dentro do silêncio é descartada; a que atravessa o fim dele começa
+  em 0. A cópia com silêncio é gravada em `FLOAT`, sem perda para o `PCM_16` do Demucs.
+
+### Consequências
+
+- O baixo, a guitarra e o piano não mudam.
+- O veredito da bateria no ADR-044 (`ajustar`) continua de pé: F1 micro subiu, mas o
+  macro (0,554 isolada) segue preso nos tons.
+- Fica registrado como risco conhecido que o rótulo do áudio inteiro depende do
+  começo dele. Se uma música real sair com o baixo rotulado como outro instrumento,
+  este ADR é o primeiro lugar para olhar.
