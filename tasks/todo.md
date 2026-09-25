@@ -438,16 +438,28 @@ Pré-requisito invisível até agora: a Fase 5 só existe se houver o que o
 
 #### M5 — compatibilidade e verificação de entrega
 
-- [ ] Preservar o caminho atual do baixo byte a byte nas fixtures existentes; pronto
+- [x] Preservar o caminho atual do baixo byte a byte nas fixtures existentes; pronto
       quando os pisos atuais, contagens de descarte e artefatos de round-trip não
       mudarem ao deixar `--instrumento` ausente.
+      Verificado em 2026-09-25: `d0d7015` (antes do `instrumento`) contra `8703c25`,
+      fixtures `walking`, `misto`, `graves` e `oitavas`, com `bpm` 90 e estimado, a
+      mesma transcrição real do MuScriptor nas duas e o separador dublado (o Demucs
+      não se repete entre rodadas). GP5, WAVs, cache de notas, contagens, andamento e
+      tom idênticos byte a byte. O MusicXML só difere nos ids `P…`/`I…` que o music21
+      sorteia a cada gravação — a versão antiga rodada duas vezes também difere de si
+      mesma —; com eles normalizados, os 8 arquivos são idênticos.
 - [ ] Adaptar a página apenas para formatos realmente suportados; pronto com teste
       `navegador` verificando seleção, artefatos e mensagem explícita quando o alvo não
       tiver GP5 — sem exigir julgamento musical.
-- [ ] Rodar `uv run pytest -n auto`, `uv run ruff check src/ tests/`,
+- [x] Rodar `uv run pytest -n auto`, `uv run ruff check src/ tests/`,
       `uv run mypy src/`, `uv run pytest -m "slow and not network"` e, se a página
       mudar, `uv run pytest -m navegador`; pronto somente com saídas e números
       registrados, sem afirmar que a suíte padrão exercitou modelo, Demucs ou navegador.
+      Verificado em 2026-09-25 em `8703c25`: suíte padrão 458 passando; ruff e mypy
+      limpos; `-m "slow and not network"` 38 passando em 13 min, nenhum abaixo do
+      piso (ponta a ponta da guitarra: nota F1 0,990, margem +0,030; `misto` do baixo
+      com separação: nota 0,968, margem +0,000). A página não mudou; `navegador` não
+      se aplica ainda.
 
 ## Pendências para o Welington
 
