@@ -3381,6 +3381,30 @@ bateria leria como som sustentado; o espaço que sobra é pausa. Pelo mesmo moti
 exportador de percussão (itens 3 e 4) corta na barra em vez de ligar: ligadura é
 sustentação.
 
+
+### Emenda (2026-09-25) — GP5 de bateria e contrato próprio de exportação
+
+Item 3 do M2. **Desvio do contrato proposto, decidido pelo usuário:** a bateria não
+entra pela `ParteMusical`. Ela ganha um segundo `Protocol`, `ExportadorDePercussao`
+(`exportar(ataques, out)`), como o `AtribuidorDeAcordes` ao lado do `FretAssigner`.
+O `Exporter` de baixo e guitarra fica intocado, e o tipo impede a bateria de cair no
+exportador de cordas. A `ParteMusical` fica para o piano, se ele também não couber.
+
+`Gp5PercussaoExporter` (em `adapters/export/gp5.py`):
+
+- faixa com `isPercussionTrack`, canal MIDI 10 (`channel = 9`) e seis cordas em zero;
+- cada grupo de `ataques_em_ticks` é um beat; o `value` de cada nota é a peça GM, e
+  a corda existe só para as peças caberem juntas. Mais de seis peças no mesmo tique
+  é recusado;
+- a figura que atravessaria a barra é cortada nela e o resto é pausa, sem ligadura.
+
+**Verificado:** round-trip pelo PyGuitarPro afirma estrutura (tique de cada beat,
+peças juntas, status, nenhuma nota ligada) e a fixture `bateria-isolada` inteira
+(32 grupos, 48 ataques). Leitor independente: o MuseScore 4 importa o arquivo como
+pauta de percussão com as mesmas 32 figuras, na ordem, e as mesmas peças em cada uma.
+O round-trip pegou um defeito que o MuseScore não pegou: `gp.Note` nasce
+`NoteType.rest`, e a peça voltava como pausa.
+
 ---
 
 ## ADR-045 — silêncio na frente do áudio: só na bateria, porque troca o rótulo dos outros

@@ -83,3 +83,12 @@ tudo na corda grave, escolha que nenhum algoritmo de custo faria — voltou
 **A lição:** sondagem que viola a semântica do formato mede a tolerância do leitor a
 entrada inválida, não a política dele sobre entrada válida. O contraexemplo precisa
 ser legal e improvável, não ilegal.
+
+## PyGuitarPro: `gp.Note` também nasce errado — `NoteType.rest` (2026-09-25)
+
+Mesma família do `Beat.status`: `gp.Note(...)` sem `type` é `NoteType.rest`. O
+arquivo grava, e o PyGuitarPro relê a nota como pausa. O exportador de cordas sempre
+passou o `type` e nunca viu isso; o de percussão nasceu sem ele. O **MuseScore
+importou as peças mesmo assim** — o leitor independente não pegou; quem pegou foi o
+round-trip afirmando `note.type`. Todo `gp.Note` leva `type` explícito, e o teste
+afirma o tipo relido, não só o `value`.

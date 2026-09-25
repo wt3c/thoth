@@ -346,6 +346,8 @@ Pré-requisito invisível até agora: a Fase 5 só existe se houver o que o
 - [ ] Generalizar `Exporter` para receber uma `ParteMusical`, não apenas
       `list[TabNote] + tuning`; pronto quando exportadores falsos provarem por teste que
       piano e bateria não exigem afinação e que baixo/guitarra não perdem posições.
+      → Bateria resolvida com `ExportadorDePercussao` à parte (emenda do ADR-044,
+      2026-09-25); a `ParteMusical` fica para o piano, se ele não couber.
 - [x] Gerar, em código versionado (`tests/sintetico_multi.py`), fixtures MIDI de pelo menos 8 s, isoladas e em mix,
       para cada instrumento; pronto quando `fluidsynth` real renderizar WAVs
       normalizados, os MIDI forem a referência e nenhum `.mid`, `.wav`, `.gp5` ou
@@ -386,9 +388,11 @@ Pré-requisito invisível até agora: a Fase 5 só existe se houver o que o
       grupo, a mesma peça repetida no tique é devolvida para relato, duração gráfica até
       o grupo seguinte e no máximo uma semínima. A bateria no pipeline (item 5) passa
       por ela, nunca pelo `monofonizar`.
-- [ ] GP5: escrever faixa nativa de percussão (`isPercussionTrack`, canal MIDI 10) e
+- [x] GP5: escrever faixa nativa de percussão (`isPercussionTrack`, canal MIDI 10) e
       peças simultâneas no mesmo beat; pronto com gravação → releitura preservando
       peça, tique e simultaneidade, além de abertura por leitor independente.
+      → `Gp5PercussaoExporter` atrás de `ExportadorDePercussao` (Protocol próprio,
+      decisão do usuário; emenda do ADR-044). MuseScore lê as 32 figuras e as peças.
 - [ ] MusicXML: escrever pauta não afinada, clave de percussão e
       `Unpitched`/`PercussionChord` com mapa GM explícito; pronto quando XML cru,
       round-trip do music21 e importação real no MuseScore preservarem peça, tique e

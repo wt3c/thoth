@@ -5,7 +5,13 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Protocol
 
-from thoth.domain.models import AudioAsset, NoteEvent, Posicionamento, TabNote
+from thoth.domain.models import (
+    AudioAsset,
+    EventoPercussivo,
+    NoteEvent,
+    Posicionamento,
+    TabNote,
+)
 
 
 class AudioSource(Protocol):
@@ -51,6 +57,17 @@ class Exporter(Protocol):
     """Notas posicionadas → arquivo de partitura. Hoje GP5 e MusicXML."""
 
     def export(self, notes: list[TabNote], out: Path, tuning: tuple[int, ...]) -> Path: ...
+
+
+class ExportadorDePercussao(Protocol):
+    """Ataques de bateria → arquivo de partitura (ADR-044, M2).
+
+    Contrato à parte do `Exporter`, como o `AtribuidorDeAcordes` do `FretAssigner`:
+    bateria não tem corda, traste nem afinação, e o tipo impede que ela caia no
+    exportador de cordas ou que o baixo passe a aceitar ataques.
+    """
+
+    def exportar(self, ataques: list[EventoPercussivo], out: Path) -> Path: ...
 
 
 class Progresso(Protocol):
