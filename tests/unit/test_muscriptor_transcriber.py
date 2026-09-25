@@ -200,6 +200,20 @@ def test_pausa_curta_nao_e_buraco() -> None:
     assert trechos_sem_nota(energia, onsets) == []
 
 
+def test_audio_mais_curto_que_a_janela_nao_quebra() -> None:
+    """Com menos segundos que a janela de vizinhança (5), `np.convolve(mode="same")`
+    devolve o comprimento da janela, e a máscara não casava com a energia."""
+    assert trechos_sem_nota([-20.0] * 3, [0.5]) == []
+
+
+def test_transcreve_stem_de_tres_segundos(tmp_path: Path) -> None:
+    transcritor, _ = _falso(tmp_path, corte=3.0, duracao=3.0)
+
+    notas = transcritor.transcribe(_stem(tmp_path, 3.0))
+
+    assert notas
+
+
 def test_buraco_e_preenchido_pela_passada_sem_prelude(tmp_path: Path) -> None:
     transcritor, log = _falso(tmp_path, corte=20.0, duracao=60.0)
 

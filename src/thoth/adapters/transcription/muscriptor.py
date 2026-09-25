@@ -96,7 +96,9 @@ def trechos_sem_nota(energia_db: list[float], onsets: list[float]) -> list[tuple
         if 0 <= t < len(energia):
             com_ataque[int(t)] = True
     janela = np.ones(2 * _VIZINHANCA_S + 1)
-    perto = np.convolve(com_ataque, janela, mode="same") > 0
+    # `full` e o recorte centrado, não `same`: com menos segundos que a janela, o `same`
+    # devolve o comprimento da janela.
+    perto = np.convolve(com_ataque, janela)[_VIZINHANCA_S : _VIZINHANCA_S + len(energia)] > 0
     buraco = soando & ~perto
 
     trechos: list[tuple[int, int]] = []
