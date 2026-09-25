@@ -8,7 +8,15 @@ import numpy as np
 import pytest
 
 from thoth.domain.models import NoteEvent
-from thoth.services.comparacao import CORRECAO_MAXIMA_S, JANELA_S, alinhar, comparar
+from thoth.services.comparacao import (
+    CORRECAO_MAXIMA_S,
+    JANELA_DO_VEREDITO_S,
+    JANELA_S,
+    MARGEM_SOBRE_O_PISO,
+    alinhar,
+    comparar,
+    veredito_de_nota,
+)
 
 
 def _tab(n: int = 120, semente: int = 0) -> list[NoteEvent]:
@@ -134,3 +142,74 @@ def test_piso_de_acaso_vem_da_tab_deslocada() -> None:
     assert c.casadas == 120
     assert 0 < c.piso_casadas < c.casadas
     assert 0.0 <= c.piso_mesma_oitava <= 1.0
+
+
+# --- Nota errada, com a tab já no tempo do stem (ADR-042) ---------------------
+
+
+def _longa() -> list[NoteEvent]:
+    """Três janelas de veredito cheias."""
+    return [n for n in _tab(n=500, semente=1) if n.onset_s < 3 * JANELA_DO_VEREDITO_S]
+
+
+def test_classifica_certa_oitava_errada_e_sem_ataque() -> None:
+    ref = _longa()
+    trocas = {0: 12, 1: 5}
+    est = [
+        NoteEvent(n.pitch + trocas.get(i, 0), n.onset_s, n.offset_s, n.instrument)
+        for i, n in enumerate(ref)
+        if i != 2
+    ]
+
+    janelas = veredito_de_nota(ref, est)
+
+    primeira = janelas[0]
+    assert primeira.inicio_s == 0.0
+    assert (primeira.oitava, primeira.errada, primeira.sem) == (1, 1, 1)
+    assert sum(j.certa for j in janelas) == len(ref) - 3
+
+
+def test_janela_muito_acima_do_piso_e_conclusiva() -> None:
+    """Um quinto das notas erradas: o erro que a medida existe para achar."""
+    ref = _longa()
+    est = [
+        NoteEvent(n.pitch + (5 if i % 5 == 0 else 0), n.onset_s, n.offset_s, n.instrument)
+        for i, n in enumerate(ref)
+    ]
+
+    janelas = veredito_de_nota(ref, est)
+
+    for j in janelas:
+        print(f"{j.inicio_s:4.0f}s certa {j.fracao_certa:.2f} piso {j.piso_certa:.2f}")
+    assert all(j.conclusiva for j in janelas)
+    erradas = sum(j.errada for j in janelas) / sum(j.com_ataque for j in janelas)
+    assert 0.15 < erradas < 0.25
+
+
+def test_transcricao_toda_errada_na_janela_e_inconclusiva_nao_nota_errada() -> None:
+    """O limite da medida (ADR-042): com o Thoth errando quase tudo, certa cai ao piso, e
+    a regra não distingue isso de alinhamento falho. A janela sai inconclusiva — com os
+    números, mas fora da conta de nota errada."""
+    ref = _longa()
+    est = [
+        NoteEvent(
+            n.pitch + (5 if JANELA_DO_VEREDITO_S <= n.onset_s < 2 * JANELA_DO_VEREDITO_S else 0),
+            n.onset_s,
+            n.offset_s,
+            n.instrument,
+        )
+        for n in ref
+    ]
+
+    janelas = veredito_de_nota(ref, est)
+
+    assert [j.conclusiva for j in janelas] == [True, False, True]
+    assert janelas[1].errada == janelas[1].com_ataque
+
+
+def test_margem_e_sobre_o_piso_da_propria_janela() -> None:
+    ref = _longa()
+    j = veredito_de_nota(ref, ref)[0]
+
+    assert j.conclusiva == (j.fracao_certa >= j.piso_certa + MARGEM_SOBRE_O_PISO)
+    assert 0.0 < j.piso_certa < 1.0

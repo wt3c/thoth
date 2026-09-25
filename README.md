@@ -55,7 +55,7 @@ uv run thoth transcribe caminho/para/musica.mp3 --afinacao 5
 # refaz só a auralização, a partir das notas em cache
 uv run thoth auralizar caminho/para/musica.mp3
 
-# a oitava da transcrição contra uma tab .gp5 baixada à mão (ADR-041)
+# oitava e nota da transcrição contra uma tab .gp5 baixada à mão (ADR-041, ADR-042)
 uv run thoth comparar tab.gp5 caminho/para/musica.mp3
 
 # API + página de estudo com alphaTab local, em 127.0.0.1
@@ -74,8 +74,10 @@ original num canal, transcrição no outro, para ouvir se o ritmo descola. Opç�
 
 Leva cerca de 2,5× a duração do áudio em CPU. Sem `--bpm`, o andamento é estimado do mix
 e **anunciado** — confira ouvindo (ADR-019). O `auralizar` precisa das notas já em cache,
-então só roda depois de um `transcribe`; o `comparar` também. O `comparar` diz só a
-oitava, e imprime ao lado o piso de acaso: o número vale o quanto fica acima dele.
+então só roda depois de um `transcribe`; o `comparar` também. O `comparar` diz a
+oitava e, se o stem do baixo estiver em cache, a nota errada por janela de 60 s; cada
+número sai com o piso de acaso ao lado, e vale o quanto fica acima dele. Janela perto do
+piso sai inconclusiva, então a nota errada é limite inferior.
 
 ### Em contêiner (só CPU)
 

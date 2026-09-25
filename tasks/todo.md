@@ -91,8 +91,17 @@ A avaliação **não depende de saber tocar** (ADR-006).
       em *And Plague Flowers*); 5–15% a uma.
       *Dance of Death* ficou no piso de acaso — não confirma nada; *And Plague
       Flowers* só alinhou em 60–300 s
-- [ ] "Nota errada" contra tab: exige alinhar a tab ao stem do baixo (DTW), não à
-      transcrição (ADR-041, consequência)
+- [x] "Nota errada" contra tab: exige alinhar a tab ao stem do baixo (DTW), não à
+      transcrição (ADR-041, consequência) → ADR-042
+  - [x] medir: DTW sobre croma do stem nas três tabs (78/≤64, 79/≤45, 60/≤55); porta só
+        de áudio não separa da música errada — descartada
+  - [x] `services/alinhamento_audio.py`: tab → tempo do stem por DTW (porte literal do
+        script de medição), teste com áudio sintético
+  - [x] `comparacao.veredito_de_nota`: certa/oitava/errada por janela de 60 s, piso ao
+        lado, janela conclusiva só com certa ≥ piso + 10 pontos; o resto "inconclusivo"
+  - [x] CLI `comparar`: tabela por janela quando há stem em cache; sem stem, recado
+  - [x] rodar nas três músicas, conferir contra a medição → ADR-042: errada 14,1% /
+        15,4% nas janelas conclusivas de *Fear* e *And Plague Flowers*; *Dance* 1 de 9
 - [x] Refazer *And Plague Flowers* com `--afinacao 5` (emenda do ADR-041): 89,3%
       contra piso de 71,9%, alinhamento igual — a afinação não mudava o quadro
 - [x] **Transcrição some depois de 511 s** em *And Plague Flowers* (`yt_ArBcOGvMvGU`):

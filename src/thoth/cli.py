@@ -13,11 +13,14 @@ from rich.progress import Progress, SpinnerColumn, TaskID, TextColumn, TimeElaps
 from rich.text import Text
 
 from thoth.adapters.ingest import resolver_fonte
+from thoth.adapters.separation import localizar_stems
 from thoth.api.app import criar_app
 from thoth.domain.models import AFINACOES
 from thoth.services import pipeline
+from thoth.services.alinhamento_audio import alinhar_ao_stem
 from thoth.services.auralizacao import auralizar as _auralizar
 from thoth.services.cache_notas import ler
+from thoth.services.comparacao import JanelaDeNota, veredito_de_nota
 from thoth.services.comparacao import comparar as _comparar
 from thoth.services.fretboard import DIGITACOES, ViterbiFretAssigner
 from thoth.services.nomes import nome_de_arquivo
@@ -128,7 +131,7 @@ def comparar(
     faixa: int | None = typer.Option(None, help="Faixa da tab (1 = primeira), se ambígua."),
     cache: Path = typer.Option(CACHE_PADRAO, help="Diretório de cache."),
 ) -> None:
-    """Transcrição contra tab humana: a oitava confere? (ADR-041)."""
+    """Transcrição contra tab humana: a oitava confere (ADR-041)? E a nota (ADR-042)?"""
     ativo = resolver_fonte(ref).fetch(ref, cache)
     notas_jsonl = cache / ativo.source_id / "notas.jsonl"
     if not notas_jsonl.exists():
@@ -161,6 +164,47 @@ def comparar(
         f"piso de acaso (tab deslocada ±0,25 e ±0,5 s): {c.piso_casadas} pares, "
         f"{100 * c.piso_mesma_oitava:.1f}% na mesma oitava",
         "dim",
+    )
+
+    try:
+        stem = localizar_stems(cache / "stems" / ativo.source_id)["bass"]
+    except FileNotFoundError:
+        _diz("sem stem do baixo em cache: nota errada não medida (ADR-042)", "dim")
+        return
+    estimativa = ler(notas_jsonl)
+    _relatar_nota_errada(veredito_de_nota(alinhar_ao_stem(referencia.notas, stem), estimativa))
+
+
+def _relatar_nota_errada(janelas: list[JanelaDeNota]) -> None:
+    """Janela abaixo do piso + margem não entra na conta: ali alinhamento falho e
+    transcrição muito errada dão o mesmo número (ADR-042)."""
+    _diz("nota errada, com a tab alinhada ao stem (ADR-042), por janela:", "bold")
+    for j in janelas:
+        numeros = (
+            f"certa {100 * j.fracao_certa:.0f}% contra piso {100 * j.piso_certa:.0f}%, "
+            f"oitava {100 * j.oitava / j.com_ataque:.0f}%, "
+            f"errada {100 * j.errada / j.com_ataque:.0f}% de {j.com_ataque}; "
+            f"sem ataque {j.sem}"
+        )
+        if j.conclusiva:
+            _diz(f"  {j.inicio_s:5.0f} s  {numeros}")
+        else:
+            _diz(f"  {j.inicio_s:5.0f} s  inconclusivo — {numeros}", "dim")
+    conclusivas = [j for j in janelas if j.conclusiva]
+    total = sum(j.com_ataque for j in conclusivas)
+    plural = "janela conclusiva" if len(janelas) == 1 else "janelas conclusivas"
+    if not total:
+        _diz(f"0 de {len(janelas)} {plural}: nota errada não medida")
+        return
+    certa, oitava, errada = (
+        sum(getattr(j, k) for j in conclusivas) for k in ("certa", "oitava", "errada")
+    )
+    _diz(
+        f"{len(conclusivas)} de {len(janelas)} {plural}, {total} notas: "
+        f"certa {100 * certa / total:.1f}%, oitava {100 * oitava / total:.1f}%, "
+        f"errada {100 * errada / total:.1f}% — limite inferior: só onde o Thoth "
+        "concorda com a tab o bastante para confirmar o alinhamento",
+        "bold",
     )
 
 

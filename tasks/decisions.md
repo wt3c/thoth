@@ -2342,3 +2342,106 @@ Era o pipeline, não o MuScriptor: depois de 511 s o modelo rotula o baixo como
 `clean_electric_guitar`, e o filtro descartava. Causa, medição e correção estão na
 emenda de 2026-09-24 do ADR-008. Refeita com a correção, a transcrição vai até 654,9 s
 e a comparação sobe de 1294 para 1558 pares, 89,5% na mesma oitava contra piso de 75,2%.
+
+### Emenda (2026-09-25, depois) — "nota errada" voltou, pelo ADR-042
+
+O próximo passo da Consequência foi feito: a tab alinhada ao stem do baixo por DTW
+sobre croma, e não à transcrição. A decisão e a medição estão no ADR-042. O veredito de
+oitava deste ADR continua como estava.
+
+
+## ADR-042 — nota errada: tab alinhada ao stem por DTW, veredito por janela, "inconclusivo" abaixo do piso
+
+**Data:** 2026-09-25 · **Status:** aceito
+
+### Contexto
+
+O ADR-041 alinha a tab à transcrição pelo nome da nota. Por isso não pode dizer se a nota
+está certa: o encaixe foi escolhido para os nomes coincidirem. A saída que ele apontou
+era alinhar a tab ao **áudio do stem**, que não passa pela transcrição.
+
+### O que a medição mostrou
+
+**Alinhamento.** `librosa.sequence.dtw` entre o croma da tab e o croma CQT do stem
+(`services/alinhamento_audio.py`). Três tentativas até funcionar:
+
+- com subsequência, o caminho colapsou em 60 s da música → `subseq=False`;
+- completo, com cosseno, ficou no piso de acaso (8% certa contra 11%). O croma
+  discriminava: a tab no alinhamento do ADR-041 casava 0,59 com o stem, deslocada 0,5 s
+  0,46 a 0,54. A falha era o silêncio: quadro sem nota da tab (croma uniforme) e quadro
+  quieto do áudio (croma normalizado, ruído com cara de nota) casavam com qualquer
+  coisa → 13º bin de silêncio nos dois lados (áudio abaixo do percentil 15 de energia),
+  `norm=None` com L2 à mão, distância euclidiana, banda de Sakoe-Chiba de 10%.
+
+**Veredito.** Por nota da tab, entre os ataques da transcrição a ±0,1 s: **certa**
+(mesma altura), **oitava** (mesmo nome, outra oitava), **errada** (outro nome), ou sem
+ataque (fora das frações). Piso: a maior fração certa com a tab deslocada ±0,25 e
+±0,5 s, como no ADR-041.
+
+| Música | certa (DTW) | piso | certa (alinhamento do ADR-041) |
+|---|---|---|---|
+| *Fear Is the Key* | 78% | ≤64% | 62% |
+| *And Plague Flowers* | 79% | ≤45% | 54% |
+| *Dance of Death* | 60% | ≤55% | 44% |
+
+Em *And Plague Flowers*, de 120 a 300 s — o único trecho que o ADR-041 confirmou —, os
+dois alinhamentos coincidem (distância mediana de 0,08 a 0,27 s); fora dele o do ADR-041
+erra de 4 a 14 s e o DTW fica 16 a 43 pontos acima do piso em toda janela. É conferência
+independente do DTW.
+
+**A porta só de áudio não funciona.** O plano era aceitar a janela pela transcrição
+(certa acima do piso), e isso é circular: onde o alinhamento acerta e o Thoth erra muito,
+certa cai ao piso e a janela seria descartada — nota errada só mediria onde o Thoth já
+acerta. Tentei uma porta que não vê a transcrição: o croma do stem, na classe da nota da
+tab, no ataque alinhado contra o deslocado. Para ter o acaso, cada tab foi alinhada ao
+stem de **outra** música:
+
+| | vantagem do alinhado sobre o deslocado, por janela de 60 s |
+|---|---|
+| música certa | −0,005 a +0,194 |
+| música errada | +0,012 a +0,224 |
+
+O DTW maximiza exatamente essa semelhança, e ela sai alta mesmo na música errada. Não há
+limiar. Já certa contra o piso separa: na música errada, certa fica em 0 a 40% e passa do
+piso por no máximo 7 pontos; na certa, por 10 a 43 nas janelas que passam.
+
+### Decisão
+
+- `alinhar_ao_stem` leva a tab ao tempo do stem pelos parâmetros acima, porte literal do
+  script de medição.
+- `veredito_de_nota` conta por janela de 60 s, com o piso da própria janela. A janela é
+  **conclusiva** se certa ≥ piso + 10 pontos (acima dos 7 do acaso medido).
+- Janela não conclusiva sai **inconclusiva**, com os números, e fora da soma. Ali
+  alinhamento falho e transcrição muito errada dão o mesmo número, e a medida não separa
+  os dois. Por isso **a nota errada somada é limite inferior**: vale onde o Thoth concorda
+  com a tab o bastante para o alinhamento se confirmar.
+- O `thoth comparar` imprime a tabela por janela quando acha o stem em cache
+  (`localizar_stems`); sem stem, diz que nota errada não foi medida e mantém a oitava.
+
+### Resultado (2026-09-25), pelo `thoth comparar`
+
+| Música | janelas conclusivas | notas | certa | oitava | errada |
+|---|---|---|---|---|---|
+| *Fear Is the Key* | 5 de 6 | 938 | 80,8% | 5,1% | 14,1% |
+| *And Plague Flowers* | 11 de 11 | 3070 | 79,5% | 5,1% | 15,4% |
+| *Dance of Death* | 1 de 9 | 334 | 76,9% | 0,0% | 23,1% |
+
+Os números por janela reproduzem os do script de medição.
+
+- **Nota errada fica em 14 a 15%** onde a medida vale — o dobro ou o triplo do erro de
+  oitava. Parte disso é da tab de comunidade e do cover (ADR-041); a medida não separa.
+- *Dance of Death* quase inteira sai inconclusiva. Nos 0 s e 480 s o croma diz que a tab
+  está no lugar e certa fica abaixo do piso: pode ser erro real do Thoth, e esta regra não
+  pode afirmar isso.
+- *Fear Is the Key* em 180 s: inconclusivo, certa 70% contra piso 73%.
+
+### Limites
+
+- A porta depende da transcrição; o viés está declarado, não removido.
+- Tab que começa antes do áudio, ou tem trecho que a gravação não tem, entra esticada: o
+  DTW sem subsequência obriga a tab a cobrir o áudio de ponta a ponta.
+- Custo: matrizes de ~7000 × 7000 quadros em float64, perto de 800 MB por música de
+  10 min. Serve para uso pessoal.
+- Três tabs, todas de comunidade. A margem de 10 pontos saiu de três pares de música
+  errada.
+

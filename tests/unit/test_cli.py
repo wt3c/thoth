@@ -182,6 +182,38 @@ def test_comparar_relata_o_veredito_de_oitava_e_o_piso(tmp_path: Path) -> None:
     assert "piso de acaso" in saida
 
 
+def test_comparar_sem_stem_avisa_que_nota_errada_nao_foi_medida(tmp_path: Path) -> None:
+    tab, origem, cache = _tab_e_cache(tmp_path, {})
+
+    resultado = runner.invoke(app, ["comparar", str(tab), str(origem), "--cache", str(cache)])
+
+    assert resultado.exit_code == 0, resultado.output
+    assert "sem stem do baixo" in resultado.output
+
+
+def test_comparar_com_stem_relata_nota_errada_por_janela(tmp_path: Path) -> None:
+    """A tab vai ao stem por DTW (ADR-042); a nota trocada por +7 agora conta como errada."""
+    from tests.unit.test_alinhamento_audio import _stem
+    from thoth.services.cache_notas import ler
+
+    tab, origem, cache = _tab_e_cache(tmp_path, {0: 12, 5: -12, 9: 7})
+    fonte = next(p for p in cache.iterdir() if p.is_dir() and p.name != "stems")
+    notas = ler(fonte / "notas.jsonl")
+    pasta = cache / "stems" / fonte.name / "htdemucs_ft"
+    pasta.mkdir(parents=True)
+    _stem(pasta / "bass.wav", notas, notas[-1].offset_s + 2.0)
+
+    resultado = runner.invoke(app, ["comparar", str(tab), str(origem), "--cache", str(cache)])
+
+    assert resultado.exit_code == 0, resultado.output
+    saida = resultado.output
+    print(saida)
+    assert "nota errada" in saida
+    assert "0 s" in saida
+    assert "1 de 1 janela conclusiva" in saida
+    assert "limite inferior" in saida
+
+
 def test_comparar_sem_cache_orienta_a_transcrever(tmp_path: Path) -> None:
     tab, origem, _ = _tab_e_cache(tmp_path, {})
 

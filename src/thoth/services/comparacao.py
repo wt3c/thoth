@@ -1,4 +1,4 @@
-"""Transcrição contra tab humana: a oitava confere? (ADR-041).
+"""Transcrição contra tab humana: a oitava confere (ADR-041)? E a nota (ADR-042)?
 
 A tab está em tempo de partitura; a gravação, em tempo de execução — banda sem
 metrônomo, intro que a tab não tem. Antes de comparar, a tab é trazida para o tempo do
@@ -12,7 +12,7 @@ oitava): um ataque da tab só conta se houver, perto dele, um ataque da transcri
 o mesmo nome.
 
 O preço é o que se pode concluir. Como o nome da nota já escolheu o encaixe, "nota
-errada" não é medida — o encaixe foi feito para ela acertar. A oitava ficou fora do
+errada" não é medida com ele — o encaixe foi feito para ela acertar. A oitava ficou fora do
 alinhamento, e é ela o veredito: entre os pares de mesmo nome, mesma oitava, oitava
 acima ou abaixo.
 
@@ -26,6 +26,12 @@ Duas etapas:
 
 E o **piso de acaso**: o mesmo veredito com a tab deslocada de propósito. Linha densa
 casa por sorte; o resultado só vale o quanto fica acima do piso.
+
+**Nota errada** (ADR-042) é outra medida, sobre a tab já alinhada ao stem por
+`alinhamento_audio`, que não olha a transcrição: `veredito_de_nota`, por janela de
+`JANELA_DO_VEREDITO_S`. A janela só é conclusiva se a fração certa passa do piso dela por
+`MARGEM_SOBRE_O_PISO`; abaixo disso, alinhamento falho e transcrição muito errada dão o
+mesmo número, e a janela sai inconclusiva. Por isso a nota errada medida é limite inferior.
 """
 
 from __future__ import annotations
@@ -48,6 +54,10 @@ DESLOCAMENTO_MAXIMO_S = 30.0
 #: Uma e duas notas de distância numa linha de colcheias: o erro em que o alinhamento
 #: cairia, e portanto o competidor que ele precisa vencer.
 DESLOCAMENTOS_DO_PISO_S = (-0.5, -0.25, 0.25, 0.5)
+JANELA_DO_VEREDITO_S = 60.0
+#: Alinhando a tab ao stem de outra música, certa passou do piso por no máximo 7 pontos
+#: (ADR-042); com a música certa, por 10 a 38.
+MARGEM_SOBRE_O_PISO = 0.10
 
 
 @dataclass(frozen=True, slots=True)
@@ -183,3 +193,76 @@ def comparar(referencia: Sequence[NoteEvent], estimativa: Sequence[NoteEvent]) -
         piso_casadas=len(piso),
         piso_mesma_oitava=sum(d == 0 for d in piso) / len(piso) if piso else 0.0,
     )
+
+
+@dataclass(frozen=True, slots=True)
+class JanelaDeNota:
+    """Notas da tab com ataque em `[inicio_s, inicio_s + JANELA_DO_VEREDITO_S)`."""
+
+    inicio_s: float
+    certa: int
+    oitava: int
+    errada: int
+    #: Sem ataque da transcrição a `TOLERANCIA_S`: fica fora das frações.
+    sem: int
+    piso_certa: float
+
+    @property
+    def com_ataque(self) -> int:
+        return self.certa + self.oitava + self.errada
+
+    @property
+    def fracao_certa(self) -> float:
+        return self.certa / self.com_ataque if self.com_ataque else 0.0
+
+    @property
+    def conclusiva(self) -> bool:
+        return self.com_ataque > 0 and self.fracao_certa >= self.piso_certa + MARGEM_SOBRE_O_PISO
+
+
+def _contar(
+    alturas: np.ndarray, tempos: np.ndarray, ataques: np.ndarray, estimadas: np.ndarray,
+    inicio: float,
+) -> tuple[int, int, int, int]:
+    """Por nota da tab, entre os ataques da transcrição a `TOLERANCIA_S`: a mesma altura,
+    o mesmo nome em outra oitava, outro nome ou nenhum ataque."""
+    certa = oitava = errada = sem = 0
+    dentro = (tempos >= inicio) & (tempos < inicio + JANELA_DO_VEREDITO_S)
+    for altura, t in zip(alturas[dentro], tempos[dentro], strict=True):
+        a, b = np.searchsorted(ataques, [t - TOLERANCIA_S, t + TOLERANCIA_S])
+        candidatas = estimadas[a:b]
+        if len(candidatas) == 0:
+            sem += 1
+        elif altura in candidatas:
+            certa += 1
+        elif altura % 12 in candidatas % 12:
+            oitava += 1
+        else:
+            errada += 1
+    return certa, oitava, errada, sem
+
+
+def veredito_de_nota(
+    tab_no_audio: Sequence[NoteEvent], estimativa: Sequence[NoteEvent]
+) -> list[JanelaDeNota]:
+    """Nota errada por janela, com a tab já no tempo do áudio (`alinhar_ao_stem`)."""
+    if not tab_no_audio or not estimativa:
+        raise ValueError("referência e transcrição precisam ter notas")
+    ordem = sorted(estimativa, key=lambda n: n.onset_s)
+    ataques = np.array([n.onset_s for n in ordem])
+    estimadas = np.array([n.pitch for n in ordem])
+    alturas = np.array([n.pitch for n in tab_no_audio])
+    tempos = np.array([n.onset_s for n in tab_no_audio])
+
+    janelas: list[JanelaDeNota] = []
+    fim = float(tempos.max())
+    for inicio in np.arange(0.0, fim + JANELA_DO_VEREDITO_S, JANELA_DO_VEREDITO_S):
+        certa, oitava, errada, sem = _contar(alturas, tempos, ataques, estimadas, inicio)
+        if certa + oitava + errada == 0:
+            continue
+        pisos = []
+        for x in DESLOCAMENTOS_DO_PISO_S:
+            c, o, e, _ = _contar(alturas, tempos + x, ataques, estimadas, inicio)
+            pisos.append(c / (c + o + e) if c + o + e else 0.0)
+        janelas.append(JanelaDeNota(float(inicio), certa, oitava, errada, sem, max(pisos)))
+    return janelas
