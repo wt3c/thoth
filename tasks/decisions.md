@@ -313,6 +313,48 @@ antes (27%): o trecho readmitido não é pior que o resto.
 Contra a tab (ADR-041): 1558 pares, 89,5% na mesma oitava contra piso de 75,2%; a
 janela de 540–600 s, que antes não tinha nota, dá 146 pares, **90%** contra piso de 69%.
 
+### Emenda (2026-09-25) — o prelude forcing emudece o modelo; segunda passada onde isso acontecer
+
+**Contexto.** Em *Ne Obliviscaris - Eyrie* (`_RMax1LS3pM`, 711 s) o MuScriptor não devolve
+nenhuma nota, de nenhum rótulo, de 557 a 671 s, com o stem de baixo soando (−28 a −24 dB,
+97% da energia harmônica, 150 a 220 ataques a cada 30 s). O caso anterior desta emenda era
+rótulo trocado. Este é o modelo em silêncio. Causa, uma variável por vez:
+
+| Teste | Notas de 570 a 660 s |
+|---|---|
+| stem inteiro (padrão) | 0 |
+| trecho de 520 s até o fim | 0 |
+| o mesmo com +6 dB | 0 |
+| só 600–630 s, isolado | 125 |
+| trecho de 520 s até o fim, `--no-prelude-forcing` | 299 |
+
+O MuScriptor corta o áudio em blocos de 5 s e, por padrão, começa cada um forçado pelas
+notas que o bloco anterior deixou abertas (*prelude forcing*). Em *Eyrie*, a partir de um
+ponto, todo bloco termina logo depois do prompt: 39 blocos em 15 s. O mecanismo interno não
+foi rastreado. A troca da flag sozinha decide. Vazamento do bumbo foi descartado: os ataques
+do stem coincidem com os da banda grave do `no_bass` no nível do acaso.
+
+**Frequência.** Varrendo as 14 músicas em cache atrás de segundos em que o stem soa (a menos de
+12 dB da mediana) e não há ataque a até 2 s, em trechos de 10 s ou mais: só *Eyrie* (114 s).
+
+**Decisão:** segunda passada **só quando há buraco**, do stem inteiro sem o forcing, usada
+apenas dentro do buraco alargado por 2 s de cada lado (a vizinhança que o atrasou). O buraco
+se mede contra os ataques de **todos** os rótulos, porque rótulo trocado é assunto da emenda
+anterior, não deste caso. Fica no adaptador (`MuscriptorTranscriber.transcribe`), porque o
+forcing é um parâmetro do MuScriptor.
+
+**Por que não desligar sempre:** o MuScriptor documenta o forcing como o que impede o bloco
+de recomeçar com o instrumento errado, e o filtro do Thoth depende do rótulo. Desligar
+exigiria remedir o corpus inteiro para corrigir 1 música em 14. Fatiar o trecho, em vez
+de passar o stem inteiro, viola a emenda de 2026-09-22.
+
+**Medido:** no trecho de *Eyrie* a partir de 520 s, 0 notas no buraco com o forcing e 382
+pelo `transcribe` (`tests/integration/test_prelude_eyrie.py`, `slow`, pula sem o arquivo em
+`~/thoth-fase0`). Custo: uma passada extra do MuScriptor, só nas músicas com buraco.
+**Risco aberto:** as notas do buraco vêm de uma passada sem forcing. Se vierem com rótulo
+trocado, a readmissão da emenda anterior as pega. Se forem ruins em altura, o veredito contra
+a tab (ADR-042) é quem mede.
+
 ---
 
 ## ADR-009 — Modelo `small` como padrão

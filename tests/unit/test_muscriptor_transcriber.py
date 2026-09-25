@@ -14,7 +14,11 @@ from pathlib import Path
 
 import pytest
 
-from thoth.adapters.transcription.muscriptor import MuscriptorTranscriber, parse_jsonl
+from thoth.adapters.transcription.muscriptor import (
+    MuscriptorTranscriber,
+    parse_jsonl,
+    trechos_sem_nota,
+)
 
 JSONL = """\
 {"type": "start", "pitch": 23, "start_time": 0.22, "index": 0, "instrument": "electric_bass"}
@@ -48,8 +52,7 @@ def test_filtra_por_instrumento() -> None:
 def test_nota_sem_evento_de_fim_nao_some_nem_tem_duracao_negativa() -> None:
     """Truncamento no fim do áudio não pode derrubar a transcrição inteira."""
     truncado = (
-        '{"type": "start", "pitch": 40, "start_time": 1.0,'
-        ' "index": 0, "instrument": "drums"}\n'
+        '{"type": "start", "pitch": 40, "start_time": 1.0, "index": 0, "instrument": "drums"}\n'
     )
 
     (nota,) = parse_jsonl(truncado)
@@ -125,3 +128,103 @@ def test_transcreve_audio_real(tmp_path: Path) -> None:
     # com o modelo e devolve algo do registro certo.
     assert min(n.pitch for n in notas) >= 24
     assert max(n.pitch for n in notas) <= 60
+
+
+# --- Buraco do prelude forcing (emenda do ADR-008, 2026-09-25) --------------------
+
+#: Finge ser o MuScriptor: com o prelude forcing (padrão) só transcreve até
+#: `CORTE_S`, como em *Eyrie*; sem ele, transcreve tudo com outra altura, para o
+#: teste saber de qual passada cada nota veio. Cada chamada fica registrada.
+FALSO = """\
+import json, sys
+from pathlib import Path
+args = sys.argv[1:]
+Path(args[args.index("--log") + 1]).open("a").write(" ".join(args) + "\\n")
+sem_prelude = "--no-prelude-forcing" in args
+fim = {duracao} if sem_prelude else {corte}
+pitch = 40 if sem_prelude else 30
+linhas = []
+t, i = 0.25, 0
+while t < fim:
+    linhas.append({{"type": "start", "pitch": pitch, "start_time": t, "index": i,
+                   "instrument": "electric_bass"}})
+    linhas.append({{"type": "end", "end_time": t + 0.3, "start_event_index": i}})
+    t, i = t + 0.5, i + 1
+Path(args[args.index("-o") + 1]).write_text("\\n".join(json.dumps(x) for x in linhas))
+"""
+
+
+def _falso(tmp_path: Path, corte: float, duracao: float) -> tuple[MuscriptorTranscriber, Path]:
+    import sys
+
+    script, log = tmp_path / "falso.py", tmp_path / "chamadas.log"
+    script.write_text(FALSO.format(corte=corte, duracao=duracao))
+    # `--log` vai no fim do comando; o falso o lê, o MuScriptor real nunca o recebe.
+    return MuscriptorTranscriber(binary=(sys.executable, str(script), "--log", str(log))), log
+
+
+def _stem(tmp_path: Path, duracao: float) -> Path:
+    """Baixo soando o tempo todo: ruído grave constante basta para a energia."""
+    import numpy as np
+    import soundfile as sf
+
+    sr = 22050
+    t = np.arange(int(duracao * sr)) / sr
+    caminho = tmp_path / "bass.wav"
+    sf.write(caminho, 0.2 * np.sin(2 * np.pi * 55 * t), sr)
+    return caminho
+
+
+def test_trecho_soando_sem_nota_e_buraco() -> None:
+    energia = [-20.0] * 60
+    onsets = [t / 2 for t in range(0, 40)] + [t / 2 for t in range(80, 120)]  # nada de 20 a 40 s
+
+    (buraco,) = trechos_sem_nota(energia, onsets)
+
+    assert 20 <= buraco[0] <= 23
+    assert 37 <= buraco[1] <= 40
+
+
+def test_silencio_sem_nota_nao_e_buraco() -> None:
+    energia = [-20.0] * 20 + [-90.0] * 20 + [-20.0] * 20
+    onsets = [t / 2 for t in range(0, 40)] + [t / 2 for t in range(80, 120)]
+
+    assert trechos_sem_nota(energia, onsets) == []
+
+
+def test_pausa_curta_nao_e_buraco() -> None:
+    """Uma pausa de poucos segundos é música, não o modelo travado."""
+    energia = [-20.0] * 60
+    onsets = [t / 2 for t in range(0, 60)] + [t / 2 for t in range(72, 120)]  # 6 s sem nota
+
+    assert trechos_sem_nota(energia, onsets) == []
+
+
+def test_buraco_e_preenchido_pela_passada_sem_prelude(tmp_path: Path) -> None:
+    transcritor, log = _falso(tmp_path, corte=20.0, duracao=60.0)
+
+    notas = transcritor.transcribe(_stem(tmp_path, 60.0))
+
+    chamadas = log.read_text().splitlines()
+    assert len(chamadas) == 2
+    assert "--no-prelude-forcing" in chamadas[1]
+    primeira = [n for n in notas if n.pitch == 30]
+    segunda = [n for n in notas if n.pitch == 40]
+    fim_1 = max(n.onset_s for n in primeira)
+    ini_2, fim_2 = min(n.onset_s for n in segunda), max(n.onset_s for n in segunda)
+    print(f"primeira passada até {fim_1:.2f} s, segunda de {ini_2:.2f} a {fim_2:.2f} s")
+    assert max(n.onset_s for n in primeira) < 20
+    assert min(n.onset_s for n in segunda) >= 20  # a segunda só entra no buraco
+    # ... mas entra logo: a vizinhança que atrasa o início do buraco não pode virar lacuna.
+    assert min(n.onset_s for n in segunda) < 20.5
+    assert max(n.onset_s for n in segunda) > 55
+    assert [n.onset_s for n in notas] == sorted(n.onset_s for n in notas)
+
+
+def test_sem_buraco_nao_ha_segunda_passada(tmp_path: Path) -> None:
+    transcritor, log = _falso(tmp_path, corte=60.0, duracao=60.0)
+
+    notas = transcritor.transcribe(_stem(tmp_path, 60.0))
+
+    assert len(log.read_text().splitlines()) == 1
+    assert {n.pitch for n in notas} == {30}

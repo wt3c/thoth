@@ -162,9 +162,12 @@ A avaliação **não depende de saber tocar** (ADR-006).
       `3f0/(2f0+4f0)`, meios-harmônicos. Com 84 casos em duas músicas, diferença pequena
       entre candidatos não se distingue de acaso: esperar mais tabs. *Eyrie* acrescentou só 2
       (quarta emenda do ADR-030): linha repetitiva demais para as janelas serem conclusivas
-- [ ] MuScriptor silencioso no fim de *Eyrie* (`_RMax1LS3pM`): nenhuma nota depois de ~555 s
-      com o stem soando a −24 dB até 690 s, nem transcrevendo só o trecho final. Não é o filtro
-      de rótulos nem a duração (o Equus, com 756 s, sai inteiro). Causa não investigada
+- [x] MuScriptor silencioso no fim de *Eyrie* (`_RMax1LS3pM`): o *prelude forcing* trava o
+      modelo em vazio de 557 a 671 s. Segunda passada sem ele, só quando há buraco, só dentro
+      do buraco (emenda do ADR-008). 0 → 382 notas no trecho, travado em
+      `tests/integration/test_prelude_eyrie.py`
+- [ ] Rodar *Eyrie* de novo com a segunda passada e refazer o veredito contra a tab: o trecho
+      de 557 a 671 s ainda não foi medido
 - [x] `MuscriptorTranscriber` atrás do `Protocol Transcriber` — subprocesso via
       `uvx` (torch fora do projeto), `small` + livre + `--detect-tempo false`.
       7 testes: 6 de parsing puro + 1 contra o modelo real (`slow`).
