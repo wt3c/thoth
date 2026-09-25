@@ -3146,3 +3146,26 @@ deslocamento da mão medido pelo menor traste pisado. O mi maior sai na forma ab
   evento de folga (`FOLGA_DEMUCS = 0,03`); `isolada` e `mix` continuam exatos.
 - Tornar o Demucs determinístico (`--shifts 0`) mudaria também o stem do baixo e
   exigiria remedir o baixo; fica fora do M4, como decisão própria se for preciso.
+
+### Emenda (2026-09-25) — GP5 com acordes de guitarra
+
+- `Gp5Exporter(acordes=True, faixa=..., programa_gm=...)`: as notas do mesmo tique
+  da grade viram **um beat com uma nota por corda** (`rhythm.acordes_em_ticks`). O
+  acorde soa até a nota mais longa dele ou até o acorde seguinte; a ligadura através
+  da barra vale para o acorde inteiro. Dois acordes posicionados separados que caem
+  no mesmo tique só se juntam sem disputar corda; senão o exportador recusa com
+  "mesma corda", em vez de gravar uma posição impossível.
+- O baixo não muda: `acordes=False` é o padrão, e ele continua recusando notas
+  simultâneas (ADR-012), com faixa "Baixo" e programa 33.
+- Acorde não recebe nome no texto do beat; nota solta continua recebendo. Nomear
+  acorde (Mi maior, Lá menor) é outro problema e fica fora do M4.
+- **Verificado:** round-trip pelo PyGuitarPro afirma estrutura (beats, início,
+  cordas, trastes, ligadura) e a fixture `guitarra-limpa-isolada` inteira (16
+  acordes, 53 notas). Leitor independente: o MuseScore 4 importa o mesmo arquivo com
+  16 acordes e 53 notas, e o par (altura, traste) de cada nota bate com o
+  posicionamento.
+- **Desvio do contrato proposto:** o ADR-044 pede `Exporter.export(ParteMusical)`
+  com estratégias por família. Aqui a assinatura continuou `list[TabNote] + tuning`,
+  com três campos no exportador — basta para baixo e guitarra, que têm corda e
+  traste. A `ParteMusical` entra quando bateria ou piano chegarem aos exportadores,
+  que são os que não cabem nessa assinatura.

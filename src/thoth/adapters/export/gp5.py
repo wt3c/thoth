@@ -10,7 +10,9 @@ Limitações assumidas desta primeira versão, todas visíveis na leitura:
 - compasso fixo 4/4, grade de semicolcheia e um único andamento para a música
   inteira — o campo de BPM do arquivo é inteiro, então ele sai arredondado
   enquanto a quantização usa o fracionário (ADR-021);
-- linha monofônica (ADR-012): notas simultâneas são recusadas, não empilhadas.
+- linha monofônica (ADR-012): notas simultâneas são recusadas, não empilhadas —
+  salvo com `acordes=True` (guitarra, ADR-044), em que notas do mesmo tique viram
+  um beat com uma nota por corda. Acorde não recebe nome no beat.
 
 A sustentação é escrita com ligadura (ADR-022): a duração que não cabe numa
 figura só — ou que atravessa a barra — vira beats `NoteType.tie` encadeados. Não
@@ -29,7 +31,7 @@ import guitarpro as gp
 from thoth.domain.models import TabNote
 from thoth.domain.ports import Exporter
 from thoth.services.notas import nome_da_nota
-from thoth.services.rhythm import COMPASSO, GRADE, PPQ, eventos
+from thoth.services.rhythm import COMPASSO, GRADE, PPQ, acordes_em_ticks, eventos
 
 BAIXO_GM = 33  # Electric Bass (finger)
 
@@ -85,6 +87,11 @@ class Gp5Exporter:
     armadura: int | None = None
     """Armadura estimada. O GP5 do Thoth não a escreve na pauta — ela só decide se o
     nome do beat sai com bemol ou com sustenido (ADR-031)."""
+    faixa: str = "Baixo"
+    programa_gm: int = BAIXO_GM
+    acordes: bool = False
+    """Empilha notas do mesmo tique num beat (guitarra). Desligado, o baixo segue
+    recusando simultaneidade: lá ela é defeito da transcrição, não música."""
 
     def export(self, notes: list[TabNote], out: Path, tuning: tuple[int, ...]) -> Path:
         if not notes:
@@ -95,18 +102,23 @@ class Gp5Exporter:
         # fora. O inverso — quantizar no inteiro — desloca as notas (ADR-021).
         song = gp.Song(title=self.titulo, tempo=round(self.bpm))
         song.tracks.clear()
-        track = gp.Track(song, number=1, name="Baixo")
+        track = gp.Track(song, number=1, name=self.faixa)
         # O GP numera as cordas da mais aguda para a mais grave; nós, o contrário.
         track.strings = [gp.GuitarString(i + 1, v) for i, v in enumerate(reversed(tuning))]
-        track.channel.instrument = BAIXO_GM
+        track.channel.instrument = self.programa_gm
         track.measures.clear()  # o construtor já cria um compasso a partir dos headers
         song.tracks.append(track)
 
         # `(início, duração, nota, continuação)` — a continuação é o que sai ligado
         # ao beat anterior em vez de reatacar a corda.
+        agrupados = (
+            acordes_em_ticks(notes, self.bpm)
+            if self.acordes
+            else [(ini, dur, (tab,)) for ini, dur, tab in eventos(notes, self.bpm)]
+        )
         marcados = [
-            (ini, dur, tab, i > 0)
-            for inicio, duracao, tab in eventos(notes, self.bpm)
+            (ini, dur, acorde, i > 0)
+            for inicio, duracao, acorde in agrupados
             for i, (ini, dur) in enumerate(_fatiar_na_barra(inicio, duracao))
         ]
         total = (marcados[-1][0] + marcados[-1][1] - 1) // COMPASSO + 1
@@ -118,7 +130,7 @@ class Gp5Exporter:
             voz = gp.Voice(medida)
             fim_do_compasso = (numero + 1) * COMPASSO
 
-            for inicio, duracao, tab, continuacao in marcados:
+            for inicio, duracao, acorde, continuacao in marcados:
                 if not numero * COMPASSO <= inicio < fim_do_compasso:
                     continue
                 for valor, pontuada in _decompor(inicio - cursor):
@@ -127,7 +139,9 @@ class Gp5Exporter:
                 # duração é a mesma nota continuando, então sai ligada.
                 for i, (valor, pontuada) in enumerate(_decompor(duracao)):
                     ligada = continuacao or i > 0
-                    voz.beats.append(self._nota(voz, tab, len(tuning), valor, pontuada, ligada))
+                    voz.beats.append(
+                        self._nota(voz, acorde, len(tuning), valor, pontuada, ligada)
+                    )
                 cursor = inicio + duracao
 
             for valor, pontuada in _decompor(fim_do_compasso - cursor):
@@ -148,27 +162,29 @@ class Gp5Exporter:
         return beat
 
     def _nota(
-        self, voz: gp.Voice, tab: TabNote, cordas: int, valor: int, pontuada: bool,
-        ligada: bool = False,
+        self, voz: gp.Voice, acorde: tuple[TabNote, ...], cordas: int, valor: int,
+        pontuada: bool, ligada: bool = False,
     ) -> gp.Beat:
         beat = gp.Beat(voz, duration=gp.Duration(value=valor, isDotted=pontuada))
-        beat.notes.append(
-            gp.Note(
-                beat,
-                value=tab.fret,
-                string=cordas - tab.string,
-                velocity=95,
-                type=gp.NoteType.tie if ligada else gp.NoteType.normal,
+        for tab in acorde:
+            beat.notes.append(
+                gp.Note(
+                    beat,
+                    value=tab.fret,
+                    string=cordas - tab.string,
+                    velocity=95,
+                    type=gp.NoteType.tie if ligada else gp.NoteType.normal,
+                )
             )
-        )
         # Sem isto o beat sai `empty` (o default do PyGuitarPro): o leitor trata beat
         # vazio como duração zero, e todos os beats do compasso colapsam num só.
         beat.status = gp.BeatStatus.normal
-        # O nome vai só no ataque: repeti-lo na ligadura sugeriria outra nota.
+        # O nome vai só no ataque de nota solta: repeti-lo na ligadura sugeriria
+        # outra nota, e seis nomes empilhados num acorde seriam ruído.
         beat.text = (
             None
-            if ligada
-            else nome_da_nota(tab.event.pitch, bemois=(self.armadura or 0) < 0)
+            if ligada or len(acorde) > 1
+            else nome_da_nota(acorde[0].event.pitch, bemois=(self.armadura or 0) < 0)
         )
         return beat
 

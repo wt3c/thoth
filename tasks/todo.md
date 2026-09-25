@@ -412,7 +412,7 @@ Pré-requisito invisível até agora: a Fase 5 só existe se houver o que o
       quando toda nota preservar a altura, cada acorde usar cordas distintas, nenhum
       traste exceder o máximo e a falha em acorde impossível for relatada, não
       monofonizada.
-- [ ] GP5: emitir acordes no mesmo beat, afinação de guitarra e programa GM do perfil;
+- [x] GP5: emitir acordes no mesmo beat, afinação de guitarra e programa GM do perfil;
       pronto quando gravação → releitura preservar alturas, cordas, trastes, ataques e
       simultaneidade, com abertura por leitor independente.
 - [ ] MusicXML: emitir partitura + tablatura de guitarra, clave correta, afinação e

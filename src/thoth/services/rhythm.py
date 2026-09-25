@@ -119,3 +119,35 @@ def eventos(notes: Sequence[TabNote], bpm: float) -> list[tuple[int, int, TabNot
             fim = min(fim, inicios[i + 1])
         saida.append((inicio, max(GRADE, fim - inicio), tab))
     return saida
+
+
+def acordes_em_ticks(
+    notes: Sequence[TabNote], bpm: float
+) -> list[tuple[int, int, tuple[TabNote, ...]]]:
+    """`(início, duração, acorde)` em ticks: notas do mesmo tique viram um acorde.
+
+    O par polifônico de `eventos`, para a guitarra (ADR-044). A simultaneidade é a
+    da grade, não a do relógio: dois acordes posicionados separados podem cair no
+    mesmo tique, e aí só se juntam se não disputarem corda. O acorde soa até a nota
+    mais longa dele ou até o acorde seguinte, o que vier antes.
+    """
+    grupos: dict[int, list[TabNote]] = {}
+    for tab in notes:
+        grupos.setdefault(para_ticks(tab.event.onset_s, bpm), []).append(tab)
+    for inicio, grupo in grupos.items():
+        cordas = [t.string for t in grupo]
+        if len(cordas) != len(set(cordas)):
+            raise ValueError(
+                f"duas notas na mesma corda no tique {inicio} "
+                f"({grupo[0].event.onset_s:.2f}s): o acorde não é tocável"
+            )
+
+    inicios = sorted(grupos)
+    saida = []
+    for i, inicio in enumerate(inicios):
+        acorde = tuple(sorted(grupos[inicio], key=lambda t: t.string))
+        fim = max(para_ticks(t.event.offset_s, bpm) for t in acorde)
+        if i + 1 < len(inicios):
+            fim = min(fim, inicios[i + 1])
+        saida.append((inicio, max(GRADE, fim - inicio), acorde))
+    return saida
