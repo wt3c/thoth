@@ -30,6 +30,11 @@ A guitarra (ADR-044) segue a mesma ordem, com três diferenças, todas medidas:
   uma nota por vez. Os outros rótulos de guitarra e as outras famílias presentes no
   stem são relatados em separado, nunca fundidos na parte.
 
+A bateria (ADR-044, M2) não tem altura nem braço: sai do stem `drums` como ataques,
+em faixa de percussão, com a grade medida pelo primeiro ataque de cada grupo, como a
+guitarra. O que a partitura não comporta — a mesma peça duas vezes no tique, peça fora
+do mapa de percussão, mais de seis peças juntas — é relatado por motivo, não fatal.
+
 Cada estágio se anuncia por `Progresso` antes de começar (ADR-037). Quem desenha é
 a CLI: o pipeline não conhece terminal, cor nem barra de progresso.
 """
@@ -41,16 +46,27 @@ from collections import Counter
 from dataclasses import dataclass, field
 from pathlib import Path
 
-from thoth.adapters.export.gp5 import Gp5Exporter
-from thoth.adapters.export.musicxml import MusicXmlExporter
+from thoth.adapters.export.gp5 import CORDAS_PERCUSSAO, Gp5Exporter, Gp5PercussaoExporter
+from thoth.adapters.export.musicxml import (
+    MAPA_PERCUSSAO,
+    MusicXmlExporter,
+    MusicXmlPercussaoExporter,
+)
 from thoth.adapters.ingest import resolver_fonte
 from thoth.adapters.separation import DemucsSeparator
 from thoth.adapters.transcription.muscriptor import MuscriptorTranscriber
 from thoth.domain.instrumentos import PERFIS, PerfilInstrumento
-from thoth.domain.models import AcordeImpossivel, AudioAsset, NoteEvent, TabNote
+from thoth.domain.models import (
+    AcordeImpossivel,
+    AudioAsset,
+    EventoPercussivo,
+    NoteEvent,
+    TabNote,
+)
 from thoth.domain.ports import (
     AtribuidorDeAcordes,
     AudioSource,
+    ExportadorDePercussao,
     Exporter,
     FretAssigner,
     Progresso,
@@ -63,7 +79,13 @@ from thoth.services.cache_notas import gravar
 from thoth.services.fretboard import ViterbiFretAssigner, cabe_no_braco
 from thoth.services.nomes import nome_de_arquivo
 from thoth.services.octave_check import OctaveWarning, verificar_oitavas
-from thoth.services.rhythm import deslocar, monofonizar, recuo_de_fase, unir_por_tique
+from thoth.services.rhythm import (
+    ataques_em_ticks,
+    deslocar,
+    monofonizar,
+    recuo_de_fase,
+    unir_por_tique,
+)
 from thoth.services.rotulos import TrechoSemBaixo, readmitidas, trechos_sem_baixo
 from thoth.services.tempo import (
     BPM_MAXIMO,
@@ -78,18 +100,22 @@ from thoth.services.tonalidade import Tonalidade, estimar_tom, tom_de_texto
 #: Os três nomes que o MuScriptor usa para baixo (`list-instruments`, v0.3.0).
 ROTULOS_DE_BAIXO = frozenset({"electric_bass", "acoustic_bass", "contrabass"})
 
-#: Os perfis que chegam à partitura, com a afinação padrão de cada um. Bateria e piano
-#: ainda não têm exportador (ADR-044): recusá-los antes do download é o que evita
-#: minutos de CPU que terminariam sem arquivo.
+#: Os perfis que chegam à partitura, com a afinação padrão de cada um — a bateria, sem
+#: nenhuma. O piano ainda não tem exportador (ADR-044): recusá-lo antes do download é o
+#: que evita minutos de CPU que terminariam sem arquivo.
 INSTRUMENTOS: dict[str, tuple[int, ...]] = {
-    nome: p.afinacao
+    nome: p.afinacao or ()
     for nome, p in PERFIS.items()
-    if p.familia in ("baixo", "guitarra") and p.afinacao
+    if p.familia == "bateria" or (p.familia in ("baixo", "guitarra") and p.afinacao)
 }
 
 #: O stem do Demucs no nome do áudio copiado. `other` não é "guitarra": é tudo que
 #: não é voz, bateria nem baixo, e as três guitarras e os pianos saem nele juntos.
-_STEM_EM_PORTUGUES = {"bass": "baixo", "other": "outros"}
+_STEM_EM_PORTUGUES = {"bass": "baixo", "other": "outros", "drums": "bateria"}
+
+#: Silêncio na frente do stem da bateria (ADR-045): levanta o F1 de 0,529 para 0,901 e,
+#: nos outros perfis, troca o rótulo — por isso só aqui.
+SILENCIO_BATERIA_S = 0.1
 
 
 @dataclass(frozen=True, slots=True)
@@ -127,6 +153,9 @@ class Resultado:
     contaminacao: dict[str, int] = field(default_factory=dict)
     #: Acordes sem digitação, relatados inteiros no tempo do áudio (ADR-014).
     acordes_impossiveis: list[AcordeImpossivel] = field(default_factory=list)
+    #: Ataques de bateria fora da partitura, por motivo e no tempo do áudio: a mesma
+    #: peça repetida no tique, peça fora do mapa de percussão, além de seis no tique.
+    ataques_descartados: dict[str, list[EventoPercussivo]] = field(default_factory=dict)
 
 
 @dataclass(frozen=True, slots=True)
@@ -157,6 +186,16 @@ class _Parte:
     erro_de_rotulo: dict[str, int] = field(default_factory=dict)
     contaminacao: dict[str, int] = field(default_factory=dict)
     impossiveis: list[AcordeImpossivel] = field(default_factory=list)
+    #: Só da bateria: os ataques da partitura, na grade, e os que ficaram fora dela.
+    ataques: list[EventoPercussivo] = field(default_factory=list)
+    ataques_descartados: dict[str, list[EventoPercussivo]] = field(default_factory=dict)
+
+
+def transcritor_padrao(perfil: PerfilInstrumento) -> MuscriptorTranscriber:
+    """O MuScriptor de sempre; na bateria, com o silêncio na frente (ADR-045)."""
+    if perfil.familia == "bateria":
+        return MuscriptorTranscriber(silencio_inicial_s=SILENCIO_BATERIA_S)
+    return MuscriptorTranscriber()
 
 
 def transcrever(
@@ -188,7 +227,9 @@ def transcrever(
     sempre. Uma guitarra sai do stem `other`, com o perfil no nome da partitura, da
     auralização e do cache de notas — `.guitarra-limpa.gp5` ao lado do `.gp5` do
     baixo, sem sobrescrevê-lo —, e o stem e o playback como `.outros.wav` e
-    `.sem-outros.wav`.
+    `.sem-outros.wav`. A bateria sai do stem `drums`, sem tablatura: `.bateria.gp5` e
+    `.bateria.musicxml` em faixa de percussão, e `.bateria.wav` e `.sem-bateria.wav`.
+    Os `exporters` injetados valem só para as cordas.
 
     Áudio que falta não desce em silêncio: a auralização depende de ferramenta
     externa, e a falha dela volta em `falha_na_auralizacao` em vez de custar a
@@ -215,10 +256,11 @@ def transcrever(
     perfil = PERFIS[instrumento]
     tuning = tuning or INSTRUMENTOS[instrumento]
     guitarra = perfil.familia == "guitarra"
+    bateria = perfil.familia == "bateria"
 
     relator = progresso or _Silencio()
     separator = separator or DemucsSeparator(stem=perfil.stem)
-    transcriber = transcriber or MuscriptorTranscriber()
+    transcriber = transcriber or transcritor_padrao(perfil)
 
     # `resolver_fonte` escolhe entre disco e YouTube pelo `ref`; `source` passa por
     # cima dessa escolha. Era o único estágio que não se deixava substituir, e sem
@@ -232,7 +274,7 @@ def transcrever(
         andamento = estimar_andamento(asset.wav)
         bpm = andamento.bpm
     relator.inicia(
-        f"separando o stem {perfil.stem}" if guitarra else "separando o baixo",
+        "separando o baixo" if perfil.familia == "baixo" else f"separando o stem {perfil.stem}",
         "Demucs, ~3x a duração do áudio em CPU",
     )
     stems = separator.separate(asset.wav, cache_dir / "stems" / asset.source_id)
@@ -243,9 +285,11 @@ def transcrever(
     rotulos = Counter(n.instrument for n in todas)
     # O perfil entra no nome de tudo que não é do baixo: a guitarra da mesma música
     # cai na mesma pasta, e o baixo tem que continuar byte a byte onde estava (M5).
-    sufixo = f".{instrumento}" if guitarra else ""
+    sufixo = "" if perfil.familia == "baixo" else f".{instrumento}"
     cache_de_notas = cache_dir / asset.source_id / f"notas{sufixo}.jsonl"
-    if guitarra:
+    if bateria:
+        parte = _parte_de_bateria(todas, perfil, asset, bpm, andamento, relator, cache_de_notas)
+    elif guitarra:
         parte = _parte_de_guitarra(
             todas, perfil, asset, bpm, andamento, tuning,
             atribuidor_de_acordes or ViterbiAcordes(), relator, cache_de_notas,
@@ -259,7 +303,8 @@ def transcrever(
     # O tom vem das notas que vão para a partitura, e a armadura só é escrita
     # quando a estimativa se sustenta: armadura errada imprime mais bequadro do
     # que armadura nenhuma (ADR-031). `tom` informado não passa por margem.
-    tonalidade = tom_de_texto(tom) if tom else estimar_tom(parte.mantidas)
+    # A bateria não tem tom: nem estimado, nem informado.
+    tonalidade = None if bateria else tom_de_texto(tom) if tom else estimar_tom(parte.mantidas)
     armadura = tonalidade.armadura if tonalidade else None
     if exporters is None and guitarra:
         exporters = {
@@ -277,17 +322,28 @@ def transcrever(
         "musicxml": MusicXmlExporter(bpm=parte.bpm, armadura=armadura, titulo=asset.title),
     }
 
-    relator.inicia("exportando a partitura", ", ".join(exporters))
     # Uma pasta por música, e o nome repetido dentro dela (ADR-037): oito músicas
     # em `out/` plano são quarenta arquivos intercalados, e o arquivo que sai da
     # pasta continua dizendo de que música é.
     nome = nome_de_arquivo(asset)
     pasta = out_dir / nome
     pasta.mkdir(parents=True, exist_ok=True)
-    artefatos = {
-        formato: exportador.export(parte.tabs, pasta / f"{nome}{sufixo}.{formato}", tuning)
-        for formato, exportador in exporters.items()
-    }
+    if bateria:
+        relator.inicia("exportando a partitura", "gp5, musicxml")
+        percussao: dict[str, ExportadorDePercussao] = {
+            "gp5": Gp5PercussaoExporter(bpm=parte.bpm, titulo=asset.title),
+            "musicxml": MusicXmlPercussaoExporter(bpm=parte.bpm, titulo=asset.title),
+        }
+        artefatos = {
+            formato: exportador.exportar(parte.ataques, pasta / f"{nome}{sufixo}.{formato}")
+            for formato, exportador in percussao.items()
+        }
+    else:
+        relator.inicia("exportando a partitura", ", ".join(exporters))
+        artefatos = {
+            formato: exportador.export(parte.tabs, pasta / f"{nome}{sufixo}.{formato}", tuning)
+            for formato, exportador in exporters.items()
+        }
 
     do_stem = _STEM_EM_PORTUGUES[perfil.stem]
     relator.inicia("copiando os áudios", f"mix, {do_stem} e playback")
@@ -309,7 +365,7 @@ def transcrever(
     try:
         artefatos["aural"] = auralizar(
             asset.wav, parte.no_audio, pasta / f"{nome}{sufixo}.aural.wav",
-            programa=perfil.programa_gm,
+            programa=perfil.programa_gm, percussao=bateria,
         )
     except (AuralizacaoError, ValueError) as erro:
         falha = str(erro)
@@ -323,7 +379,7 @@ def transcrever(
         asset=asset,
         stem=stem,
         artefatos=artefatos,
-        notas=len(parte.mantidas),
+        notas=len(parte.ataques) if bateria else len(parte.mantidas),
         rotulos=dict(rotulos),
         descartadas=parte.descartadas,
         fora_do_braco=parte.fora,
@@ -332,6 +388,7 @@ def transcrever(
         erro_de_rotulo=parte.erro_de_rotulo,
         contaminacao=parte.contaminacao,
         acordes_impossiveis=parte.impossiveis,
+        ataques_descartados=parte.ataques_descartados,
     )
 
 
@@ -469,4 +526,76 @@ def _parte_de_guitarra(
             AcordeImpossivel(tuple(deslocar(a.notas, -recuo)), a.motivo)
             for a in posicionamento.impossiveis
         ],
+    )
+
+
+def _parte_de_bateria(
+    todas: list[NoteEvent],
+    perfil: PerfilInstrumento,
+    asset: AudioAsset,
+    bpm: float,
+    andamento: Andamento | None,
+    relator: Progresso,
+    cache_de_notas: Path,
+) -> _Parte:
+    """Ataques do stem `drums`: grade como a da guitarra, descartes por motivo.
+
+    A grade se mede pelo primeiro ataque de cada grupo, pela razão da guitarra: bumbo e
+    prato juntos seriam uma colisão e o desdobramento dobraria o andamento (ADR-024).
+    O que a partitura não comporta fica fora, relatado, e a música segue (ADR-014).
+    """
+    do_perfil = [n for n in todas if n.instrument in perfil.rotulos]
+    if not do_perfil:
+        raise ValueError(
+            f"nenhum ataque com {sorted(perfil.rotulos)} em {asset.title!r}: o transcritor "
+            f"devolveu {dict(Counter(n.instrument for n in todas)) or 'nada'}"
+        )
+    contaminacao = Counter(n.instrument for n in todas if n.instrument not in perfil.rotulos)
+
+    relator.inicia("ajustando a grade rítmica")
+    onsets = inicios_de_acorde(do_perfil)
+    base = desdobrar(onsets, bpm) if andamento else float(bpm)
+    andamento_fino, fase = ajustar(onsets, base, faixa=None if andamento else 0.0)
+    recuo = recuo_de_fase(do_perfil, andamento_fino, fase)
+
+    na_grade = deslocar(do_perfil, recuo)
+    no_mapa = [n for n in na_grade if n.pitch in MAPA_PERCUSSAO]
+    ataques = [EventoPercussivo(n.onset_s, n.pitch) for n in no_mapa]
+    # Pela identidade, não pela igualdade: a repetida no tique pode ser igual à mantida,
+    # e o cache precisa da nota que de fato foi para a partitura.
+    nota_de = {id(a): n for a, n in zip(ataques, no_mapa, strict=True)}
+    grupos, repetidas = ataques_em_ticks(ataques, andamento_fino)
+    # Mais peças que cordas na faixa: ficam as de número GM mais baixo, que no mapa são
+    # bumbo e caixa — as que sustentam o compasso — antes de pratos e percussão de mão.
+    mantidos = [a for _, _, grupo in grupos for a in grupo[:CORDAS_PERCUSSAO]]
+    alem = [a for _, _, grupo in grupos for a in grupo[CORDAS_PERCUSSAO:]]
+    fora_do_mapa = [
+        EventoPercussivo(n.onset_s, n.pitch) for n in na_grade if n.pitch not in MAPA_PERCUSSAO
+    ]
+
+    def no_audio(lista: list[EventoPercussivo]) -> list[EventoPercussivo]:
+        return [EventoPercussivo(a.instante_s - recuo, a.peca_gm) for a in lista]
+
+    descartados = {
+        motivo: no_audio(lista)
+        for motivo, lista in (
+            ("repetida no tique", repetidas),
+            ("fora do mapa de percussão", fora_do_mapa),
+            ("além de seis no tique", alem),
+        )
+        if lista
+    }
+    notas_no_audio = sorted(
+        deslocar([nota_de[id(a)] for a in mantidos], -recuo), key=lambda n: (n.onset_s, n.pitch)
+    )
+    gravar(notas_no_audio, cache_de_notas)
+    return _Parte(
+        tabs=[],
+        mantidas=[],
+        no_audio=notas_no_audio,
+        bpm=andamento_fino,
+        base=base,
+        contaminacao=dict(contaminacao),
+        ataques=mantidos,
+        ataques_descartados=descartados,
     )

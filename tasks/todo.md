@@ -400,10 +400,13 @@ Pré-requisito invisível até agora: a Fase 5 só existe se houver o que o
       → `MusicXmlPercussaoExporter` e `MAPA_PERCUSSAO` (GM 35–59, drumset do MuseScore),
       com `<instrument id>` por nota; sem ele o MuseScore confunde 38 com 40 (emenda do
       ADR-044).
-- [ ] Integrar `--instrumento bateria` na CLI/API sem alterar o default; pronto com
+- [x] Integrar `--instrumento bateria` na CLI/API sem alterar o default; pronto com
       teste ponta a ponta que usa o stem `drums`, entrega os dois formatos e não gera
       tablatura de cordas. O transcritor da bateria usa `silencio_inicial_s=0.1`
       (ADR-045); o dos outros perfis, não.
+      → `_parte_de_bateria`, descartes por motivo em `ataques_descartados`, opção na
+      página. Pipeline inteiro na `bateria-mix`: F1 micro 0,901, igual ao stem cru
+      (emenda do ADR-044).
 
 #### M3 — piano depois
 

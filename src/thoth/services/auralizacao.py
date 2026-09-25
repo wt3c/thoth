@@ -38,10 +38,16 @@ class AuralizacaoError(RuntimeError):
     """Falta uma ferramenta externa ou ela falhou."""
 
 
-def _midi(notas: list[NoteEvent], destino: Path, programa: int = BAIXO_GM) -> Path:
-    """As notas já estão em tempo absoluto, então o andamento do MIDI é irrelevante."""
+def _midi(
+    notas: list[NoteEvent], destino: Path, programa: int = BAIXO_GM, *, percussao: bool = False
+) -> Path:
+    """As notas já estão em tempo absoluto, então o andamento do MIDI é irrelevante.
+
+    `percussao` põe a faixa no canal 10: ali a altura é a peça GM, e o bumbo (36) toca
+    bumbo em vez de um dó grave no `programa`.
+    """
     pm = pretty_midi.PrettyMIDI()
-    instrumento = pretty_midi.Instrument(program=programa)
+    instrumento = pretty_midi.Instrument(program=programa, is_drum=percussao)
     instrumento.notes.extend(
         pretty_midi.Note(velocity=100, pitch=n.pitch, start=n.onset_s, end=n.offset_s)
         for n in notas
@@ -129,7 +135,12 @@ def _ganhos(original: Path, rendido: Path) -> tuple[float, float]:
 
 
 def auralizar(
-    original: Path, notas: list[NoteEvent], destino: Path, programa: int = BAIXO_GM
+    original: Path,
+    notas: list[NoteEvent],
+    destino: Path,
+    programa: int = BAIXO_GM,
+    *,
+    percussao: bool = False,
 ) -> Path:
     """WAV estéreo: original à esquerda, transcrição à direita.
 
@@ -142,7 +153,7 @@ def auralizar(
 
     destino.parent.mkdir(parents=True, exist_ok=True)
     with tempfile.TemporaryDirectory() as tmp:
-        mid = _midi(notas, Path(tmp) / "notas.mid", programa)
+        mid = _midi(notas, Path(tmp) / "notas.mid", programa, percussao=percussao)
         rendido = _renderizar(mid, Path(tmp) / "notas.wav")
         g_esq, g_dir = _ganhos(original, rendido)
         # `apad` + `shortest` iguala o canal curto ao longo sem cortar nenhum dos dois.

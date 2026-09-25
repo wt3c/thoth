@@ -150,3 +150,28 @@ def test_o_midi_leva_o_programa_pedido(tmp_path: Path) -> None:
 
     assert [i.program for i in padrao.instruments] == [BAIXO_GM]
     assert [i.program for i in guitarra.instruments] == [27]
+
+
+def test_a_bateria_vai_no_canal_de_percussao(tmp_path: Path) -> None:
+    """Sem `is_drum`, o bumbo (36) tocaria um dó grave no programa zero, o piano."""
+    import pretty_midi
+
+    from thoth.services.auralizacao import _midi
+
+    notas = [NoteEvent(36, 0.0, 0.01, "drums")]
+
+    midi = pretty_midi.PrettyMIDI(str(_midi(notas, tmp_path / "d.mid", 0, percussao=True)))
+
+    assert [i.is_drum for i in midi.instruments] == [True]
+
+
+@requer_ferramentas
+def test_a_bateria_auralizada_soa(original: Path, tmp_path: Path) -> None:
+    """Ataques de 10 ms, como o MuScriptor fecha a bateria: o banco de percussão toca."""
+    notas = [NoteEvent(p, t, t + 0.01, "drums") for t in (0.1, 0.6, 1.1) for p in (36, 42)]
+
+    saida = auralizar(original, notas, tmp_path / "aural.wav", programa=0, percussao=True)
+    audio, taxa = sf.read(str(saida))
+
+    direito = audio[:, 1]
+    assert np.abs(direito[int(0.1 * taxa) : int(0.4 * taxa)]).max() > 0.01, "bateria muda"

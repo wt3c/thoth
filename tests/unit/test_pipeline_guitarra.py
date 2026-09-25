@@ -200,7 +200,7 @@ def test_acordes_nao_enganam_o_desdobramento_do_andamento(tmp_path: Path) -> Non
     assert not r.desdobrado
 
 
-@pytest.mark.parametrize("instrumento", ["bateria", "piano-acustico", "ukulele"])
+@pytest.mark.parametrize("instrumento", ["piano-acustico", "ukulele"])
 def test_perfil_sem_exportador_e_recusado_antes_do_download(
     tmp_path: Path, instrumento: str
 ) -> None:

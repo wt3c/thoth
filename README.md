@@ -80,6 +80,12 @@ como `.outros.wav` e `.sem-outros.wav`: nada do baixo é sobrescrito. A afinaç�
 perfil, e `--afinacao` só vale para o baixo. O relatório separa as notas de outra guitarra, as
 de outra família que vazaram para o stem e os acordes que não cabem no braço.
 
+`--instrumento bateria` transcreve a bateria do stem `drums`, sem tablatura:
+`<título>.bateria.gp5` e `.musicxml` em faixa de percussão, `.bateria.wav`,
+`.sem-bateria.wav` e `.bateria.aural.wav`. O relatório conta os ataques que a partitura não
+comporta — a mesma peça duas vezes no tique, peça fora do kit GM (35 a 59) e mais de seis
+peças juntas.
+
 Leva cerca de 2,5× a duração do áudio em CPU. Sem `--bpm`, o andamento é estimado do mix
 e **anunciado** — confira ouvindo (ADR-019). O `auralizar` precisa das notas já em cache,
 então só roda depois de um `transcribe`; o `comparar` também. O `comparar` diz a

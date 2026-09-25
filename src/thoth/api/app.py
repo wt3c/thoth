@@ -126,7 +126,7 @@ class Pedido(BaseModel):
 
 
 def _afinacao(pedido: Pedido) -> tuple[int, ...] | None:
-    """Guitarra: `None`, e o pipeline usa a do perfil."""
+    """Fora do baixo: `None`, e o pipeline usa a do perfil (a bateria não tem nenhuma)."""
     if pedido.instrumento != "baixo":
         return None
     return AFINACOES[pedido.afinacao or "4"]
@@ -213,6 +213,9 @@ def _resumo(job: Job) -> dict[str, Any]:
         "descartadas": len(r.descartadas) if r else None,
         "erro_de_rotulo": r.erro_de_rotulo if r else None,
         "contaminacao": r.contaminacao if r else None,
+        "ataques_descartados": {m: len(a) for m, a in r.ataques_descartados.items()}
+        if r
+        else None,
         "acordes_impossiveis": [_acorde_impossivel(a) for a in r.acordes_impossiveis]
         if r
         else None,

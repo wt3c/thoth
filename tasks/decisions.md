@@ -3429,6 +3429,33 @@ não relê o instrumento por nota, e por isso a peça é conferida no XML); a fi
 `bateria-isolada` inteira. O MuseScore 4 importa a referência com as mesmas 32 figuras
 e as mesmas peças, e separa 38 de 40 no mesmo tique.
 
+
+### Emenda (2026-09-25) — `--instrumento bateria` na CLI, na API e na página
+
+Item 5 do M2. A bateria entra em `INSTRUMENTOS`, sem afinação; baixo continua o padrão, e
+o piano segue recusado antes do download. `_parte_de_bateria` é um ramo próprio do
+pipeline: filtra `drums`, mede a grade pelo primeiro ataque de cada grupo (como a
+guitarra, para bumbo e prato juntos não dobrarem o andamento, ADR-024) e entrega
+`EventoPercussivo` aos dois exportadores de percussão. Não há tablatura, tom nem
+conferência de oitava. Os artefatos levam o perfil no nome (`.bateria.gp5`,
+`.bateria.musicxml`, `.bateria.aural.wav`), e o stem e o playback saem como
+`.bateria.wav` e `.sem-bateria.wav`.
+
+**O que a partitura não comporta é relatado por motivo, não fatal (ADR-014).**
+`Resultado.ataques_descartados` separa três causas, no tempo do áudio: a mesma peça
+repetida no tique, peça fora do `MAPA_PERCUSSAO` e mais de seis peças num tique. Com
+mais de seis, ficam as de número GM mais baixo (bumbo e caixa antes de pratos). Sem
+esse corte, o `Gp5PercussaoExporter` recusaria o arquivo depois dos minutos de CPU.
+
+O transcritor padrão da bateria põe 0,1 s de silêncio na frente (ADR-045); o dos outros
+perfis, não (`transcritor_padrao`). A auralização toca no canal 10 (`is_drum`), onde a
+altura é a peça GM.
+
+**Medido:** a fixture `bateria-mix` pelo pipeline inteiro, com Demucs e MuScriptor reais,
+dá F1 micro 0,901 sobre os ataques do cache. É o mesmo 0,901 do stem cru: grade,
+quantização e descartes não perderam ataque. O piso é 0,871, com a folga do Demucs. O
+ponta a ponta do baixo continua passando.
+
 ---
 
 ## ADR-045 — silêncio na frente do áudio: só na bateria, porque troca o rótulo dos outros

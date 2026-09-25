@@ -299,6 +299,9 @@ def transcribe(
         _diz(f"fora da parte por erro de rótulo: {_contagem(r.erro_de_rotulo)}", "yellow")
     if r.contaminacao:
         _diz(f"fora da parte por contaminação do stem: {_contagem(r.contaminacao)}", "yellow")
+    if r.ataques_descartados:
+        contagem = {motivo: len(a) for motivo, a in r.ataques_descartados.items()}
+        _diz(f"ataque(s) fora da partitura: {_contagem(contagem)}", "yellow")
     if r.acordes_impossiveis:
         _diz(f"{len(r.acordes_impossiveis)} acorde(s) impossível(is):", "yellow")
         for acorde in r.acordes_impossiveis:

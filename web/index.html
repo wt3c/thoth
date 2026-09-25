@@ -60,6 +60,7 @@
           <option value="guitarra-limpa">guitarra limpa</option>
           <option value="guitarra-distorcida">guitarra distorcida</option>
           <option value="guitarra-acustica">guitarra acústica</option>
+          <option value="bateria">bateria</option>
         </select>
       </div>
       <div>
@@ -158,6 +159,14 @@ const relatar = (job) => {
   }
   if (job.contaminacao && Object.keys(job.contaminacao).length) {
     partes.push(`fora da parte por contaminação do stem: ${contagem(job.contaminacao)}`);
+  }
+  // A bateria relata por motivo o que a partitura não comporta (ADR-044, M2).
+  if (job.ataques_descartados && Object.keys(job.ataques_descartados).length) {
+    const porMotivo = Object.entries(job.ataques_descartados)
+      .sort(([a], [b]) => a.localeCompare(b))
+      .map(([motivo, n]) => `${n} ${motivo}`)
+      .join(', ');
+    partes.push(`ataque(s) fora da partitura: ${porMotivo}`);
   }
   if (job.acordes_impossiveis?.length) {
     const lista = job.acordes_impossiveis

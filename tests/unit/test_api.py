@@ -156,8 +156,9 @@ def test_sem_instrumento_o_pedido_e_de_baixo_na_afinacao_padrao(tmp_path: Path) 
 @pytest.mark.parametrize(
     "corpo",
     [
-        {"instrumento": "bateria"},
+        {"instrumento": "piano-acustico"},
         {"instrumento": "violino"},
+        {"instrumento": "bateria", "afinacao": "5"},
         {"instrumento": "guitarra-limpa", "afinacao": "drop-d"},
     ],
 )
@@ -195,6 +196,30 @@ def test_job_de_guitarra_relata_as_tres_causas_de_nota_fora(tmp_path: Path) -> N
     assert job["acordes_impossiveis"] == [
         {"onset_s": 12.0, "alturas": [40, 41], "motivo": "duas notas só cabem na mesma corda"}
     ]
+
+
+def test_job_de_bateria_relata_os_ataques_fora_por_motivo(tmp_path: Path) -> None:
+    from thoth.domain.models import EventoPercussivo
+
+    recebido: dict[str, object] = {}
+
+    def executar(ref: str, out_dir: Path, **kw: object) -> Resultado:
+        recebido.update(kw)
+        return replace(
+            _resultado_falso(out_dir),
+            instrumento="bateria",
+            ataques_descartados={"além de seis no tique": [EventoPercussivo(4.0, 57)]},
+        )
+
+    cliente = _cliente(tmp_path, executar)
+
+    criado = cliente.post("/jobs", json={"ref": "x.mp3", "instrumento": "bateria"})
+    job = cliente.get(f"/jobs/{criado.json()['id']}").json()
+
+    assert criado.status_code == 202, criado.text
+    assert recebido["instrumento"] == "bateria"
+    assert recebido["tuning"] is None
+    assert job["ataques_descartados"] == {"além de seis no tique": 1}
 
 
 def test_artefato_volta_com_os_bytes_do_arquivo(tmp_path: Path) -> None:

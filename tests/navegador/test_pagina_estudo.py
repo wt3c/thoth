@@ -20,7 +20,7 @@ import httpx
 import pytest
 
 from tests.navegador.cdp import CHROMIUM, avaliar, sessao
-from thoth.adapters.export.gp5 import Gp5Exporter
+from thoth.adapters.export.gp5 import Gp5Exporter, Gp5PercussaoExporter
 from thoth.api.app import WEB_PADRAO, criar_app
 from thoth.domain.instrumentos import PERFIS, TUNING_GUITARRA_6
 from thoth.domain.models import (
@@ -28,6 +28,7 @@ from thoth.domain.models import (
     TUNING_BASS_DROP_D,
     AcordeImpossivel,
     AudioAsset,
+    EventoPercussivo,
     NoteEvent,
     TabNote,
 )
@@ -74,6 +75,16 @@ def _guitarra_real(out_dir: Path) -> Path:
     return exportador.export(tab, out_dir / "estudo.guitarra-limpa.gp5", TUNING_GUITARRA_6)
 
 
+def _bateria_real(out_dir: Path) -> Path:
+    """Faixa de percussão com bumbo e chimbal juntos e caixa: o que a bateria entrega."""
+    ataques = [
+        EventoPercussivo(i * 30 / BPM, p)
+        for i in range(8)
+        for p in ((36, 42) if i % 2 == 0 else (38,))
+    ]
+    return Gp5PercussaoExporter(bpm=BPM).exportar(ataques, out_dir / "estudo.bateria.gp5")
+
+
 def _partitura_real(out_dir: Path, **kw: object) -> Resultado:
     """Executor de mentira, artefato de verdade: o alphaTab precisa de um GP5 legítimo."""
     RECEBIDOS.append(kw)
@@ -89,6 +100,8 @@ def _partitura_real(out_dir: Path, **kw: object) -> Resultado:
     ]
     if kw.get("instrumento", "baixo") == "baixo":
         artefato = Gp5Exporter(bpm=BPM).export(notas, out_dir / "estudo.gp5", TUNING_BASS_4)
+    elif kw["instrumento"] == "bateria":
+        artefato = _bateria_real(out_dir)
     else:
         artefato = _guitarra_real(out_dir)
     resultado = Resultado(
@@ -407,3 +420,57 @@ def test_tocar_faz_sair_som_e_andar_o_cursor_e_parar_cala(servidor: str) -> None
         f"o cursor não andou: {tocando_1} → {tocando_2}"
     )
     assert parado["rms"] < 0.001, f"parar não calou: {parado}"
+
+
+def test_o_formulario_de_bateria_manda_o_instrumento_e_nao_a_afinacao(servidor: str) -> None:
+    estado = avaliar(
+        f"{servidor}/",
+        """(async () => {
+             document.getElementById('ref').value = 'x.wav';
+             const escolha = document.getElementById('instrumento');
+             escolha.value = 'bateria';
+             escolha.dispatchEvent(new Event('change'));
+             const desabilitada = document.getElementById('afinacao').disabled;
+             document.getElementById('enviar').click();
+             for (let i = 0; i < 100; i++) {
+               const jobs = await (await fetch('/jobs')).json();
+               if (jobs.length && jobs[0].status !== 'na fila') {
+                 return {status: jobs[0].status, desabilitada};
+               }
+               await new Promise(r => setTimeout(r, 100));
+             }
+             return {status: 'nenhum job criado', desabilitada,
+                     texto: document.getElementById('estado').innerText};
+           })()""",
+        espera_s=6,
+    )
+
+    assert estado["status"] == "pronto", estado
+    assert estado["desabilitada"] is True
+    assert RECEBIDOS[0]["instrumento"] == "bateria"
+    assert RECEBIDOS[0]["tuning"] is None
+
+
+def test_a_partitura_de_bateria_aparece_e_os_ataques_fora_sao_relatados(servidor: str) -> None:
+    """Faixa de percussão no alphaTab, e cada causa de ataque fora na sua contagem."""
+    TROCAS.update(
+        ataques_descartados={
+            "repetida no tique": [EventoPercussivo(1.0, 36), EventoPercussivo(2.0, 38)],
+            "além de seis no tique": [EventoPercussivo(3.0, 57)],
+        },
+    )
+    ident = _pronto(servidor, {"ref": "x.wav", "bpm": BPM, "instrumento": "bateria"})
+
+    estado = avaliar(
+        f"{servidor}/?job={ident}",
+        "({svg: document.querySelectorAll('#tab svg').length,"
+        " viva_por_ms: performance.now(),"
+        " texto: document.getElementById('estado').innerText})",
+        espera_s=15,
+    )
+
+    assert estado["viva_por_ms"] > 10_000, f"sessão curta demais para concluir nada: {estado}"
+    assert estado["svg"] > 0, f"a partitura de bateria não foi desenhada: {estado}"
+    assert "ataque(s) fora da partitura: 1 além de seis no tique, 2 repetida no tique" in (
+        estado["texto"]
+    ), estado

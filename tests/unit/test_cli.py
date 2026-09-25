@@ -497,7 +497,7 @@ def test_sem_instrumento_o_baixo_segue_com_a_afinacao_de_sempre(
 @pytest.mark.parametrize(
     ("argumentos", "citado"),
     [
-        (["--instrumento", "bateria"], "guitarra-limpa"),
+        (["--instrumento", "piano-acustico"], "guitarra-limpa"),
         (["--instrumento", "guitarra-limpa", "--afinacao", "5"], "--afinacao"),
     ],
 )
@@ -543,3 +543,40 @@ def test_a_guitarra_relata_rotulo_contaminacao_e_acorde_impossivel(
     assert "5 acoustic_piano" in resultado.output
     assert "1 acorde(s) impossível(is)" in resultado.output
     assert "1:01 40 41: 2 notas na mesma corda" in resultado.output
+
+
+def test_a_bateria_relata_cada_causa_de_ataque_fora(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Sem afinação e com os ataques fora da partitura contados por motivo (ADR-044, M2)."""
+    from thoth.domain.models import EventoPercussivo
+    from thoth.services.pipeline import Resultado
+
+    recebido: dict[str, object] = {}
+    asset = AudioAsset(wav=tmp_path / "mix.wav", source_id="abc", title="t", duration_s=1.0)
+
+    def falso(ref: str, out: Path, **kw: object) -> Resultado:
+        recebido.update(kw)
+        return Resultado(
+            asset=asset, stem=tmp_path / "drums.wav", artefatos={}, notas=40,
+            rotulos={"drums": 43}, descartadas=[], fora_do_braco=[], bpm=90,
+            avisos_de_oitava=[], instrumento="bateria",
+            ataques_descartados={
+                "repetida no tique": [EventoPercussivo(1.0, 36), EventoPercussivo(2.0, 38)],
+                "fora do mapa de percussão": [EventoPercussivo(3.0, 81)],
+            },
+        )
+
+    monkeypatch.setattr(pipeline, "transcrever", falso)
+
+    resultado = runner.invoke(
+        app, ["transcribe", "x.mp3", "--bpm", "90", "--instrumento", "bateria"]
+    )
+
+    assert resultado.exit_code == 0, resultado.output
+    assert recebido["instrumento"] == "bateria"
+    assert recebido["tuning"] is None
+    assert "40 notas de bateria" in resultado.output
+    assert "ataque(s) fora da partitura: 1 fora do mapa de percussão, 2 repetida no tique" in (
+        resultado.output
+    )
