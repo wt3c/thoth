@@ -1560,6 +1560,31 @@ concordantes).
 quem ler o veredito do ADR-042: a contagem "oitava" mistura erro do Thoth com erro da
 tab, e para cima é quase só da tab. O que continua aberto é o erro para baixo (AUC 0,75).
 
+### Emenda (2026-09-25, quarta tab) — *Eyrie* não amplia a amostra
+
+Uma quarta tab, *Ne Obliviscaris - Eyrie* (baixo de 6 cordas, 2529 notas), contra a versão de
+estúdio no YouTube (`_RMax1LS3pM`, 711 s), transcrita com `--afinacao 6`. Rende **2 casos** de
+erro para baixo e nenhum para cima, de 53 notas rotuladas: a amostra vai de 84 para 86, o que não
+muda nada do que está acima.
+
+Três motivos, todos medidos:
+
+- **Só 2 de 9 janelas são conclusivas.** Entre 180 s e 540 s o piso de acaso (a tab deslocada
+  ±0,25 e ±0,5 s) chega a 73–80%: a linha repete a mesma nota em sequência rápida, e a tab
+  deslocada ainda acerta. O critério do ADR-042 funcionou, porque não há como confirmar o
+  alinhamento ali. Afrouxar o critério para aproveitar a música rotularia pares que o acaso explica.
+- **A tab tem outro andamento.** O `ler_tab` a põe entre 68 s e 430 s: o andamento sobe de 90 para
+  200 no compasso 94, e o DTW precisou esticar essa parte cerca de 2× para cobrir o stem. Isso
+  sugere que o autor escreveu esse trecho em andamento dobrado. O DTW absorve, mas não
+  há como distinguir um bom alinhamento do acaso nas janelas repetitivas.
+- **O MuScriptor não devolve nada depois de ~555 s**, embora o stem soe entre −30 e −24 dB até 690 s.
+  Refeito só no trecho final do stem (520 s até o fim): 26 notas antes de 570 s e nenhuma
+  depois, com qualquer rótulo. Não é filtro do Thoth nem truncamento por duração: o Equus
+  (756 s) sai inteiro. Fica anotado no `todo.md`.
+
+**Decisão:** nada muda no aviso de oitava. O discriminador do erro para baixo continua esperando
+tabs de músicas com linha menos repetitiva, para que as janelas sejam conclusivas.
+
 ## ADR-031 — a grafia do acidente segue o tom, com margem (B9)
 
 **Data:** 2026-09-23 · **Status:** aceito

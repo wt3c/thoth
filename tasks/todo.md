@@ -160,7 +160,11 @@ A avaliação **não depende de saber tocar** (ADR-006).
 - [ ] Discriminador do erro **para baixo** que separe melhor que o `f0 / 2·f0` (AUC 0,75,
       segunda emenda do ADR-030). Candidatos já medidos e descartados: ímpares/pares,
       `3f0/(2f0+4f0)`, meios-harmônicos. Com 84 casos em duas músicas, diferença pequena
-      entre candidatos não se distingue de acaso: esperar mais tabs
+      entre candidatos não se distingue de acaso: esperar mais tabs. *Eyrie* acrescentou só 2
+      (quarta emenda do ADR-030): linha repetitiva demais para as janelas serem conclusivas
+- [ ] MuScriptor silencioso no fim de *Eyrie* (`_RMax1LS3pM`): nenhuma nota depois de ~555 s
+      com o stem soando a −24 dB até 690 s, nem transcrevendo só o trecho final. Não é o filtro
+      de rótulos nem a duração (o Equus, com 756 s, sai inteiro). Causa não investigada
 - [x] `MuscriptorTranscriber` atrás do `Protocol Transcriber` — subprocesso via
       `uvx` (torch fora do projeto), `small` + livre + `--detect-tempo false`.
       7 testes: 6 de parsing puro + 1 contra o modelo real (`slow`).
