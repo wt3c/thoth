@@ -166,8 +166,11 @@ A avaliação **não depende de saber tocar** (ADR-006).
       modelo em vazio de 557 a 671 s. Segunda passada sem ele, só quando há buraco, só dentro
       do buraco (emenda do ADR-008). 0 → 382 notas no trecho, travado em
       `tests/integration/test_prelude_eyrie.py`
-- [ ] Rodar *Eyrie* de novo com a segunda passada e refazer o veredito contra a tab: o trecho
-      de 557 a 671 s ainda não foi medido
+- [x] *Eyrie* de novo com a segunda passada: 1507 → 1809 notas, a última em 659 s (antes 555 s);
+      136 e 192 notas nas janelas de 540 e 600 s, antes 25 e 0. **Qualidade não medida:** contra
+      a tab, as duas janelas saem inconclusivas (600 s: certa 20% contra piso 25%), como as do
+      meio da música. A tab de *Eyrie* não serve para julgar o trecho. Casos de oitava para
+      baixo continuam 2
 - [x] `MuscriptorTranscriber` atrás do `Protocol Transcriber` — subprocesso via
       `uvx` (torch fora do projeto), `small` + livre + `--detect-tempo false`.
       7 testes: 6 de parsing puro + 1 contra o modelo real (`slow`).
