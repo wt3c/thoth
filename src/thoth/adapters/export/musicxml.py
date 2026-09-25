@@ -21,6 +21,12 @@ drumset padrão do MuseScore). Posição e cabeça não identificam a peça — 
 acústica e a eletrônica caem as duas em C5 —, e o music21 10.5 só escreve um
 instrumento genérico por parte. O instrumento de cada peça, com o seu
 `midi-unpitched`, é escrito depois, no XML (`_com_pecas`).
+
+O piano (`MusicXmlPianoExporter`, ADR-044, M3) é um sistema de duas pautas sem
+tablatura: clave de Sol do dó central para cima, de Fá abaixo, sem inferir a mão.
+Mesmo tique e mesma duração formam acorde; duração sobreposta vai para outra voz,
+até 4 (o limite do MuseScore). Cada voz é posta em compassos à parte e as vozes
+se juntam por compasso, porque o `makeNotation` não separa vozes sozinho.
 """
 
 from __future__ import annotations
@@ -48,10 +54,18 @@ from music21 import (
     tempo,
 )
 
-from thoth.domain.models import EventoPercussivo, TabNote
-from thoth.domain.ports import ExportadorDePercussao, Exporter
+from thoth.domain.models import EventoPercussivo, NoteEvent, TabNote
+from thoth.domain.ports import ExportadorDePercussao, ExportadorDePiano, Exporter
 from thoth.services.notas import nome_da_nota
-from thoth.services.rhythm import COMPASSO, PPQ, acordes_em_ticks, ataques_em_ticks, eventos
+from thoth.services.rhythm import (
+    COMPASSO,
+    GRADE,
+    PPQ,
+    acordes_em_ticks,
+    ataques_em_ticks,
+    eventos,
+    para_ticks,
+)
 
 #: `(início, duração, acorde)` em ticks; no baixo o acorde tem sempre uma nota.
 Posicionadas = list[tuple[int, int, tuple[TabNote, ...]]]
@@ -181,7 +195,9 @@ def _consertar_beams(pronto: stream.Score) -> None:
     do conserto. Rodá-lo antes e marcar a pauta é o que faz o arquivo sair com o
     que foi examinado.
 
-    Sem vozes: a pauta é monofônica por construção (ADR-014).
+    Uma voz por vez: baixo e guitarra não têm vozes (ADR-014) e a camada é o
+    compasso; no piano o music21 quebra os beams dentro de cada voz do mesmo jeito
+    (ADR-044, M3), e cada voz é refeita sozinha.
     """
     for pauta in pronto.parts:
         pauta.makeBeams(inPlace=True)
@@ -189,25 +205,32 @@ def _consertar_beams(pronto: stream.Score) -> None:
         for compasso in pauta.getElementsByClass(stream.Measure):
             # Como o `makeBeams` acha a fórmula: a do compasso, senão a última vista.
             formula = compasso.timeSignature or formula
-            if formula is None or not _beams_quebrados(compasso):
+            if formula is None:
                 continue
-            elementos = list(compasso.notesAndRests)
-            for tempo_ in range(int(formula.barDuration.quarterLength)):
-                trecho = [e for e in elementos if tempo_ <= e.offset < tempo_ + 1]
-                if not trecho:
-                    continue
-                # Cópias: o `getBeams` só lê durações, mas não mexer no `activeSite`
-                # das notas da partitura custa uma linha.
-                novos = formula.getBeams(
-                    deepcopy(trecho), measureStartOffset=trecho[0].offset
-                )
-                for elemento, beams in zip(trecho, novos, strict=True):
-                    if isinstance(elemento, note.NotRest):
-                        elemento.beams = beams or beam.Beams()
+            for camada in list(compasso.voices) or [compasso]:
+                if _beams_quebrados(camada):
+                    _refazer_beams(camada, formula)
         pauta.streamStatus.beams = True
 
 
-def _beams_quebrados(compasso: stream.Measure) -> bool:
+def _refazer_beams(camada: stream.Measure | stream.Voice, formula: meter.TimeSignature) -> None:
+    """O `getBeams` do music21 um tempo por vez, sem grupo atravessando a fronteira."""
+    elementos = list(camada.notesAndRests)
+    for tempo_ in range(int(formula.barDuration.quarterLength)):
+        trecho = [e for e in elementos if tempo_ <= e.offset < tempo_ + 1]
+        if not trecho:
+            continue
+        # Cópias: o `getBeams` só lê durações, mas não mexer no `activeSite`
+        # das notas da partitura custa uma linha.
+        novos = formula.getBeams(
+            deepcopy(trecho), measureStartOffset=trecho[0].offset
+        )
+        for elemento, beams in zip(trecho, novos, strict=True):
+            if isinstance(elemento, note.NotRest):
+                elemento.beams = beams or beam.Beams()
+
+
+def _beams_quebrados(camada: stream.Measure | stream.Voice) -> bool:
     """A gramática do MusicXML sobre os beams do music21, por nível.
 
     `start` abre, `continue` e `stop` exigem aberto, `partial` (gancho) é isolado,
@@ -215,7 +238,7 @@ def _beams_quebrados(compasso: stream.Measure) -> bool:
     sobre o XML escrito.
     """
     abertos: dict[int, bool] = {}
-    for nota in compasso.notes:
+    for nota in camada.notes:
         for b in nota.beams:
             if b.type == "start":
                 if abertos.get(b.number):
@@ -461,6 +484,129 @@ def _com_pecas(xml: str, ordem: list[int]) -> str:
     return cabecalho + ElementTree.tostring(raiz, encoding="unicode")
 
 
+#: Do dó central para cima, clave de Sol; abaixo, clave de Fá. Regra fixa: a partitura
+#: não sabe que mão toca cada nota, e adivinhar seria inventar dedilhado (ADR-044).
+DO_CENTRAL = 60
+
+#: `(início, duração)` em ticks → alturas que soam juntas nesse trecho.
+Acordes = dict[tuple[int, int], list[int]]
+
+
+@dataclass(frozen=True, slots=True)
+class MusicXmlPianoExporter:
+    """Implementa o `ExportadorDePiano`: sistema de duas pautas, sem tablatura."""
+
+    bpm: float = 120
+    titulo: str = "Thoth"
+    armadura: int | None = None
+    """Armadura estimada, ou `None`, como no `MusicXmlExporter`."""
+
+    def exportar(self, notas: list[NoteEvent], out: Path) -> Path:
+        if not notas:
+            raise ValueError("sem notas para exportar")
+
+        acordes: tuple[Acordes, Acordes] = ({}, {})
+        for n in notas:
+            inicio = para_ticks(n.onset_s, self.bpm)
+            duracao = max(GRADE, para_ticks(n.offset_s, self.bpm) - inicio)
+            acordes[0 if n.pitch >= DO_CENTRAL else 1].setdefault(
+                (inicio, duracao), []
+            ).append(n.pitch)
+        fim = max(i + d for pauta in acordes for i, d in pauta)
+        fim = -(-fim // COMPASSO) * COMPASSO
+
+        superior = self._pauta(acordes[0], clef.TrebleClef(), fim, primeira=True)
+        inferior = self._pauta(acordes[1], clef.BassClef(), fim, primeira=False)
+        score = stream.Score()
+        score.insert(0, superior)
+        score.insert(0, inferior)
+        score.insert(0, layout.StaffGroup([superior, inferior], symbol="brace", barTogether=True))
+        score.insert(0, metadata.Metadata(title=self.titulo))
+        _consertar_beams(score)
+        out.parent.mkdir(parents=True, exist_ok=True)
+        score.write("musicxml", fp=str(out))
+        return out
+
+    def _pauta(
+        self, acordes: Acordes, clave: clef.Clef, fim: int, *, primeira: bool
+    ) -> stream.PartStaff:
+        """Uma pauta já em compassos, com uma voz por camada de durações sobrepostas."""
+        compassos_por_voz = [
+            _em_compassos(voz, fim) for voz in _vozes(acordes)
+        ] or [_em_compassos([], fim)]
+        pauta = stream.PartStaff()
+        for numero, grupo in enumerate(zip(*compassos_por_voz, strict=True), start=1):
+            compasso = stream.Measure(number=numero)
+            if numero == 1:
+                if primeira:
+                    compasso.insert(0, instrument.Piano())
+                    compasso.insert(0, tempo.MetronomeMark(number=round(self.bpm)))
+                compasso.insert(0, clave)
+                if self.armadura is not None:
+                    compasso.insert(0, key.KeySignature(self.armadura))
+                compasso.insert(0, meter.TimeSignature("4/4"))
+            if len(grupo) == 1:
+                for el in grupo[0].notesAndRests:
+                    compasso.insert(el.offset, el)
+            else:
+                for i, parcial in enumerate(grupo, start=1):
+                    voz = stream.Voice(id=str(i))
+                    for el in parcial.notesAndRests:
+                        voz.insert(el.offset, el)
+                    compasso.insert(0, voz)
+            pauta.append(compasso)
+        return pauta
+
+
+#: O MuseScore tem 4 vozes por pauta e descarta a 5ª sem aviso (medido: 2 de 6 notas).
+MAX_VOZES = 4
+
+
+def _vozes(acordes: Acordes) -> list[list[tuple[int, int, list[int]]]]:
+    """Cada acorde na primeira voz já livre no seu início; senão, voz nova, até 4.
+
+    Mesmo tique com duração diferente não cabe num acorde MusicXML (as notas de um
+    `<chord>` dividem a duração): a mais longa entra primeiro e a outra vai para a voz
+    seguinte.
+
+    Com as 4 ocupadas, a que libera primeiro é encurtada até o ataque novo; se ela
+    ataca no mesmo tique, encurta até a duração do acorde novo e os dois se fundem
+    (decisão do usuário). Altura e ataque nunca se perdem; duração só encolhe.
+    """
+    vozes: list[list[tuple[int, int, list[int]]]] = []
+    for (inicio, duracao), alturas in sorted(acordes.items(), key=lambda x: (x[0][0], -x[0][1])):
+        livre = next((v for v in vozes if v[-1][0] + v[-1][1] <= inicio), None)
+        if livre is None and len(vozes) < MAX_VOZES:
+            livre = []
+            vozes.append(livre)
+        if livre is None:
+            livre = min(vozes, key=lambda v: v[-1][0] + v[-1][1])
+            anterior, _, soando = livre[-1]
+            if anterior == inicio:
+                livre[-1] = (inicio, duracao, sorted(soando + alturas))
+                continue
+            livre[-1] = (anterior, inicio - anterior, soando)
+        livre.append((inicio, duracao, sorted(alturas)))
+    return vozes
+
+
+def _em_compassos(voz: list[tuple[int, int, list[int]]], fim: int) -> list[stream.Measure]:
+    """Uma voz inteira em compassos de 4/4, pausas nos buracos, ligadura na barra."""
+    linha = stream.Part()
+    linha.insert(0, meter.TimeSignature("4/4"))
+    for inicio, duracao, alturas in voz:
+        elemento: note.NotRest = (
+            note.Note(alturas[0]) if len(alturas) == 1 else chord.Chord(alturas)
+        )
+        elemento.quarterLength = duracao / PPQ
+        linha.insert(inicio / PPQ, elemento)
+    linha.makeRests(fillGaps=True, refStreamOrTimeRange=[0, fim / PPQ], inPlace=True)
+    medida = linha.makeMeasures()
+    medida.makeTies(inPlace=True)
+    return list(medida.getElementsByClass(stream.Measure))
+
+
 if TYPE_CHECKING:  # pragma: no cover — trava a assinatura contra o Protocol
     _: Exporter = MusicXmlExporter()
     __: ExportadorDePercussao = MusicXmlPercussaoExporter()
+    ___: ExportadorDePiano = MusicXmlPianoExporter()

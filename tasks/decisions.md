@@ -3504,6 +3504,49 @@ Notas achadas (rótulo do perfil | qualquer rótulo), de 2 extremos, 8 da mão e
 Os pisos ficam em `MEDIDO_PARTES_PIANO` e `MEDIDO_EXTREMOS`, com uma nota de folga
 onde há Demucs, como a `FOLGA_DEMUCS`.
 
+
+### Emenda (2026-09-25) — MusicXML de piano: duas pautas, vozes até 4
+
+Item 2 do M3. O piano tem contrato próprio, `ExportadorDePiano.exportar(notas, out)`
+em `domain/ports.py`, no padrão da bateria (decisão do usuário): tem altura e duração,
+mas não corda, traste nem afinação, e o tipo o impede de passar pelo exportador de
+cordas. Com isso o item da `ParteMusical` fecha sem ela.
+
+`MusicXmlPianoExporter` escreve uma parte com duas `PartStaff`, chave de piano,
+`Metadata`, andamento, programa 1 e a armadura nas duas pautas. A divisão é fixa: do
+dó central (60) para cima, pauta 1 em clave de Sol; abaixo, pauta 2 em clave de Fá. A
+mão não é inferida. A duração é a quantizada que chega,
+`max(GRADE, para_ticks(offset) − para_ticks(onset))`, sem corte no acorde seguinte
+(ao contrário da guitarra). Mesmo tique com a mesma duração forma `<chord>`; duração
+diferente ou sobreposta vai para outra voz, a primeira que estiver livre.
+
+**Quatro vozes, no máximo.** O MuseScore tem 4 vozes por pauta. Medido: num arquivo
+de seis notas escalonadas ele descartou 2 sem aviso, e num sorteio denso (60 sementes
+de 40 notas) 20 arquivos passavam de 4 vozes. Com as 4 ocupadas, a voz que libera
+primeiro tem a nota encurtada até o ataque novo. Se ela ataca no mesmo tique, encurta
+até a duração do acorde novo e os dois se fundem. Decisão do usuário, contra escrever
+quantas vozes fossem precisas (arquivo válido, mas o MuseScore perde notas) e contra
+descartar o trecho (ADR-014). **Altura e ataque nunca se perdem; só a duração
+encolhe**: 31 de 2400 notas no sorteio denso.
+
+**Beams por voz (ADR-038).** O music21 escreve `end` sem `begin` também dentro das
+vozes: foram 11 compassos quebrados em 60 sementes. O `_consertar_beams` agora trata
+cada voz como uma camada. Baixo e guitarra não têm vozes, então para eles a camada
+continua sendo o compasso e o comportamento não muda.
+
+**Armadilha do teste.** O `stripTies` do music21 numa pauta com vozes emenda
+ligaduras de vozes diferentes: com o XML certo, ele alongou uma nota e partiu outras.
+Por isso o leitor do teste lê voz a voz (`voicesToParts`).
+
+**Verificado:**
+- o XML cru, com pautas, claves, `<chord>`, vozes, ligadura na barra, título, andamento
+  e programa;
+- o round-trip do music21, com alturas, ataques, durações e pautas, inclusive A0, C8, o
+  acorde de dez notas e a referência da `piano-acustico-isolada`;
+- a gramática dos beams nas 60 sementes;
+- no MuseScore 4, as 24 notas de um caso com os extremos, o acorde de dez notas, duas
+  vozes e seis notas escalonadas, iguais às do nosso arquivo, com as claves G/F.
+
 ---
 
 ## ADR-045 — silêncio na frente do áudio: só na bateria, porque troca o rótulo dos outros

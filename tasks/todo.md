@@ -3,11 +3,40 @@
 > Áudio → partitura e tablatura, foco em contrabaixo. Uso pessoal. CPU-only.
 > Decisões em `tasks/decisions.md`.
 
-## Próxima sessão — o que está aberto (fechado em 2026-09-24)
+## Próxima sessão — o que está aberto (atualizado em 2026-09-25)
 
-Estado: verificação de entrega verde (343 passed na suíte padrão, ruff e mypy limpos; varredura `slow`
+### 0. Retomar aqui — ADR-044, M3 (piano)
+
+Estado em 2026-09-25: suíte padrão com 530 passed, `ruff` e `mypy` limpos, os 44 testes
+de MusicXML com `-m ""` verdes (o `mscore` real inclusive). M2 (bateria) fechado. No M3
+estão feitos o item 1 (medição parte a parte) e o item 2 (`MusicXmlPianoExporter`,
+com no máximo 4 vozes por pauta; ver as emendas do ADR-044 de 2026-09-25).
+
+Próximos passos, em ordem (detalhe em "M3 — piano depois", abaixo):
+
+1. **Spike do GP5 de piano (item 3 do M3).** Gravar com PyGuitarPro A0, C8, um acorde
+   de dez notas e duas vozes; reler com PyGuitarPro e com um leitor independente
+   (`mscore` importa `.gp5`). Critério: tudo preservado, sem corda nem traste fictício
+   visível. Se falhar, o teste passa a exigir o erro "GP5 não suportado para piano", e
+   o MusicXML fica sendo o canônico. Lembrar de `BeatStatus.normal`
+   (`tasks/lessons/exportadores.md`).
+2. **Integrar `--instrumento piano-acustico` (item 4 do M3).** Transcrever o stem
+   `other`, com diagnóstico de contaminação por outros rótulos e sem chamar o
+   atribuidor de trastes; exportar com o `ExportadorDePiano`. Seguir o padrão do
+   `--instrumento bateria` (commit `fc44da9`: CLI, API e página). O `piano-eletrico`
+   continua recusado (decisão do usuário). Se a página mudar, rodar `-m navegador`.
+3. Depois: os dois itens abertos do M1 (`Transcriber` com a transcrição livre completa;
+   contrato de acordes separado do `FretAssigner` monofônico), e então o M5.
+
+Regra permanente: o caminho do baixo nunca pode ser degradado. Verificação de entrega:
+suíte padrão, `ruff`, `mypy`, mais o marcador da camada tocada (`-m "slow and not
+network"` para modelos, `-m ""` para os testes do `mscore`).
+
+### Estado anterior (2026-09-24)
+
+Verificação de entrega verde (343 passed na suíte padrão, ruff e mypy limpos; varredura `slow`
 de beams 32767/0). As nove músicas reexportadas em `out/` em 2026-09-24 com o conserto
-de beams: **0 mal-formados**. Conferir `git status -sb` — o push fica a pedido.
+de beams: **0 mal-formados**.
 
 Em 2026-09-24 fecharam: a forma (B) dos beams (ADR-039 — 2496 → 0 na varredura de todos
 os 32767 compassos contíguos), README alinhado à CLI e licença MIT, `demucs@4.1.0`
@@ -343,11 +372,14 @@ Pré-requisito invisível até agora: a Fase 5 só existe se houver o que o
 - [ ] Preservar o `FretAssigner` monofônico do baixo e criar um contrato distinto para
       acordes de guitarra; pronto quando o tipo impedir piano e bateria de passarem por
       atribuição de corda e impedir o baixo de herdar polifonia por acidente.
-- [ ] Generalizar `Exporter` para receber uma `ParteMusical`, não apenas
+- [x] Generalizar `Exporter` para receber uma `ParteMusical`, não apenas
       `list[TabNote] + tuning`; pronto quando exportadores falsos provarem por teste que
       piano e bateria não exigem afinação e que baixo/guitarra não perdem posições.
       → Bateria resolvida com `ExportadorDePercussao` à parte (emenda do ADR-044,
       2026-09-25); a `ParteMusical` fica para o piano, se ele não couber.
+      → Não foi preciso: o piano também ganhou contrato próprio, `ExportadorDePiano`
+      (decisão do usuário, emenda do ADR-044 de 2026-09-25). Item encerrado sem a
+      `ParteMusical`.
 - [x] Gerar, em código versionado (`tests/sintetico_multi.py`), fixtures MIDI de pelo menos 8 s, isoladas e em mix,
       para cada instrumento; pronto quando `fluidsynth` real renderizar WAVs
       normalizados, os MIDI forem a referência e nenhum `.mid`, `.wav`, `.gp5` ou
@@ -417,9 +449,12 @@ Pré-requisito invisível até agora: a Fase 5 só existe se houver o que o
       ADR-044): A0/C8 nunca saem, nem no meio do áudio; a mix perde a mão esquerda e o
       stem a devolve; inversões perdem a nota de cima; o elétrico acerta as notas com o
       rótulo de outro instrumento.
-- [ ] MusicXML: escrever piano em sistema de duas pautas, acordes verdadeiros e vozes
+- [x] MusicXML: escrever piano em sistema de duas pautas, acordes verdadeiros e vozes
       quando as durações sobrepuserem; pronto quando round-trip e MuseScore real
       preservarem todas as alturas, ataques, durações quantizadas, clave e pauta.
+      → `MusicXmlPianoExporter` (emenda do ADR-044): no máximo 4 vozes por pauta,
+      porque o MuseScore descarta a 5ª; acima disso a duração encolhe (decisão do
+      usuário), altura e ataque não. Beams consertados voz a voz (ADR-038).
 - [ ] Fazer o spike de GP5 antes de prometer o formato: cobrir A0, C8, acorde de dez
       notas e duas vozes; pronto quando PyGuitarPro e um leitor independente
       preservarem tudo sem cordas/trastes fictícios visíveis. Se falhar, o teste deve

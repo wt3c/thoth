@@ -70,6 +70,17 @@ class ExportadorDePercussao(Protocol):
     def exportar(self, ataques: list[EventoPercussivo], out: Path) -> Path: ...
 
 
+class ExportadorDePiano(Protocol):
+    """Notas de piano → arquivo de partitura (ADR-044, M3).
+
+    Contrato à parte, como o da bateria (decisão do usuário): piano tem altura e
+    duração, mas não corda, traste nem afinação, e o tipo impede que ele passe pelo
+    exportador de cordas.
+    """
+
+    def exportar(self, notas: list[NoteEvent], out: Path) -> Path: ...
+
+
 class Progresso(Protocol):
     """Recebe o nome de cada estágio quando ele começa (ADR-037).
 
