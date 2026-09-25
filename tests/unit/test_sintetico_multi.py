@@ -101,3 +101,16 @@ def test_renderiza_wav_normalizado_fora_do_repositorio(nome: str, tmp_path: Path
     assert taxa == 44100
     assert len(audio) / taxa >= 8.0
     assert -1.5 < pico_db < -0.5
+
+
+@pytest.mark.parametrize("perfil", ["piano-acustico", "piano-eletrico"])
+def test_fixture_de_extremos_poe_a0_e_c8_longe_das_bordas(perfil: str) -> None:
+    """A fixture geral tem A0 no instante zero e C8 no fim, onde o modelo já perde
+    ataques; aqui os dois tocam entre dós centrais, sozinhos e juntos."""
+    ref = referencia(FIXTURES_MULTI[f"{perfil}-extremos"])
+
+    extremos = [n for n in ref.notas if n.pitch in (21, 108)]
+    assert sorted(n.pitch for n in extremos) == [21, 21, 108, 108]
+    fim = max(n.onset_s for n in ref.notas)
+    assert all(0 < n.onset_s < fim for n in extremos)
+    assert {n.instrument for n in ref.notas} == PERFIS[perfil].rotulos

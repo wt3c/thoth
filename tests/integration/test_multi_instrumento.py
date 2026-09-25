@@ -19,11 +19,11 @@ from pathlib import Path
 import pytest
 
 from tests.sintetico import SOUNDFONT
-from tests.sintetico_multi import FIXTURES_MULTI, referencia, renderizar_multi
+from tests.sintetico_multi import EXTREMOS_PIANO, FIXTURES_MULTI, referencia, renderizar_multi
 from thoth.adapters.separation import DemucsSeparator
 from thoth.adapters.transcription.muscriptor import MuscriptorTranscriber
 from thoth.domain.instrumentos import PERFIS
-from thoth.domain.models import Transcricao
+from thoth.domain.models import NoteEvent, Transcricao
 from thoth.services.evaluation import (
     avaliar_bateria,
     avaliar_polifonico,
@@ -94,6 +94,73 @@ MEDIDO_SEIS_NOTAS: dict[tuple[str, str], int] = {
     ("guitarra-limpa", "mix-stem"): 24,
 }
 
+#: As notas da fixture de piano por parte (M3), em cinco grupos que somam as 34: os dois
+#: extremos, a mão esquerda dos acordes, a mão direita em posição fundamental, a mão
+#: direita das três inversões e a mão direita do acorde repetido no fim.
+PARTES_DO_PIANO = ("extremos", "mão esquerda", "fundamental", "inversão", "repetido")
+
+
+def _parte_do_piano(nota: NoteEvent, indice_do_acorde: int) -> str:
+    if nota.pitch in (21, 108):
+        return "extremos"
+    if nota.pitch < 48:
+        return "mão esquerda"
+    if indice_do_acorde >= 6:
+        return "repetido"
+    return "inversão" if indice_do_acorde % 2 else "fundamental"
+
+
+def _achadas_por_parte(
+    ref: tuple[NoteEvent, ...], bruto: list[NoteEvent], rotulos: frozenset[str] | None
+) -> dict[str, tuple[int, int]]:
+    """`{parte: (achadas, total)}`, casando só a parte contra toda a estimativa.
+
+    `rotulos=None` aceita qualquer rótulo: separa nota errada de rótulo trocado."""
+    est = [n for n in bruto if rotulos is None or n.instrument in rotulos]
+    inicios = sorted({round(n.onset_s, 3) for n in ref if n.pitch not in (21, 108)})
+    grupos: dict[str, list[NoteEvent]] = {parte: [] for parte in PARTES_DO_PIANO}
+    for n in ref:
+        indice = inicios.index(round(n.onset_s, 3)) if n.pitch not in (21, 108) else -1
+        grupos[_parte_do_piano(n, indice)].append(n)
+    return {
+        parte: (sum(c for c, _ in revocacao_por_acorde(notas, est).values()), len(notas))
+        for parte, notas in grupos.items()
+    }
+
+
+#: Notas achadas por parte da fixture de piano, (com o rótulo do perfil, com qualquer
+#: rótulo), medidas em 2026-09-25. Uma nota de folga onde há Demucs.
+MEDIDO_PARTES_PIANO: dict[tuple[str, str], dict[str, tuple[int, int]]] = {
+    ("piano-acustico", "isolada"): {
+        "extremos": (0, 0), "mão esquerda": (8, 8), "fundamental": (9, 9),
+        "inversão": (7, 7), "repetido": (6, 6),
+    },
+    # A mão esquerda some do rótulo na mix: 3 das 8 saem com outro rótulo, o resto some.
+    ("piano-acustico", "mix"): {
+        "extremos": (0, 0), "mão esquerda": (0, 3), "fundamental": (9, 9),
+        "inversão": (9, 9), "repetido": (6, 6),
+    },
+    ("piano-acustico", "mix-stem"): {
+        "extremos": (0, 0), "mão esquerda": (8, 8), "fundamental": (9, 9),
+        "inversão": (6, 6), "repetido": (6, 6),
+    },
+    # O piano elétrico acerta as notas com o rótulo errado: `clean_electric_guitar`
+    # isolado, `acoustic_piano` no stem.
+    ("piano-eletrico", "isolada"): {
+        "extremos": (0, 0), "mão esquerda": (0, 4), "fundamental": (0, 9),
+        "inversão": (0, 9), "repetido": (0, 6),
+    },
+    ("piano-eletrico", "mix"): {
+        "extremos": (0, 0), "mão esquerda": (0, 3), "fundamental": (9, 9),
+        "inversão": (8, 8), "repetido": (6, 6),
+    },
+    ("piano-eletrico", "mix-stem"): {
+        "extremos": (0, 0), "mão esquerda": (0, 6), "fundamental": (0, 9),
+        "inversão": (0, 7), "repetido": (0, 6),
+    },
+}
+
+
 def _audio(perfil: str, condicao: str, tmp_path: Path) -> Path:
     fixture = f"{perfil}-{'isolada' if condicao == 'isolada' else 'mix'}"
     wav = renderizar_multi(fixture, tmp_path)
@@ -150,11 +217,29 @@ def test_mede_perfil(perfil: str, condicao: str, tmp_path: Path) -> None:
 
     assert bruto, f"MuScriptor não devolveu nada para {perfil} {condicao}"
     assert f1 >= piso, f"{perfil} {condicao} regrediu: {f1} < {piso} medido no ADR-044"
+    if PERFIS[perfil].familia == "piano":
+        _confere_partes_do_piano(perfil, condicao, ref.notas, bruto)
     if (perfil, condicao) in MEDIDO_SEIS_NOTAS:
         seis = por_acorde[6][0]
         piso_seis = MEDIDO_SEIS_NOTAS[(perfil, condicao)] - (condicao == "mix-stem")
         print(f"SEIS NOTAS {perfil} {condicao}: {seis}/24 piso={piso_seis}")
         assert seis >= piso_seis, f"acordes de seis notas regrediram: {seis} < {piso_seis}"
+
+
+def _confere_partes_do_piano(
+    perfil: str, condicao: str, ref: tuple[NoteEvent, ...], bruto: list[NoteEvent]
+) -> None:
+    do_perfil = _achadas_por_parte(ref, bruto, PERFIS[perfil].rotulos)
+    qualquer = _achadas_por_parte(ref, bruto, None)
+    folga = condicao == "mix-stem"
+    tabela = " ".join(
+        f"{parte}:{do_perfil[parte][0]}|{qualquer[parte][0]}/{do_perfil[parte][1]}"
+        for parte in PARTES_DO_PIANO
+    )
+    print(f"PARTES {perfil} {condicao} (perfil|qualquer rótulo/total): {tabela}")
+    for parte, (piso_perfil, piso_qualquer) in MEDIDO_PARTES_PIANO[(perfil, condicao)].items():
+        assert do_perfil[parte][0] >= piso_perfil - folga, f"{parte} regrediu no rótulo"
+        assert qualquer[parte][0] >= piso_qualquer - folga, f"{parte} regrediu"
 
 
 #: F1 micro da fixture só de tons (emenda do ADR-044), com `SILENCIO_BATERIA`. O modelo
@@ -189,3 +274,48 @@ def test_mede_tons(tmp_path: Path) -> None:
         f"rótulos={dict(rotulos)} piso={MEDIDO_TONS} margem={b.micro.f1 - MEDIDO_TONS:+.3f}"
     )
     assert b.micro.f1 >= MEDIDO_TONS, f"tons regrediram: {b.micro.f1} < {MEDIDO_TONS}"
+
+
+#: Extremos achados na fixture `piano-*-extremos`, de 4 (A0 e C8, sozinhos e juntos),
+#: com o rótulo do perfil e com qualquer rótulo, e os dós centrais de âncora, de 4.
+#: Medidos em 2026-09-25: nenhum extremo sai, com rótulo nenhum. O A0 vira A1 (33), uma
+#: oitava acima; o C8 não deixa nada. A âncora que falta é a do instante zero, a borda
+#: do ADR-045. O elétrico sai como `acoustic_piano` aqui, e as notas coincidem.
+MEDIDO_EXTREMOS: dict[str, tuple[int, int, int]] = {
+    "piano-acustico": (0, 0, 3),
+    "piano-eletrico": (0, 0, 3),
+}
+
+
+@pytest.mark.parametrize("perfil", ["piano-acustico", "piano-eletrico"])
+def test_mede_extremos_do_piano(perfil: str, tmp_path: Path) -> None:
+    """A0 e C8 no meio do áudio: separa o limite de altura da perda na borda."""
+    nome = f"{perfil}-extremos"
+    bruto = MuscriptorTranscriber(model="small").transcribe(renderizar_multi(nome, tmp_path))
+    ref = referencia(FIXTURES_MULTI[nome]).notas
+
+    def achadas(alturas: tuple[int, ...], rotulos: frozenset[str] | None) -> int:
+        est = [n for n in bruto if rotulos is None or n.instrument in rotulos]
+        notas = [n for n in ref if n.pitch in alturas]
+        return sum(c for c, _ in revocacao_por_acorde(notas, est).values())
+
+    extremos_perfil = achadas((21, 108), PERFIS[perfil].rotulos)
+    extremos_qualquer = achadas((21, 108), None)
+    ancoras = achadas((60,), None)
+    perto = {
+        round(r.onset_s, 2): sorted(
+            (n.pitch, n.instrument) for n in bruto if abs(n.onset_s - r.onset_s) < 0.1
+        )
+        for r in ref
+        if r.pitch in (21, 108)
+    }
+    print(
+        f"\nEXTREMOS {perfil}: perfil={extremos_perfil}/4 qualquer={extremos_qualquer}/4 "
+        f"âncoras={ancoras}/{len(EXTREMOS_PIANO) - 3} perto dos extremos={perto} "
+        f"piso={MEDIDO_EXTREMOS[perfil]}"
+    )
+
+    piso_perfil, piso_qualquer, piso_ancoras = MEDIDO_EXTREMOS[perfil]
+    assert extremos_perfil >= piso_perfil
+    assert extremos_qualquer >= piso_qualquer
+    assert ancoras >= piso_ancoras, "o dó central sumiu: o problema não é só o extremo"

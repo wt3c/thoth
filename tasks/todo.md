@@ -410,9 +410,13 @@ Pré-requisito invisível até agora: a Fase 5 só existe se houver o que o
 
 #### M3 — piano depois
 
-- [ ] Medir piano acústico e elétrico separadamente, com acordes de duas mãos,
+- [x] Medir piano acústico e elétrico separadamente, com acordes de duas mãos,
       inversões, notas repetidas e extremos A0/C8; pronto com teste `slow` e tabela por
       rótulo/condição, ou veredito negativo documentado.
+      → Tabela por parte no `test_mede_perfil` e fixture `piano-*-extremos` (emenda do
+      ADR-044): A0/C8 nunca saem, nem no meio do áudio; a mix perde a mão esquerda e o
+      stem a devolve; inversões perdem a nota de cima; o elétrico acerta as notas com o
+      rótulo de outro instrumento.
 - [ ] MusicXML: escrever piano em sistema de duas pautas, acordes verdadeiros e vozes
       quando as durações sobrepuserem; pronto quando round-trip e MuseScore real
       preservarem todas as alturas, ataques, durações quantizadas, clave e pauta.
@@ -420,9 +424,10 @@ Pré-requisito invisível até agora: a Fase 5 só existe se houver o que o
       notas e duas vozes; pronto quando PyGuitarPro e um leitor independente
       preservarem tudo sem cordas/trastes fictícios visíveis. Se falhar, o teste deve
       exigir erro “GP5 não suportado para piano” e o MusicXML será o artefato canônico.
-- [ ] Integrar `--instrumento piano-acustico|piano-eletrico`; pronto com teste ponta a
+- [ ] Integrar `--instrumento piano-acustico`; pronto com teste ponta a
       ponta pelo stem `other`, diagnóstico de contaminação por outros instrumentos e
-      ausência de qualquer chamada ao atribuidor de trastes.
+      ausência de qualquer chamada ao atribuidor de trastes. O `piano-eletrico` continua
+      recusado (decisão do usuário, 2026-09-25: o veredito de fora de escopo vale).
 
 #### M4 — guitarra polifônica por último
 

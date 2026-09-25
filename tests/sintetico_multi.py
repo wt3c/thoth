@@ -164,6 +164,17 @@ FIXTURES_MULTI: dict[str, FixtureMulti] = {
 FIXTURES_MULTI["bateria-tons"] = FixtureMulti("bateria", pretty_midi.PrettyMIDI(initial_tempo=BPM))
 FIXTURES_MULTI["bateria-tons"].midi.instruments.append(_instrumento(0, _tons(), bateria=True))
 
+#: Os extremos do teclado longe das bordas do áudio, entre dós centrais de âncora: a
+#: fixture geral põe A0 no instante zero e C8 no fim, onde o modelo já perde ataques.
+EXTREMOS_PIANO = ((60,), (21,), (60,), (108,), (60,), (21, 108), (60,))
+for _perfil in ("piano-acustico", "piano-eletrico"):
+    FIXTURES_MULTI[f"{_perfil}-extremos"] = FixtureMulti(
+        _perfil, pretty_midi.PrettyMIDI(initial_tempo=BPM)
+    )
+    FIXTURES_MULTI[f"{_perfil}-extremos"].midi.instruments.append(
+        _instrumento(PERFIS[_perfil].programa_gm, _em_semiminimas(list(EXTREMOS_PIANO), TEMPO * 2))
+    )
+
 
 def referencia(fixture: FixtureMulti) -> Transcricao:
     """O instrumento-alvo como o Thoth espera recebê-lo do transcritor."""

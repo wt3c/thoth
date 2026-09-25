@@ -3456,6 +3456,54 @@ dá F1 micro 0,901 sobre os ataques do cache. É o mesmo 0,901 do stem cru: grad
 quantização e descartes não perderam ataque. O piso é 0,871, com a folga do Demucs. O
 ponta a ponta do baixo continua passando.
 
+
+### Emenda (2026-09-25) — piano parte a parte: extremos fora do modelo, elétrico só no rótulo
+
+Primeiro item do M3. A fixture `_piano()` já tinha tudo que o plano pede (duas mãos,
+inversões, acorde repetido, A0 e C8); faltava ler as 34 notas por parte, e não só o F1.
+O `test_mede_perfil` agora imprime, para os dois pianos, notas achadas por parte com o
+rótulo do perfil e com qualquer rótulo, e a fixture nova `piano-*-extremos` põe A0 e C8
+no meio do áudio, entre dós centrais, sozinhos e juntos.
+
+Notas achadas (rótulo do perfil | qualquer rótulo), de 2 extremos, 8 da mão esquerda,
+9 da direita em posição fundamental, 9 das inversões e 6 do acorde repetido:
+
+| perfil | condição | extremos | mão esquerda | fundamental | inversão | repetido |
+|---|---|---|---|---|---|---|
+| acústico | isolada | 0\|0 | 8\|8 | 9\|9 | 7\|7 | 6\|6 |
+| acústico | mix | 0\|0 | 0\|3 | 9\|9 | 9\|9 | 6\|6 |
+| acústico | mix-stem | 0\|0 | 8\|8 | 9\|9 | 6\|6 | 6\|6 |
+| elétrico | isolada | 0\|0 | 0\|4 | 0\|9 | 0\|9 | 0\|6 |
+| elétrico | mix | 0\|0 | 0\|3 | 9\|9 | 8\|8 | 6\|6 |
+| elétrico | mix-stem | 0\|0 | 0\|6 | 0\|9 | 0\|7 | 0\|6 |
+
+- **Extremos: limite do modelo, não da borda.** No meio do áudio, A0 e C8 continuam
+  em zero nos dois pianos, com qualquer rótulo. O A0 sai como A1 (33), uma oitava
+  acima; o C8 não deixa nada. Na exploração, A#0 e B0 também subiram uma oitava, C1
+  acertou com harmônicos junto, e de A7 para cima nada saiu (o 105 virou `drums`).
+  Não dá para descartar que a soundfont contribua; o que se sabe é que o par
+  FluidR3 + MuScriptor `small` não entrega os extremos. Os exportadores de piano
+  (itens 2 e 3) continuam obrigados a gravar A0 e C8 — a entrada deles pode vir de
+  outro transcritor ou de uma correção; o teste deles usa notas sintéticas.
+- **Mix direta perde a mão esquerda.** 0 de 8 com rótulo de piano; o baixo distrator
+  toca na mesma região. O stem devolve as 8 — é a mesma lição do baixo no ADR-010, e
+  confirma o stem `other` para o item 4.
+- **Inversões perdem a nota de cima.** O 72 de (41,65,69,72) e o 71 de (43,62,67,71)
+  somem mesmo isolados; no 72 aparece um 60, a oitava abaixo. No stem cai também o 72
+  de (36,64,67,72). É a única parte que piora com a separação (7 → 6).
+- **Repetição não é problema.** O acorde tocado duas vezes sai duas vezes em todas as
+  condições, nos dois pianos.
+- **Piano elétrico: as notas estão lá, o rótulo não.** Com qualquer rótulo, o elétrico
+  isolado acha 28 das 32 notas de acorde e o stem 28 — perto do acústico —, mas como
+  `clean_electric_guitar` (isolado) e `acoustic_piano` (stem e fixture de extremos).
+  O veredito de fora de escopo continua: incluir `acoustic_piano` no perfil elétrico
+  mudaria o critério, e tornaria o elétrico indistinguível do acústico no stem.
+  **Decisão do usuário (2026-09-25):** o M3 integra só o `piano-acustico`; a CLI e a
+  API continuam recusando o `piano-eletrico`.
+
+Os pisos ficam em `MEDIDO_PARTES_PIANO` e `MEDIDO_EXTREMOS`, com uma nota de folga
+onde há Demucs, como a `FOLGA_DEMUCS`.
+
 ---
 
 ## ADR-045 — silêncio na frente do áudio: só na bateria, porque troca o rótulo dos outros
