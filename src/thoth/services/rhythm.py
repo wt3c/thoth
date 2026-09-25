@@ -20,7 +20,7 @@ from collections.abc import Sequence
 from dataclasses import replace
 from itertools import pairwise
 
-from thoth.domain.models import NoteEvent, TabNote
+from thoth.domain.models import EventoPercussivo, NoteEvent, TabNote
 
 PPQ = 960  # ticks por semínima (convenção do GP5)
 GRADE = PPQ // 4  # semicolcheia: a menor figura que a grade reconhece
@@ -165,3 +165,35 @@ def acordes_em_ticks(
             fim = min(fim, inicios[i + 1])
         saida.append((inicio, max(GRADE, fim - inicio), acorde))
     return saida
+
+
+def ataques_em_ticks(
+    ataques: Sequence[EventoPercussivo], bpm: float
+) -> tuple[list[tuple[int, int, tuple[EventoPercussivo, ...]]], list[EventoPercussivo]]:
+    """`(início, duração, grupo)` em ticks e as repetidas: o par percussivo de `acordes_em_ticks`.
+
+    Peças diferentes no mesmo tique tocam juntas; nenhuma é descartada, ao contrário do
+    `monofonizar` do baixo (ADR-044). A mesma peça duas vezes no tique é um ataque só
+    para a partitura: a segunda volta em `repetidas`, para quem chamou relatar (ADR-014).
+
+    Não há sustentação medida (o MuScriptor fecha o ataque 10 ms depois), então a
+    duração é só gráfica: até o grupo seguinte, no máximo uma semínima — figura mais
+    longa numa peça de bateria leria como som sustentado. O último grupo, sem ninguém
+    depois, fica com a semicolcheia.
+    """
+    grupos: dict[int, dict[int, EventoPercussivo]] = {}
+    repetidas: list[EventoPercussivo] = []
+    for ataque in sorted(ataques, key=lambda a: a.instante_s):
+        grupo = grupos.setdefault(para_ticks(ataque.instante_s, bpm), {})
+        if ataque.peca_gm in grupo:
+            repetidas.append(ataque)
+        else:
+            grupo[ataque.peca_gm] = ataque
+
+    inicios = sorted(grupos)
+    saida = []
+    for i, inicio in enumerate(inicios):
+        duracao = min(inicios[i + 1] - inicio, PPQ) if i + 1 < len(inicios) else GRADE
+        pecas = tuple(grupos[inicio][p] for p in sorted(grupos[inicio]))
+        saida.append((inicio, duracao, pecas))
+    return saida, repetidas

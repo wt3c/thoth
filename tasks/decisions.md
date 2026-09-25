@@ -3366,6 +3366,21 @@ consistente. A bateria escreve o que o modelo devolver; na partitura, os tons
 aparecem com a altura errada, e isso fica registrado como limite do modelo, não
 como defeito do Thoth. O piso do `test_mede_tons` é o valor medido, sem folga.
 
+
+### Emenda (2026-09-25) — quantização dos ataques de bateria
+
+Item 2 do M2. `ataques_em_ticks` (em `services/rhythm.py`) é o par percussivo de
+`acordes_em_ticks`: os ataques no mesmo tique de semicolcheia formam um grupo, e
+peças diferentes nunca se descartam. A mesma peça duas vezes no tique vira um ataque
+só na partitura; a outra é devolvida para relato (ADR-014).
+
+**A duração é gráfica, não medida.** O MuScriptor fecha o ataque 10 ms depois, então
+não há sustentação para quantizar. Cada grupo vai até o seguinte, **no máximo uma
+semínima**, e o último fica com a semicolcheia. Figura mais longa numa peça de
+bateria leria como som sustentado; o espaço que sobra é pausa. Pelo mesmo motivo, o
+exportador de percussão (itens 3 e 4) corta na barra em vez de ligar: ligadura é
+sustentação.
+
 ---
 
 ## ADR-045 — silêncio na frente do áudio: só na bateria, porque troca o rótulo dos outros

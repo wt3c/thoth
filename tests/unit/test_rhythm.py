@@ -4,8 +4,17 @@ from __future__ import annotations
 
 import pytest
 
-from thoth.domain.models import NoteEvent, TabNote
-from thoth.services.rhythm import PPQ, alinhar, eventos, monofonizar
+from tests.sintetico import BPM
+from tests.sintetico_multi import FIXTURES_MULTI, referencia
+from thoth.domain.models import EventoPercussivo, NoteEvent, TabNote
+from thoth.services.rhythm import (
+    GRADE,
+    PPQ,
+    alinhar,
+    ataques_em_ticks,
+    eventos,
+    monofonizar,
+)
 
 
 def _nota(pitch: int, onset: float) -> NoteEvent:
@@ -138,3 +147,54 @@ def test_unir_por_tique_leva_o_tique_inteiro_ao_primeiro_ataque() -> None:
         (41, 0.0, 0.5),
         (45, 0.7, 1.0),
     ]
+
+
+# Bateria (ADR-044, M2 item 2): 120 BPM, semicolcheia = 0,125 s.
+
+
+def test_pecas_diferentes_no_mesmo_tique_viram_um_grupo() -> None:
+    """Bumbo e prato a 20 ms: o mesmo tique. O `monofonizar` ficaria só com o bumbo."""
+    grupos, repetidas = ataques_em_ticks(
+        [EventoPercussivo(0.52, 49), EventoPercussivo(0.50, 36)], 120
+    )
+
+    assert [(inicio, tuple(a.peca_gm for a in g)) for inicio, _, g in grupos] == [
+        (PPQ, (36, 49))
+    ]
+    assert repetidas == []
+
+
+def test_mesma_peca_repetida_no_tique_sai_uma_vez_e_a_outra_e_devolvida() -> None:
+    grupos, repetidas = ataques_em_ticks(
+        [EventoPercussivo(0.50, 38), EventoPercussivo(0.53, 38)], 120
+    )
+
+    assert [tuple(a.peca_gm for a in g) for _, _, g in grupos] == [(38,)]
+    assert repetidas == [EventoPercussivo(0.53, 38)]
+
+
+def test_ataques_em_semicolcheias_vizinhas_ficam_separados() -> None:
+    grupos, _ = ataques_em_ticks([EventoPercussivo(0.0, 42), EventoPercussivo(0.125, 42)], 120)
+
+    assert [inicio for inicio, _, _ in grupos] == [0, GRADE]
+
+
+def test_duracao_vai_ate_o_proximo_ataque_no_maximo_uma_seminima() -> None:
+    """Sem sustentação medida: a figura só preenche o espaço, e nunca passa da semínima."""
+    grupos, _ = ataques_em_ticks(
+        [EventoPercussivo(0.0, 36), EventoPercussivo(0.25, 38), EventoPercussivo(2.0, 49)], 120
+    )
+
+    assert [duracao for _, duracao, _ in grupos] == [2 * GRADE, PPQ, GRADE]
+
+
+def test_referencia_da_bateria_vira_uma_colcheia_por_grupo_sem_perder_ataque() -> None:
+    """A fixture tem até três peças juntas; quantizada no próprio andamento, nada some."""
+    ref = referencia(FIXTURES_MULTI["bateria-isolada"])
+
+    grupos, repetidas = ataques_em_ticks(ref.ataques, BPM)
+
+    assert repetidas == []
+    assert sum(len(g) for _, _, g in grupos) == len(ref.ataques) == 48
+    assert [inicio for inicio, _, _ in grupos] == [i * PPQ // 2 for i in range(32)]
+    assert max(len(g) for _, _, g in grupos) == 3

@@ -379,9 +379,13 @@ Pré-requisito invisível até agora: a Fase 5 só existe se houver o que o
       (`silencio_inicial_s`, padrão 0).
       → Fixture só de tons: 45 de 48 ataques achados, quase todos como 43 ou 36;
       o modelo não separa os tons (emenda do ADR-044, F1 micro 0,109).
-- [ ] Implementar quantização de ataques sem inventar sustain; pronto quando dois hits
+- [x] Implementar quantização de ataques sem inventar sustain; pronto quando dois hits
       no mesmo tique virarem um acorde percussivo e peças diferentes não forem
       descartadas pela `monofonizar` do baixo.
+      → `ataques_em_ticks` em `services/rhythm.py`: peças do mesmo tique viram um
+      grupo, a mesma peça repetida no tique é devolvida para relato, duração gráfica até
+      o grupo seguinte e no máximo uma semínima. A bateria no pipeline (item 5) passa
+      por ela, nunca pelo `monofonizar`.
 - [ ] GP5: escrever faixa nativa de percussão (`isPercussionTrack`, canal MIDI 10) e
       peças simultâneas no mesmo beat; pronto com gravação → releitura preservando
       peça, tique e simultaneidade, além de abertura por leitor independente.
