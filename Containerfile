@@ -31,7 +31,7 @@ RUN uv tool install yt-dlp
 RUN useradd --create-home --uid 1000 thoth \
     # Os volumes nomeados herdam o dono do ponto de montagem: sem isto nascem de root.
     && install -d -o thoth /home/thoth/.cache/uv /home/thoth/.cache/torch \
-        /home/thoth/.cache/huggingface
+    /home/thoth/.cache/huggingface
 WORKDIR /app
 ENV UV_COMPILE_BYTECODE=1 UV_LINK_MODE=copy UV_PYTHON_DOWNLOADS=never
 COPY pyproject.toml uv.lock README.md LICENSE ./

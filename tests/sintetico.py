@@ -54,8 +54,10 @@ def _com_piano() -> pretty_midi.PrettyMIDI:
         for altura in acorde:
             piano.notes.append(
                 pretty_midi.Note(
-                    velocity=80, pitch=altura,
-                    start=i * TEMPO * 2, end=i * TEMPO * 2 + TEMPO * 1.8,
+                    velocity=80,
+                    pitch=altura,
+                    start=i * TEMPO * 2,
+                    end=i * TEMPO * 2 + TEMPO * 1.8,
                 )
             )
     return _midi(_sequencia([36, 43, 38, 45, 31, 38, 36, 43] * 2, TEMPO), extra=piano)
@@ -68,11 +70,13 @@ FIXTURES = {
         _sequencia([36, 38, 40, 41, 43, 45, 47, 48, 47, 45, 43, 41, 40, 38, 36], TEMPO)
     ),
     # Walking bass sobre II-V-I.
-    "walking": _midi(_sequencia([38, 41, 43, 45, 31, 35, 38, 40, 36, 40, 43, 45, 36, 33, 31, 36],
-                                TEMPO)),
+    "walking": _midi(
+        _sequencia([38, 41, 43, 45, 31, 35, 38, 40, 36, 40, 43, 45, 36, 33, 31, 36], TEMPO)
+    ),
     # Semicolcheias — estressa resolução temporal de onset.
-    "groove16": _midi(_sequencia([36, 36, 43, 36, 38, 36, 43, 41, 36, 36, 43, 36, 41, 40, 38, 36]
-                                 * 2, TEMPO / 4)),
+    "groove16": _midi(
+        _sequencia([36, 36, 43, 36, 38, 36, 43, 41, 36, 36, 43, 36, 41, 40, 38, 36] * 2, TEMPO / 4)
+    ),
     # Região grave de 5 cordas (B0..E1) — o caso que não pode ser clampado.
     "graves": _midi(_sequencia([23, 24, 26, 28, 26, 24, 23, 25, 27, 23], TEMPO)),
     # Saltos de oitava — sonda específica de erro de oitava.
@@ -85,7 +89,9 @@ FIXTURES = {
 def _pico_dbfs(wav: Path) -> float:
     saida = subprocess.run(
         ["ffmpeg", "-nostdin", "-i", str(wav), "-af", "volumedetect", "-f", "null", "-"],
-        capture_output=True, text=True, check=True,
+        capture_output=True,
+        text=True,
+        check=True,
     ).stderr
     achado = re.search(r"max_volume: (-?[\d.]+) dB", saida)
     if achado is None:
@@ -107,12 +113,22 @@ def renderizar_midi(midi: pretty_midi.PrettyMIDI, nome: str, destino: Path) -> P
     midi.write(str(mid))
     subprocess.run(
         ["fluidsynth", "-ni", "-q", "-F", str(bruto), "-r", "44100", str(SOUNDFONT), str(mid)],
-        check=True, capture_output=True,
+        check=True,
+        capture_output=True,
     )
     ganho = -1.0 - _pico_dbfs(bruto)
     subprocess.run(
-        ["ffmpeg", "-y", "-loglevel", "error", "-i", str(bruto),
-         "-af", f"volume={ganho:.2f}dB", str(wav)],
+        [
+            "ffmpeg",
+            "-y",
+            "-loglevel",
+            "error",
+            "-i",
+            str(bruto),
+            "-af",
+            f"volume={ganho:.2f}dB",
+            str(wav),
+        ],
         check=True,
     )
     return wav

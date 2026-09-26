@@ -68,8 +68,19 @@ def test_aviso_de_oitava_no_equus(tmp_path: Path) -> None:
     # Canal esquerdo, como na Fase 0.
     stem = tmp_path / "stem_L.wav"
     subprocess.run(
-        ["ffmpeg", "-y", "-loglevel", "error", "-i", str(ARQUIVOS[0]),
-         "-af", "pan=mono|c0=c0", "-c:a", "pcm_s16le", str(stem)],
+        [
+            "ffmpeg",
+            "-y",
+            "-loglevel",
+            "error",
+            "-i",
+            str(ARQUIVOS[0]),
+            "-af",
+            "pan=mono|c0=c0",
+            "-c:a",
+            "pcm_s16le",
+            str(stem),
+        ],
         check=True,
     )
     eventos, errada = _rotular()

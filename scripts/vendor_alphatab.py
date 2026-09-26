@@ -87,7 +87,9 @@ def baixar(destino: Path = DESTINO) -> Path:
     with tempfile.TemporaryDirectory() as tmp:
         subprocess.run(
             ["npm", "pack", f"@coderline/alphatab@{VERSAO}"],
-            cwd=tmp, check=True, capture_output=True,
+            cwd=tmp,
+            check=True,
+            capture_output=True,
         )
         tgz = next(Path(tmp).glob("*.tgz"))
         _conferir(tgz)
