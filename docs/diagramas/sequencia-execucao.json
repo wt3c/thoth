@@ -1,0 +1,53 @@
+{
+  "schema_version": 1,
+  "diagram_type": "sequence",
+  "meta": {
+    "title": "Thoth — execução pela CLI e pela interface web",
+    "output": "sequencia-execucao.html",
+    "viewBox": [1020, 600],
+    "animation": "trace",
+    "visual_preset": "signal-flow",
+    "quality_profile": "showcase",
+    "views": [
+      {"id": "cli", "label": "Caminho CLI", "focus": ["usuario", "cli", "pipeline", "ferramentas", "arquivos"], "note": "A CLI chama o pipeline e espera o processamento terminar."},
+      {"id": "web", "label": "Caminho web", "focus": ["usuario", "pagina", "api", "pipeline", "arquivos"], "note": "A página cria um job, consulta seu estado e abre os artefatos."},
+      {"id": "nucleo", "label": "Núcleo comum", "focus": ["pipeline", "ferramentas", "arquivos"], "note": "As duas entradas reutilizam exatamente o mesmo pipeline e o mesmo cache."}
+    ]
+  },
+  "participants": [
+    {"id": "usuario", "type": "external", "label": "Pessoa"},
+    {"id": "cli", "type": "frontend", "label": "CLI"},
+    {"id": "pagina", "type": "frontend", "label": "Página"},
+    {"id": "api", "type": "backend", "label": "API"},
+    {"id": "pipeline", "type": "backend", "label": "Pipeline"},
+    {"id": "ferramentas", "type": "cloud", "label": "Ferramentas"},
+    {"id": "arquivos", "type": "database", "label": "Disco local"}
+  ],
+  "segments": [
+    {"from": 140, "to": 285, "label": "Execução direta pela CLI"},
+    {"from": 300, "to": 525, "label": "Job iniciado pela interface web"}
+  ],
+  "messages": [
+    {"from": "usuario", "to": "cli", "y": 160, "label": "thoth transcribe", "variant": "emphasis"},
+    {"from": "cli", "to": "pipeline", "y": 188, "label": "transcrever(ref, opções)", "variant": "emphasis"},
+    {"from": "pipeline", "to": "ferramentas", "y": 216, "label": "ffmpeg · Demucs · MuScriptor", "variant": "default"},
+    {"from": "pipeline", "to": "arquivos", "y": 244, "label": "cache + artefatos", "variant": "emphasis"},
+    {"from": "pipeline", "to": "cli", "y": 272, "label": "Resultado", "variant": "return"},
+    {"from": "usuario", "to": "pagina", "y": 320, "label": "envia áudio ou URL", "variant": "emphasis"},
+    {"from": "pagina", "to": "api", "y": 348, "label": "POST /jobs", "variant": "emphasis"},
+    {"from": "api", "to": "pagina", "y": 376, "label": "202 + job id", "variant": "return"},
+    {"from": "api", "to": "pipeline", "y": 404, "label": "BackgroundTask com trava", "variant": "emphasis"},
+    {"from": "pipeline", "to": "api", "y": 432, "label": "processa; pronto ou erro", "variant": "return"},
+    {"from": "pagina", "to": "api", "y": 460, "label": "GET /jobs/{id}", "variant": "default"},
+    {"from": "api", "to": "pagina", "y": 488, "label": "resumo + links", "variant": "return"},
+    {"from": "pagina", "to": "arquivos", "y": 516, "label": "GET /artifacts/...", "variant": "default"}
+  ],
+  "activations": [
+    {"participant": "cli", "from": 154, "to": 280, "type": "frontend"},
+    {"participant": "pipeline", "from": 182, "to": 278, "type": "backend"},
+    {"participant": "pagina", "from": 314, "to": 524, "type": "frontend"},
+    {"participant": "api", "from": 342, "to": 496, "type": "backend"},
+    {"participant": "pipeline", "from": 398, "to": 440, "type": "backend"},
+    {"participant": "arquivos", "from": 510, "to": 524, "type": "database"}
+  ]
+}

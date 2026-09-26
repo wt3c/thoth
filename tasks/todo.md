@@ -2,6 +2,16 @@
 
 > Áudio → partitura e tablatura, foco em contrabaixo. Uso pessoal. CPU-only. Decisões em `tasks/decisions.md`.
 
+## Documentação arquitetural completa (2026-09-26)
+
+- [x] Inventariar módulos, contratos, dependências, fluxos, testes e ADRs do estado atual.
+- [x] Escrever `docs/arquitetura.md` em linguagem progressiva para júnior e revisão por arquitetos.
+- [x] Criar e validar diagrama de componentes da arquitetura.
+- [x] Criar e validar diagrama de fluxo de dados do pipeline.
+- [x] Criar e validar diagrama de sequência entre usuário, CLI/API e pipeline.
+- [x] Aplicar o patch obrigatório de hover e realizar validação visual dos HTMLs entregues.
+- [x] Vincular a documentação no README e executar a verificação final.
+
 ## Detalhamento dos comandos no README (2026-09-26)
 
 - [x] Conferir comportamento, argumentos e opções de cada subcomando contra `src/thoth/cli.py` e a ajuda real.
@@ -12,10 +22,9 @@
 
 - [x] Conferir requisitos e ferramentas externas contra o código, o contêiner e os ADRs.
 - [x] Reestruturar o `README.md` com instalação nativa, pesos, alphaTab, validação, primeiro uso e contêiner.
-- [ ] Fechar a verificação da entrega:
+- [x] Fechar a verificação da entrega:
     - [x] `git diff --check`, `thoth --help`, Ruff e mypy.
-    - [ ] Suíte padrão: `test_job_roda_e_relata_o_que_o_pipeline_descartou` não termina nem isolado em 20 s; investigar
-      fora desta alteração exclusivamente documental. A execução paralela também registrou uma falha antes de travar.
+    - [x] Suíte padrão: 530 testes passaram em 26,87 s na repetição de 2026-09-26.
 
 ## Próxima sessão — o que está aberto (atualizado em 2026-09-25)
 

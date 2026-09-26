@@ -26,6 +26,10 @@ O MuScriptor transcreve. O código deste repositório existe para o que ele não
 configurável** (4/5/6 cordas, Drop D), separação antes de transcrever (ADR-010), andamento e grade rítmica
 (ADR-019/021), sanity-check de oitava e a orquestração com cache.
 
+Para entender os componentes, o fluxo dos dados, a sequência CLI/web, as decisões, os riscos e os termos usados no
+código, consulte a [documentação completa de arquitetura](docs/arquitetura.md). Ela inclui três diagramas HTML
+interativos e um guia de leitura voltado a quem está começando no projeto.
+
 ## Instalação
 
 Há duas formas de instalar:
@@ -415,6 +419,8 @@ então `-m slow` sozinho também toca a rede.
 
 ## Documentos
 
+- `docs/arquitetura.md` — arquitetura de software e solução, fluxo completo, operação, riscos e glossário
+- `docs/diagramas/` — diagramas interativos e suas fontes JSON versionadas
 - `AGENTS.md` — contrato para agentes (o `CLAUDE.md` importa este)
 - `tasks/todo.md` — plano de execução por fases
 - `tasks/decisions.md` — ADRs (sem DRM · CPU-only · MuScriptor · Python 3.12)

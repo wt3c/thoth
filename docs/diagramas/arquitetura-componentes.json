@@ -1,0 +1,30 @@
+{
+  "schema_version": 1,
+  "diagram_type": "architecture",
+  "meta": {"title": "Thoth — arquitetura de componentes", "output": "arquitetura-componentes.html", "quality_profile": "showcase", "viewBox": [1380, 650]},
+  "components": [
+    {"id": "usuario", "type": "external", "label": "Pessoa usuária", "sublabel": "terminal ou navegador", "pos": [40, 340], "size": [170, 76]},
+    {"id": "cli", "type": "frontend", "label": "CLI Typer", "sublabel": "execução síncrona", "pos": [280, 210], "size": [180, 76]},
+    {"id": "webapi", "type": "frontend", "label": "Web + API", "sublabel": "FastAPI · jobs em memória", "pos": [280, 480], "size": [190, 76]},
+    {"id": "pipeline", "type": "backend", "label": "Pipeline", "sublabel": "ordena todos os estágios", "pos": [570, 340], "size": [200, 82]},
+    {"id": "dominio", "type": "backend", "label": "Domínio", "sublabel": "dataclasses + Protocols", "pos": [570, 80], "size": [200, 76]},
+    {"id": "servicos", "type": "backend", "label": "Serviços musicais", "sublabel": "tempo · ritmo · braço · tom", "pos": [870, 210], "size": [210, 76]},
+    {"id": "adapters", "type": "backend", "label": "Adapters", "sublabel": "ingestão · ML · exportação", "pos": [870, 480], "size": [210, 76]},
+    {"id": "arquivos", "type": "database", "label": "Sistema de arquivos", "sublabel": "cache/ + out/", "pos": [1130, 210], "size": [190, 76]},
+    {"id": "externos", "type": "external", "label": "Ferramentas externas", "sublabel": "ffmpeg · yt-dlp · uvx · pesos", "pos": [1120, 480], "size": [210, 76]}
+  ],
+  "boundaries": [{"kind": "region", "label": "Processo local do Thoth", "wraps": ["cli", "webapi", "pipeline", "dominio", "servicos", "adapters"]}],
+  "connections": [
+    {"id": "usa-cli", "from": "usuario", "to": "cli", "label": "comandos", "variant": "emphasis"},
+    {"id": "usa-web", "from": "usuario", "to": "webapi", "label": "localhost", "variant": "emphasis"},
+    {"id": "cli-pipeline", "from": "cli", "to": "pipeline"},
+    {"id": "web-pipeline", "from": "webapi", "to": "pipeline", "label": "job serializado"},
+    {"id": "pipeline-dominio", "from": "pipeline", "to": "dominio", "label": "contratos"},
+    {"id": "pipeline-servicos", "from": "pipeline", "to": "servicos", "label": "regras musicais"},
+    {"id": "pipeline-adapters", "from": "pipeline", "to": "adapters", "label": "ports"},
+    {"id": "servicos-dominio", "from": "servicos", "to": "dominio"},
+    {"id": "pipeline-arquivos", "from": "pipeline", "to": "arquivos"},
+    {"id": "adapters-arquivos", "from": "adapters", "to": "arquivos"},
+    {"id": "adapters-externos", "from": "adapters", "to": "externos", "variant": "dashed"}
+  ]
+}
