@@ -2,6 +2,21 @@
 
 > Áudio → partitura e tablatura, foco em contrabaixo. Uso pessoal. CPU-only. Decisões em `tasks/decisions.md`.
 
+## Detalhamento dos comandos no README (2026-09-26)
+
+- [x] Conferir comportamento, argumentos e opções de cada subcomando contra `src/thoth/cli.py` e a ajuda real.
+- [x] Reestruturar a seção `Uso` por comando, explicando pré-requisitos, processamento, saídas e exemplos.
+- [x] Validar o diff e todas as ajudas da CLI documentadas.
+
+## Documentação detalhada de instalação (2026-09-26)
+
+- [x] Conferir requisitos e ferramentas externas contra o código, o contêiner e os ADRs.
+- [x] Reestruturar o `README.md` com instalação nativa, pesos, alphaTab, validação, primeiro uso e contêiner.
+- [ ] Fechar a verificação da entrega:
+    - [x] `git diff --check`, `thoth --help`, Ruff e mypy.
+    - [ ] Suíte padrão: `test_job_roda_e_relata_o_que_o_pipeline_descartou` não termina nem isolado em 20 s; investigar
+      fora desta alteração exclusivamente documental. A execução paralela também registrou uma falha antes de travar.
+
 ## Próxima sessão — o que está aberto (atualizado em 2026-09-25)
 
 ### 0. Retomar aqui — ADR-044, M3 (piano)
@@ -70,62 +85,62 @@ Sem escrever código do pipeline. Medir se a qualidade justifica o projeto. A av
 ### Preparo
 
 - [x] `uvx muscriptor transcribe --help` → flags verificadas na v0.3.0 (2026-09-21): `-f midi|json|jsonl` ·
-      `-m small|medium|large` · `-d auto|cpu|cuda|mps` · `--instruments` · `--auralize` + `--soundfont` ·
-      `--detect-tempo     true|false|best-effort` · `--sampling/-t` · `--cfg-coef` · `--notes` · `-o -` Nomes de
-      instrumento (`list-instruments`): `electric_bass`, `acoustic_bass`, `contrabass`, `clean_electric_guitar`,
-      `distorted_electric_guitar`, `drums`… **Sem MusicXML/PDF/tab** — ver correção no ADR-003.
+  `-m small|medium|large` · `-d auto|cpu|cuda|mps` · `--instruments` · `--auralize` + `--soundfont` ·
+  `--detect-tempo     true|false|best-effort` · `--sampling/-t` · `--cfg-coef` · `--notes` · `-o -` Nomes de
+  instrumento (`list-instruments`): `electric_bass`, `acoustic_bass`, `contrabass`, `clean_electric_guitar`,
+  `distorted_electric_guitar`, `drums`… **Sem MusicXML/PDF/tab** — ver correção no ADR-003.
 - [x] Aceitar a licença CC BY-NC 4.0 no HuggingFace + `hf auth login` na estação
 
 ### Camada 1 — objetiva (critério principal)
 
 - [x] Fixtures: 6 linhas de baixo em MIDI (`tests/sintetico.py`) → fluidsynth + soundfont → WAV normalizado a −1 dBFS
 - [x] **Onset F1** com `mir_eval` (`services/evaluation.py`), travado por fixture como teste de regressão em
-      `tests/integration/test_regressao_fase0.py`
+  `tests/integration/test_regressao_fase0.py`
 - [x] Medir o **pipeline completo** (com separação) contra ground truth: no `misto`, nota F1 0,682 → **0,968** com
-      separação, onset inalterado em 0,938 (ADR-010, emenda de 2026-09-22). Separar recupera altura, não tempo
+  separação, onset inalterado em 0,938 (ADR-010, emenda de 2026-09-22). Separar recupera altura, não tempo
 - [x] Repetir com `small` vs `medium`, cronometrando em CPU — feito em 2026-09-24, emenda do ADR-009: com separação o
-      `medium` não degenera, mas não ganha em nenhuma fixture, custa ~2× e em `escala` rotula o baixo como
-      `acoustic_guitar`. A comparação em áudio real fica com a Camada 3 (precisa de tab humana)
+  `medium` não degenera, mas não ganha em nenhuma fixture, custa ~2× e em `escala` rotula o baixo como
+  `acoustic_guitar`. A comparação em áudio real fica com a Camada 3 (precisa de tab humana)
 
 ### Camada 2 — perceptual assistida (dispensa treino)
 
 - [x] Auralização: original em um canal, MIDI no outro (`thoth auralizar`, ADR-020). Se descolar, qualquer ouvido
-      percebe
+  percebe
 - [x] ~~Rodar a auralização sobre o corpus e reportar F1 por grupo~~ — auditoria encerrada em 2026-09-25: 2/4 arquivos
-      validados no Grupo A, 2/2 no B e 2/2 no C; F1 não é definido em nenhum grupo porque o corpus tem zero referências.
-      Não foi agregado nem substituído por zero (emenda do ADR-020)
+  validados no Grupo A, 2/2 no B e 2/2 no C; F1 não é definido em nenhum grupo porque o corpus tem zero referências.
+  Não foi agregado nem substituído por zero (emenda do ADR-020)
 
 ### Camada 3 — referência externa (ADR-007)
 
 - [x] Tabs humanas escolhidas: três `.gp5` da comunidade do UG, baixados à mão pelo usuário para `samples/` (ignorada
-      pelo git): _Fear Is the Key_, _Dance of Death_, _And Plague Flowers_. O Songsterr ficou fora (emenda do ADR-007)
+  pelo git): _Fear Is the Key_, _Dance of Death_, _And Plague Flowers_. O Songsterr ficou fora (emenda do ADR-007)
 - [x] `thoth comparar <tab.gp5> <fonte>` (ADR-041):
-  - [x] leitor da tab → `NoteEvent` em segundos: faixa de baixo, andamento de **todas** as faixas na posição exata,
-        repetições com finais alternativos, ligaduras, compasso que não é 4/4. D.S./coda fora, declarado
-  - [x] ~~alinhamento só por ataque~~ — medido e derrubado: a tab deslocada casava quase tanto quanto a alinhada.
-        Alinhamento pelo nome da nota (sem oitava), escala + deslocamento globais, correção por trecho de ±80 ms
-  - [x] relatório: mesma oitava / acima / abaixo nos pares de mesmo nome, com o piso de acaso (tab deslocada) ao lado;
-        escala na borda da grade é recusada
-  - [x] subcomando na CLI, lendo `notas.jsonl` do cache como o `auralizar`
-  - [x] rodar nas três músicas → ADR-041
+    - [x] leitor da tab → `NoteEvent` em segundos: faixa de baixo, andamento de **todas** as faixas na posição exata,
+      repetições com finais alternativos, ligaduras, compasso que não é 4/4. D.S./coda fora, declarado
+    - [x] ~~alinhamento só por ataque~~ — medido e derrubado: a tab deslocada casava quase tanto quanto a alinhada.
+      Alinhamento pelo nome da nota (sem oitava), escala + deslocamento globais, correção por trecho de ±80 ms
+    - [x] relatório: mesma oitava / acima / abaixo nos pares de mesmo nome, com o piso de acaso (tab deslocada) ao lado;
+      escala na borda da grade é recusada
+    - [x] subcomando na CLI, lendo `notas.jsonl` do cache como o `auralizar`
+    - [x] rodar nas três músicas → ADR-041
 - [x] Conferir oitava contra essa tab: duas oitavas quase nunca (6 de 1266 pares, só em _And Plague Flowers_); 5–15% a
-      uma. _Dance of Death_ ficou no piso de acaso — não confirma nada; _And Plague Flowers_ só alinhou em 60–300 s
+  uma. _Dance of Death_ ficou no piso de acaso — não confirma nada; _And Plague Flowers_ só alinhou em 60–300 s
 - [x] "Nota errada" contra tab: exige alinhar a tab ao stem do baixo (DTW), não à transcrição (ADR-041, consequência) →
-      ADR-042
-  - [x] medir: DTW sobre croma do stem nas três tabs (78/≤64, 79/≤45, 60/≤55); porta só de áudio não separa da música
-        errada — descartada
-  - [x] `services/alinhamento_audio.py`: tab → tempo do stem por DTW (porte literal do script de medição), teste com
-        áudio sintético
-  - [x] `comparacao.veredito_de_nota`: certa/oitava/errada por janela de 60 s, piso ao lado, janela conclusiva só com
-        certa ≥ piso + 10 pontos; o resto "inconclusivo"
-  - [x] CLI `comparar`: tabela por janela quando há stem em cache; sem stem, recado
-  - [x] rodar nas três músicas, conferir contra a medição → ADR-042: errada 14,1% / 15,4% nas janelas conclusivas de
-        _Fear_ e _And Plague Flowers_; _Dance_ 1 de 9
+  ADR-042
+    - [x] medir: DTW sobre croma do stem nas três tabs (78/≤64, 79/≤45, 60/≤55); porta só de áudio não separa da música
+      errada — descartada
+    - [x] `services/alinhamento_audio.py`: tab → tempo do stem por DTW (porte literal do script de medição), teste com
+      áudio sintético
+    - [x] `comparacao.veredito_de_nota`: certa/oitava/errada por janela de 60 s, piso ao lado, janela conclusiva só com
+      certa ≥ piso + 10 pontos; o resto "inconclusivo"
+    - [x] CLI `comparar`: tabela por janela quando há stem em cache; sem stem, recado
+    - [x] rodar nas três músicas, conferir contra a medição → ADR-042: errada 14,1% / 15,4% nas janelas conclusivas de
+      _Fear_ e _And Plague Flowers_; _Dance_ 1 de 9
 - [x] Refazer _And Plague Flowers_ com `--afinacao 5` (emenda do ADR-041): 89,3% contra piso de 71,9%, alinhamento igual
-      — a afinação não mudava o quadro
+  — a afinação não mudava o quadro
 - [x] **Transcrição some depois de 511 s** em _And Plague Flowers_ (`yt_ArBcOGvMvGU`): era o filtro de rótulo — o baixo
-      vira `clean_electric_guitar`. Trechos sem baixo agora são relatados e readmitidos (emenda do ADR-008); vai até
-      654,9 s, 1558 pares, 89,5% na mesma oitava contra piso de 75,2%
+  vira `clean_electric_guitar`. Trechos sem baixo agora são relatados e readmitidos (emenda do ADR-008); vai até
+  654,9 s, 1558 pares, 89,5% na mesma oitava contra piso de 75,2%
 
 ### Comparações a fazer
 
@@ -149,48 +164,48 @@ sintético é métrica de regressão, não de qualidade real.
 ## Fase 2 — MuScriptor + ground truth
 
 - [x] **Verificador de oitava** (`services/octave_check.py`) — razão `f0 / 2·f0` por nota, limiar 0,40, 7 testes contra
-      WAV real gerado pelo ffmpeg. Roda sobre o **stem**, não sobre a mix: validado nos dois, pega 12/12 no stem e só
-      6/12 na mix (bumbo e guitarra enchem a banda de 30,9 Hz).
+  WAV real gerado pelo ffmpeg. Roda sobre o **stem**, não sobre a mix: validado nos dois, pega 12/12 no stem e só
+  6/12 na mix (bumbo e guitarra enchem a banda de 30,9 Hz).
 - Mais um dado para essa validação (2026-09-22, primeira execução da CLI ponta a ponta): no stem do Demucs da fixture
   `walking` o limiar sinaliza **4 de 15 notas** (27%), todas G2/A2 — bem acima dos 8,7% medidos em material real.
   Fixture sintética passada pelo Demucs não é material real, então isto não condena o limiar; é mais uma amostra de que
   a taxa de alarme depende forte do material
 - [x] Validar o limiar **fora do Equus** — ele foi calibrado nas mesmas 12 notas em que foi medido. Feito com as três
-      tabs alinhadas ao stem (emenda do ADR-030): **não se sustenta** — alarma 31–39% das notas que a tab confirma (8,7%
-      no Equus), 4–5% dos avisos são erro real, e nenhum limiar de 0,2 a 1,0 separa. O limiar fica; o aviso deixa de
-      valer como lista curta
+  tabs alinhadas ao stem (emenda do ADR-030): **não se sustenta** — alarma 31–39% das notas que a tab confirma (8,7%
+  no Equus), 4–5% dos avisos são erro real, e nenhum limiar de 0,2 a 1,0 separa. O limiar fica; o aviso deixa de
+  valer como lista curta
 - [x] **A janela do ADR-029 tinha quebrado a detecção** (emenda do ADR-029): no Equus caiu de 12 para 2 das 12, e o pico
-      zero (faixa de 41 Hz entre dois pontos da FFT) virava nota certa em suspeita. FFT completada com zeros + janela
-      com piso de 0,3 s: 8 de 12, 4 de 127 alarmes. Calibração travada em `tests/integration/test_oitava_equus.py`
-      (`slow`, pula sem `~/thoth-fase0`). Remedido nas tabs: segunda emenda do ADR-030
+  zero (faixa de 41 Hz entre dois pontos da FFT) virava nota certa em suspeita. FFT completada com zeros + janela
+  com piso de 0,3 s: 8 de 12, 4 de 127 alarmes. Calibração travada em `tests/integration/test_oitava_equus.py`
+  (`slow`, pula sem `~/thoth-fase0`). Remedido nas tabs: segunda emenda do ADR-030
 - [x] Erro de oitava **para cima** — não é do Thoth: em 91 dos 95 casos medidos o áudio desmente a tab (terceira emenda
-      do ADR-030). Nada a detectar
+  do ADR-030). Nada a detectar
 - [ ] Discriminador do erro **para baixo** que separe melhor que o `f0 / 2·f0` (AUC 0,75, segunda emenda do ADR-030).
-      Candidatos já medidos e descartados: ímpares/pares, `3f0/(2f0+4f0)`, meios-harmônicos. Com 84 casos em duas
-      músicas, diferença pequena entre candidatos não se distingue de acaso: esperar mais tabs. _Eyrie_ acrescentou só 2
-      (quarta emenda do ADR-030): linha repetitiva demais para as janelas serem conclusivas
+  Candidatos já medidos e descartados: ímpares/pares, `3f0/(2f0+4f0)`, meios-harmônicos. Com 84 casos em duas
+  músicas, diferença pequena entre candidatos não se distingue de acaso: esperar mais tabs. _Eyrie_ acrescentou só 2
+  (quarta emenda do ADR-030): linha repetitiva demais para as janelas serem conclusivas
 - [x] MuScriptor silencioso no fim de _Eyrie_ (`_RMax1LS3pM`): o _prelude forcing_ trava o modelo em vazio de 557 a 671
-      s. Segunda passada sem ele, só quando há buraco, só dentro do buraco (emenda do ADR-008). 0 → 382 notas no trecho,
-      travado em `tests/integration/test_prelude_eyrie.py`
+  s. Segunda passada sem ele, só quando há buraco, só dentro do buraco (emenda do ADR-008). 0 → 382 notas no trecho,
+  travado em `tests/integration/test_prelude_eyrie.py`
 - [x] _Eyrie_ de novo com a segunda passada: 1507 → 1809 notas, a última em 659 s (antes 555 s); 136 e 192 notas nas
-      janelas de 540 e 600 s, antes 25 e 0. **Qualidade não medida:** contra a tab, as duas janelas saem inconclusivas
-      (600 s: certa 20% contra piso 25%), como as do meio da música. A tab de _Eyrie_ não serve para julgar o trecho.
-      Casos de oitava para baixo continuam 2
+  janelas de 540 e 600 s, antes 25 e 0. **Qualidade não medida:** contra a tab, as duas janelas saem inconclusivas (600
+  s: certa 20% contra piso 25%), como as do meio da música. A tab de _Eyrie_ não serve para julgar o trecho.
+  Casos de oitava para baixo continuam 2
 - [x] `MuscriptorTranscriber` atrás do `Protocol Transcriber` — subprocesso via `uvx` (torch fora do projeto), `small` +
-      livre + `--detect-tempo false`. 7 testes: 6 de parsing puro + 1 contra o modelo real (`slow`).
+  livre + `--detect-tempo false`. 7 testes: 6 de parsing puro + 1 contra o modelo real (`slow`).
 - [x] **Não fatiar áudio antes de transcrever** — o rótulo do instrumento depende de contexto (emenda do ADR-008): 2,9 s
-      viram `acoustic_piano`, 8 s viram `electric_bass`. Vale como restrição ao montar o serviço de pipeline.
+  viram `acoustic_piano`, 8 s viram `electric_bass`. Vale como restrição ao montar o serviço de pipeline.
 - [x] `models.lock.toml` com SHA-256 dos pesos — `small` e `medium`, com revisão do HF e licença. Conferido contra o
-      cache real da estação por teste `slow` (1,6 GB em ~5 s). Pesos seguem fora do versionamento (ADR-005); o lock
-      guarda só a identidade deles.
+  cache real da estação por teste `slow` (1,6 GB em ~5 s). Pesos seguem fora do versionamento (ADR-005); o lock
+  guarda só a identidade deles.
 - [x] Promover as fixtures da Fase 0 a **gate de regressão** — `tests/sintetico.py` (regera as seis fixtures; áudio
-      nunca versionado, ADR-005) + `tests/integration/test_regressao_fase0.py`. Válido só para o `small` (ADR-009) sobre
-      o checkpoint de `models.lock.toml`, conferido por hash antes de medir. Sem folga: renderização byte-idêntica e
-      `muscriptor@0.3.0` pregado. Cobre também o avaliador, agora em `thoth.services.evaluation` com 8 testes contra o
-      mir_eval real.
+  nunca versionado, ADR-005) + `tests/integration/test_regressao_fase0.py`. Válido só para o `small` (ADR-009) sobre
+  o checkpoint de `models.lock.toml`, conferido por hash antes de medir. Sem folga: renderização byte-idêntica e
+  `muscriptor@0.3.0` pregado. Cobre também o avaliador, agora em `thoth.services.evaluation` com 8 testes contra o
+  mir_eval real.
 - [x] ~~Travar o gate no CI~~ — **descartado** (2026-09-22, decisão do Welington): projeto pessoal, sem necessidade de
-      CI. O teste de regressão roda localmente sob demanda: `uv run pytest -m slow`. Consequência aceita: ele só protege
-      quando alguém o roda — não há nada impedindo um commit de regredir.
+  CI. O teste de regressão roda localmente sob demanda: `uv run pytest -m slow`. Consequência aceita: ele só protege
+  quando alguém o roda — não há nada impedindo um commit de regredir.
 - [x] `@pytest.mark.slow` para o que carrega modelo
 
 **Pronto quando:** o F1 estiver documentado e travado. **Cuidado:** F1 sintético é métrica de regressão, não de
@@ -199,14 +214,14 @@ qualidade real.
 ## Fase 3 — Motor de tablatura (Viterbi/DP)
 
 - [x] Estados (corda, traste) válidos por afinação — qualquer tupla de afinação; EADG, BEADG e Drop D já em
-      `thoth.domain.models`
+  `thoth.domain.models`
 - [x] Custo: traste alto, corda solta, deslocamento, troca de corda e janela da mão (ADR-012). A janela é **absoluta**
-      (trastes 0–5), não móvel — ver ADR-012
+  (trastes 0–5), não móvel — ver ADR-012
 - [x] **Modo iniciante** (ADR-006) — preset `INICIANTE`. Nasceu idêntico ao `PADRAO`: custo linear por traste não separa
-      os modos. Quem separa é a penalidade fora da primeira posição (ADR-012)
-- [x] Hypothesis: pitch(corda,traste) == pitch original; nenhum traste > `max_fret`
+  os modos. Quem separa é a penalidade fora da primeira posição (ADR-012)
+- [x] Hypothesis: pitch (corda,traste) == pitch original; nenhum traste > `max_fret`
 - [x] **Acordes / notas simultâneas** — resolvido na borda do pipeline, não no motor: `monofonizar` reduz o grupo à nota
-      mais grave e relata o descarte (ADR-014). `assign` continua monofônico de propósito
+  mais grave e relata o descarte (ADR-014). `assign` continua monofônico de propósito
 
 **Medido:** as seis fixtures caem em primeira posição sob os **dois** presets — o corpus sintético vive no grave, onde
 tocável e ótimo coincidem, e portanto **não** valida o modo iniciante. A distinção se apoia no teste de contraste e na
@@ -221,21 +236,21 @@ varredura de 400 linhas aleatórias (170 divergem).
 - [x] MusicXML via music21 (clave de Fá 8vb, compasso, corda/traste como indicações) — `MusicXmlExporter`
 - [x] Round-trip: grava → relê → mesmas cordas e trastes. 16 testes contra as bibliotecas reais (Regra 3), nenhum mock
 - [x] **Abrir no TuxGuitar** — verificado pelo Welington em 2026-09-22: os quatro GP5 e os quatro MusicXML (incluindo
-      `graves`, de 5 cordas) abriram corretamente. É o único leitor independente disponível — o round-trip sozinho prova
-      consistência com quem escreveu, não validade do formato
+  `graves`, de 5 cordas) abriram corretamente. É o único leitor independente disponível — o round-trip sozinho prova
+  consistência com quem escreveu, não validade do formato
 - [x] Ligaduras no GP5 — feito pelo ADR-022 (`NoteType.tie`, fatiado nas barras); o item ficou aberto por engano até
-      2026-09-24
+  2026-09-24
 
 **Pronto quando:** abrir sem erro no TuxGuitar.
 
 ## Condicionais — só com evidência da Fase 0
 
 - [x] **C1** `DemucsSeparator` (`htdemucs_ft`) — **aprovada** e promovida a etapa fixa do pipeline (ADR-010). Custo
-      conhecido: erra a oitava em 7% das notas no material grave e denso — mitigação na Fase 2, não motivo para
-      reverter.
+  conhecido: erra a oitava em 7% das notas no material grave e denso — mitigação na Fase 2, não motivo para
+  reverter.
 - [x] **C2** quantizador próprio — o Beat This! é dependência dura do MuScriptor (ADR-003 corrigido), não condicional.
-      Resolvido pelo segundo caminho: o transcritor roda sempre com `--detect-tempo false` e a quantização é nossa
-      (`services/rhythm.py`).
+  Resolvido pelo segundo caminho: o transcritor roda sempre com `--detect-tempo false` e a quantização é nossa
+  (`services/rhythm.py`).
 
 ## Fase 4.5 — Pipeline ponta a ponta ✅ **CONCLUÍDA (2026-09-22)**
 
@@ -243,15 +258,15 @@ Pré-requisito invisível até agora: a Fase 5 só existe se houver o que o `POS
 isolados e nada os liga.
 
 - [x] `DemucsSeparator` atrás do `Separator` (ADR-010) — `htdemucs_ft`, `--two-stems=bass`, `uvx --with "numpy<2"` (o
-      demucs declara mal suas dependências). Stem descoberto por glob, não por caminho reconstruído
+  demucs declara mal suas dependências). Stem descoberto por glob, não por caminho reconstruído
 - [x] `services/pipeline.py` — `ref → artefatos`, uma função, sem fila nem estado
 - [x] **Política de simultaneidade** (ADR-014) — decidir na borda do pipeline, não descobrir no meio de uma música:
-      `assign` é monofônico e `rhythm.eventos` levanta erro. Deixa de ser latente no primeiro áudio real
+  `assign` é monofônico e `rhythm.eventos` levanta erro. Deixa de ser latente no primeiro áudio real
 - [x] Rótulo do instrumento por **conjunto** (`electric_bass`, `acoustic_bass`, `contrabass`), nunca literal — o rótulo
-      depende de contexto (emenda do ADR-008) e não foi medido sobre stem do Demucs. `Counter` dos rótulos no resultado,
-      como no gate de regressão
+  depende de contexto (emenda do ADR-008) e não foi medido sobre stem do Demucs. `Counter` dos rótulos no resultado,
+  como no gate de regressão
 - [x] **Nota fora do braço não é fatal** (ADR-014) — apareceu no primeiro teste: é a assinatura do erro de oitava do
-      Demucs, e `assign` levantava `AlturaImpossivelError` matando a música inteira por causa de uma nota
+  Demucs, e `assign` levantava `AlturaImpossivelError` matando a música inteira por causa de uma nota
 - [x] BPM plumbado ponta a ponta (entrada, não estimativa — ADR-013)
 - [x] `thoth transcribe <ref> --out <dir> --bpm` na CLI
 
@@ -261,20 +276,20 @@ avisos de oitava no relatório.
 ## Fase 5 — API e UI
 
 - [x] FastAPI: `POST /jobs`, `GET /jobs`, `GET /jobs/{id}`, `GET /jobs/{id}/artifacts/{fmt}`. Jobs em memória e falha de
-      pipeline como estado do job, não 500 (ADR-015). O resumo devolve descartes, notas fora do braço e avisos de oitava
-      — a tablatura sozinha não conta o que foi perdido
+  pipeline como estado do job, não 500 (ADR-015). O resumo devolve descartes, notas fora do braço e avisos de oitava
+  — a tablatura sozinha não conta o que foi perdido
 - [x] alphaTab servido localmente (sem CDN): renderiza, toca e **controla andamento (estudar a 50–70%)** — ferramenta de
-      estudo central para iniciante (ADR-006). `scripts/vendor_alphatab.py` resolve os `import` em vez de listar
-      arquivos; a lista fixa trazia só a fachada de 4 KB e deixava a página em branco
+  estudo central para iniciante (ADR-006). `scripts/vendor_alphatab.py` resolve os `import` em vez de listar
+  arquivos; a lista fixa trazia só a fachada de 4 KB e deixava a página em branco
 - [x] `thoth serve` — sobe API e página em `127.0.0.1` por padrão
 - [x] **Abrir a página no navegador** — não renderizava. Causa: `scrollElement` apontando para o próprio `#tab`, que faz
-      o lazy loading do alphaTab achar que nada está visível (ADR-016). Fechado com teste de navegador de verdade
-      (`tests/navegador/`, marcador `navegador`), verificado nos dois sentidos
+  o lazy loading do alphaTab achar que nada está visível (ADR-016). Fechado com teste de navegador de verdade
+  (`tests/navegador/`, marcador `navegador`), verificado nos dois sentidos
 - [x] Reabrir job pronto por `?job=<id>`, com guarda para id inexistente
 - [x] **Tocar e cursor** — medido, não ouvido (2026-09-25): `test_tocar_faz_sair_som_e_andar_o_cursor_e_parar_cala`. Um
-      analisador preso a toda ligação com a saída de som mede o volume: 0 antes, ≈ 0,094 tocando, 0 depois de Parar; o
-      cursor anda (x 198 → 235 px em 1 s). Provado nos dois sentidos: `enablePlayer: false` e `enableCursor: false` o
-      fazem falhar. Limite: o autoplay é liberado por flag, então a política de gesto do navegador real não é exercitada
+  analisador preso a toda ligação com a saída de som mede o volume: 0 antes, ≈ 0,094 tocando, 0 depois de Parar; o
+  cursor anda (x 198 → 235 px em 1 s). Provado nos dois sentidos: `enablePlayer: false` e `enableCursor: false` o
+  fazem falhar. Limite: o autoplay é liberado por flag, então a política de gesto do navegador real não é exercitada
 
 ## Fase 6 — Opcionais
 
@@ -291,14 +306,14 @@ avisos de oitava no relatório.
 #### M0 — aceitar o recorte antes de implementar
 
 - [x] Aceitar ou rejeitar o ADR-044 (aceito em 2026-09-25, com emenda no ADR-011); pronto quando o status deixar de ser
-      `Proposto` e estiver decidido se piano sem GP5 nativo ainda conta como suporte completo.
+  `Proposto` e estiver decidido se piano sem GP5 nativo ainda conta como suporte completo.
 - [x] Congelar em teste a taxonomia do MuScriptor 0.3.0 (`slow`, via `list-instruments`) para o escopo: piano
-      (`acoustic_piano`, `electric_piano`), guitarra (`acoustic_guitar`, `clean_electric_guitar`,
-      `distorted_electric_guitar`) e `drums`; pronto quando uma mudança de nome no motor falhar com a lista observada
-      impressa.
+  (`acoustic_piano`, `electric_piano`), guitarra (`acoustic_guitar`, `clean_electric_guitar`,
+  `distorted_electric_guitar`) e `drums`; pronto quando uma mudança de nome no motor falhar com a lista observada
+  impressa.
 - [x] Criar perfis de instrumento no domínio (`domain/instrumentos.py`) sem misturar rótulos por conveniência; pronto
-      quando cada perfil declarar família, rótulos aceitos, stem, programa GM e afinação opcional, e guitarra
-      limpa/acústica/distorcida puderem ser selecionadas separadamente.
+  quando cada perfil declarar família, rótulos aceitos, stem, programa GM e afinação opcional, e guitarra
+  limpa/acústica/distorcida puderem ser selecionadas separadamente.
 
 #### M1 — contrato de domínio e régua comum, por TDD
 
@@ -307,130 +322,129 @@ avisos de oitava no relatório.
 > nos exportadores, esperam um `seguir`. Critério do veredito fixado no ADR-044.
 
 - [x] Testar primeiro e introduzir `EventoPercussivo` e `Transcricao` (`ParteMusical` espera o primeiro exportador
-      novo): nota com altura continua sendo `NoteEvent`; ataque de bateria guarda instante e peça GM, sem fingir altura
-      ou sustentação; pronto com testes de igualdade, ordenação e validação de cada modelo.
+  novo): nota com altura continua sendo `NoteEvent`; ataque de bateria guarda instante e peça GM, sem fingir altura
+  ou sustentação; pronto com testes de igualdade, ordenação e validação de cada modelo.
 - [ ] Generalizar `Transcriber` para devolver a transcrição livre completa e remover o seletor opcional do contrato;
-      pronto quando nenhum caminho usar `--instruments` e notas mais ataques de bateria sobreviverem ao parsing real do
-      JSONL.
+  pronto quando nenhum caminho usar `--instruments` e notas mais ataques de bateria sobreviverem ao parsing real do
+  JSONL.
 - [x] Manter `Separator.separate()` retornando stems nomeados, mas retirar do contrato a suposição de “baixo”; pronto
-      quando os perfis resolverem `bass`, `drums` ou `other` e um stem ausente produzir erro explícito antes da
-      transcrição.
+  quando os perfis resolverem `bass`, `drums` ou `other` e um stem ausente produzir erro explícito antes da
+  transcrição.
 - [ ] Preservar o `FretAssigner` monofônico do baixo e criar um contrato distinto para acordes de guitarra; pronto
-      quando o tipo impedir piano e bateria de passarem por atribuição de corda e impedir o baixo de herdar polifonia
-      por acidente.
+  quando o tipo impedir piano e bateria de passarem por atribuição de corda e impedir o baixo de herdar polifonia
+  por acidente.
 - [x] Generalizar `Exporter` para receber uma `ParteMusical`, não apenas `list[TabNote] + tuning`; pronto quando
-      exportadores falsos provarem por teste que piano e bateria não exigem afinação e que baixo/guitarra não perdem
-      posições. → Bateria resolvida com `ExportadorDePercussao` à parte (emenda do ADR-044, 2026-09-25); a
-      `ParteMusical` fica para o piano, se ele não couber. → Não foi preciso: o piano também ganhou contrato próprio,
-      `ExportadorDePiano` (decisão do usuário, emenda do ADR-044 de 2026-09-25). Item encerrado sem a `ParteMusical`.
+  exportadores falsos provarem por teste que piano e bateria não exigem afinação e que baixo/guitarra não perdem
+  posições. → Bateria resolvida com `ExportadorDePercussao` à parte (emenda do ADR-044, 2026-09-25); a
+  `ParteMusical` fica para o piano, se ele não couber. → Não foi preciso: o piano também ganhou contrato próprio,
+  `ExportadorDePiano` (decisão do usuário, emenda do ADR-044 de 2026-09-25). Item encerrado sem a `ParteMusical`.
 - [x] Gerar, em código versionado (`tests/sintetico_multi.py`), fixtures MIDI de pelo menos 8 s, isoladas e em mix, para
-      cada instrumento; pronto quando `fluidsynth` real renderizar WAVs normalizados, os MIDI forem a referência e
-      nenhum `.mid`, `.wav`, `.gp5` ou `.musicxml` gerado aparecer no índice do Git.
+  cada instrumento; pronto quando `fluidsynth` real renderizar WAVs normalizados, os MIDI forem a referência e
+  nenhum `.mid`, `.wav`, `.gp5` ou `.musicxml` gerado aparecer no índice do Git.
 - [x] Estender o avaliador (`avaliar_polifonico`, `avaliar_bateria`): piano/guitarra com precisão, revocação e F1 de
-      ataque e de nota sem cobrar offset; bateria com F1 micro e macro por peça GM a 50 ms, sem métrica de duração;
-      pronto com testes contra `mir_eval` real e casos que demonstrem erro de altura, troca de peça e ataque deslocado.
+  ataque e de nota sem cobrar offset; bateria com F1 micro e macro por peça GM a 50 ms, sem métrica de duração;
+  pronto com testes contra `mir_eval` real e casos que demonstrem erro de altura, troca de peça e ataque deslocado.
 - [x] Medir cada fixture em três condições — isolada, mix direta e stem do Demucs (`drums` para bateria; `other` para
-      piano/guitarra) — com decodificação livre; pronto com tabela de tempo de CPU, contagem por rótulo, precisão,
-      revocação e F1, sempre imprimindo medido e piso lado a lado. → `tests/integration/test_multi_instrumento.py`
-      (2026-09-25).
+  piano/guitarra) — com decodificação livre; pronto com tabela de tempo de CPU, contagem por rótulo, precisão,
+  revocação e F1, sempre imprimindo medido e piso lado a lado. → `tests/integration/test_multi_instrumento.py`
+  (2026-09-25).
 - [x] Registrar o veredito por instrumento antes do respectivo exportador; pronto quando a medição disser `seguir`,
-      `ajustar` ou `manter fora de escopo`, sem usar avaliação auditiva do usuário e sem promover a primeira rodada a
-      piso por simples conveniência. → ADR-044, Veredito: bateria e piano acústico `ajustar`, piano elétrico fora de
-      escopo, as três guitarras `seguir`.
+  `ajustar` ou `manter fora de escopo`, sem usar avaliação auditiva do usuário e sem promover a primeira rodada a
+  piso por simples conveniência. → ADR-044, Veredito: bateria e piano acústico `ajustar`, piano elétrico fora de
+  escopo, as três guitarras `seguir`.
 
 #### M2 — bateria primeiro
 
 - [x] Medir bumbo, caixa, chimbal, tons e prato, incluindo ataques simultâneos; pronto quando o teste `slow` contra o
-      MuScriptor e o Demucs reais publicar F1 micro/macro por peça e matriz de confusão GM, ou encerrar bateria com
-      veredito negativo documentado. → `confusao_bateria`; tons trocam de número; revocação perdida na borda dos pedaços
-      de 5 s do MuScriptor (emenda do ADR-044 de 2026-09-25). → Borda medida (ADR-045): 0,1 s de silêncio na frente leva
-      a bateria de 0,529 a 0,901, mas troca o rótulo de baixo, guitarra e piano; fica só na bateria
-      (`silencio_inicial_s`, padrão 0). → Fixture só de tons: 45 de 48 ataques achados, quase todos como 43 ou 36; o
-      modelo não separa os tons (emenda do ADR-044, F1 micro 0,109).
+  MuScriptor e o Demucs reais publicar F1 micro/macro por peça e matriz de confusão GM, ou encerrar bateria com
+  veredito negativo documentado. → `confusao_bateria`; tons trocam de número; revocação perdida na borda dos pedaços
+  de 5 s do MuScriptor (emenda do ADR-044 de 2026-09-25). → Borda medida (ADR-045): 0,1 s de silêncio na frente leva
+  a bateria de 0,529 a 0,901, mas troca o rótulo de baixo, guitarra e piano; fica só na bateria (`silencio_inicial_s`,
+  padrão 0). → Fixture só de tons: 45 de 48 ataques achados, quase todos como 43 ou 36; o
+  modelo não separa os tons (emenda do ADR-044, F1 micro 0,109).
 - [x] Implementar quantização de ataques sem inventar sustain; pronto quando dois hits no mesmo tique virarem um acorde
-      percussivo e peças diferentes não forem descartadas pela `monofonizar` do baixo. → `ataques_em_ticks` em
-      `services/rhythm.py`: peças do mesmo tique viram um grupo, a mesma peça repetida no tique é devolvida para relato,
-      duração gráfica até o grupo seguinte e no máximo uma semínima. A bateria no pipeline (item 5) passa por ela, nunca
-      pelo `monofonizar`.
+  percussivo e peças diferentes não forem descartadas pela `monofonizar` do baixo. → `ataques_em_ticks` em
+  `services/rhythm.py`: peças do mesmo tique viram um grupo, a mesma peça repetida no tique é devolvida para relato,
+  duração gráfica até o grupo seguinte e no máximo uma semínima. A bateria no pipeline (item 5) passa por ela, nunca
+  pelo `monofonizar`.
 - [x] GP5: escrever faixa nativa de percussão (`isPercussionTrack`, canal MIDI 10) e peças simultâneas no mesmo beat;
-      pronto com gravação → releitura preservando peça, tique e simultaneidade, além de abertura por leitor
-      independente. → `Gp5PercussaoExporter` atrás de `ExportadorDePercussao` (Protocol próprio, decisão do usuário;
-      emenda do ADR-044). MuseScore lê as 32 figuras e as peças.
+  pronto com gravação → releitura preservando peça, tique e simultaneidade, além de abertura por leitor
+  independente. → `Gp5PercussaoExporter` atrás de `ExportadorDePercussao` (Protocol próprio, decisão do usuário;
+  emenda do ADR-044). MuseScore lê as 32 figuras e as peças.
 - [x] MusicXML: escrever pauta não afinada, clave de percussão e `Unpitched`/`PercussionChord` com mapa GM explícito;
-      pronto quando XML cru, round-trip do music21 e importação real no MuseScore preservarem peça, tique e
-      simultaneidade. → `MusicXmlPercussaoExporter` e `MAPA_PERCUSSAO` (GM 35–59, drumset do MuseScore), com
-      `<instrument id>` por nota; sem ele o MuseScore confunde 38 com 40 (emenda do ADR-044).
+  pronto quando XML cru, round-trip do music21 e importação real no MuseScore preservarem peça, tique e
+  simultaneidade. → `MusicXmlPercussaoExporter` e `MAPA_PERCUSSAO` (GM 35–59, drumset do MuseScore), com
+  `<instrument id>` por nota; sem ele o MuseScore confunde 38 com 40 (emenda do ADR-044).
 - [x] Integrar `--instrumento bateria` na CLI/API sem alterar o default; pronto com teste ponta a ponta que usa o stem
-      `drums`, entrega os dois formatos e não gera tablatura de cordas. O transcritor da bateria usa
-      `silencio_inicial_s=0.1` (ADR-045); o dos outros perfis, não. → `_parte_de_bateria`, descartes por motivo em
-      `ataques_descartados`, opção na página. Pipeline inteiro na `bateria-mix`: F1 micro 0,901, igual ao stem cru
-      (emenda do ADR-044).
+  `drums`, entrega os dois formatos e não gera tablatura de cordas. O transcritor da bateria usa
+  `silencio_inicial_s=0.1` (ADR-045); o dos outros perfis, não. → `_parte_de_bateria`, descartes por motivo em
+  `ataques_descartados`, opção na página. Pipeline inteiro na `bateria-mix`: F1 micro 0,901, igual ao stem cru (emenda
+  do ADR-044).
 
 #### M3 — piano depois
 
 - [x] Medir piano acústico e elétrico separadamente, com acordes de duas mãos, inversões, notas repetidas e extremos
-      A0/C8; pronto com teste `slow` e tabela por rótulo/condição, ou veredito negativo documentado. → Tabela por parte
-      no `test_mede_perfil` e fixture `piano-*-extremos` (emenda do ADR-044): A0/C8 nunca saem, nem no meio do áudio; a
-      mix perde a mão esquerda e o stem a devolve; inversões perdem a nota de cima; o elétrico acerta as notas com o
-      rótulo de outro instrumento.
+  A0/C8; pronto com teste `slow` e tabela por rótulo/condição, ou veredito negativo documentado. → Tabela por parte
+  no `test_mede_perfil` e fixture `piano-*-extremos` (emenda do ADR-044): A0/C8 nunca saem, nem no meio do áudio; a
+  mix perde a mão esquerda e o stem a devolve; inversões perdem a nota de cima; o elétrico acerta as notas com o
+  rótulo de outro instrumento.
 - [x] MusicXML: escrever piano em sistema de duas pautas, acordes verdadeiros e vozes quando as durações sobrepuserem;
-      pronto quando round-trip e MuseScore real preservarem todas as alturas, ataques, durações quantizadas, clave e
-      pauta. → `MusicXmlPianoExporter` (emenda do ADR-044): no máximo 4 vozes por pauta, porque o MuseScore descarta a
-      5ª; acima disso a duração encolhe (decisão do usuário), altura e ataque não. Beams consertados voz a voz
-      (ADR-038).
+  pronto quando round-trip e MuseScore real preservarem todas as alturas, ataques, durações quantizadas, clave e
+  pauta. → `MusicXmlPianoExporter` (emenda do ADR-044): no máximo 4 vozes por pauta, porque o MuseScore descarta a
+  5ª; acima disso a duração encolhe (decisão do usuário), altura e ataque não. Beams consertados voz a voz (ADR-038).
 - [ ] Fazer o spike de GP5 antes de prometer o formato: cobrir A0, C8, acorde de dez notas e duas vozes; pronto quando
-      PyGuitarPro e um leitor independente preservarem tudo sem cordas/trastes fictícios visíveis. Se falhar, o teste
-      deve exigir erro “GP5 não suportado para piano” e o MusicXML será o artefato canônico.
+  PyGuitarPro e um leitor independente preservarem tudo sem cordas/trastes fictícios visíveis. Se falhar, o teste
+  deve exigir erro “GP5 não suportado para piano” e o MusicXML será o artefato canônico.
 - [ ] Integrar `--instrumento piano-acustico`; pronto com teste ponta a ponta pelo stem `other`, diagnóstico de
-      contaminação por outros instrumentos e ausência de qualquer chamada ao atribuidor de trastes. O `piano-eletrico`
-      continua recusado (decisão do usuário, 2026-09-25: o veredito de fora de escopo vale).
+  contaminação por outros instrumentos e ausência de qualquer chamada ao atribuidor de trastes. O `piano-eletrico`
+  continua recusado (decisão do usuário, 2026-09-25: o veredito de fora de escopo vale).
 
 #### M4 — guitarra polifônica por último
 
 - [x] Medir separadamente guitarra acústica, elétrica limpa e distorcida, com notas simples, díades e acordes de até
-      seis notas; pronto com teste `slow`, tabela por condição e comparação explícita com o teto do ADR-011, ou veredito
-      negativo. → `revocacao_por_acorde`; acordes de 6 notas em 21–24 de 24, 23–24 no stem (emenda do ADR-044 de
-      2026-09-25, comparação com o ADR-011).
+  seis notas; pronto com teste `slow`, tabela por condição e comparação explícita com o teto do ADR-011, ou veredito
+  negativo. → `revocacao_por_acorde`; acordes de 6 notas em 21–24 de 24, 23–24 no stem (emenda do ADR-044 de
+  2026-09-25, comparação com o ADR-011).
 - [x] Implementar atribuição de acordes ao braço por teste de propriedade (`services/acordes.py`, emenda do ADR-044 de
-      2026-09-25); pronto quando toda nota preservar a altura, cada acorde usar cordas distintas, nenhum traste exceder
-      o máximo e a falha em acorde impossível for relatada, não monofonizada.
+  2026-09-25); pronto quando toda nota preservar a altura, cada acorde usar cordas distintas, nenhum traste exceder
+  o máximo e a falha em acorde impossível for relatada, não monofonizada.
 - [x] GP5: emitir acordes no mesmo beat, afinação de guitarra e programa GM do perfil; pronto quando gravação →
-      releitura preservar alturas, cordas, trastes, ataques e simultaneidade, com abertura por leitor independente.
+  releitura preservar alturas, cordas, trastes, ataques e simultaneidade, com abertura por leitor independente.
 - [x] MusicXML: emitir partitura + tablatura de guitarra, clave correta, afinação e acordes; pronto quando XML cru,
-      round-trip e MuseScore real preservarem as posições escolhidas, inclusive uma digitação válida alternativa.
+  round-trip e MuseScore real preservarem as posições escolhidas, inclusive uma digitação válida alternativa.
 - [x] Integrar os três perfis de guitarra na CLI/API pelo stem `other`; pronto quando o relatório separar erro de
-      rótulo, contaminação do stem e acorde impossível, sem fundir os três rótulos numa única parte. - [x] Pipeline:
-      `instrumento` (padrão `baixo`, caminho intacto); guitarra pelo stem do perfil, filtro pelos rótulos do perfil,
-      notas do mesmo tique unidas antes do `ViterbiAcordes` (senão o exportador recusa depois dos minutos de CPU),
-      andamento pelo primeiro ataque de cada acorde, sem readmissão, monofonização nem conferência de oitava. - [x]
-      Relatório: `erro_de_rotulo` (outras guitarras), `contaminacao` (outras famílias no stem) e `acordes_impossiveis`,
-      vazios no baixo. - [x] Nada do baixo é sobrescrito: arquivos e cache de notas levam o perfil no nome
-      (`<nome>.guitarra-limpa.gp5`, `notas.guitarra-limpa.jsonl`); chaves de `artefatos` continuam `gp5`/`musicxml`;
-      stem e playback como `outros` e `sem-outros`. Auralização com o programa GM do perfil. - [x] CLI `--instrumento` e
-      API `instrumento`; `--afinacao` só vale para o baixo; perfis sem exportador (bateria, piano) recusados antes do
-      download. - [x] Ponta a ponta `slow` com `guitarra-limpa-mix`, Demucs e MuScriptor reais.
+  rótulo, contaminação do stem e acorde impossível, sem fundir os três rótulos numa única parte. - [x] Pipeline:
+  `instrumento` (padrão `baixo`, caminho intacto); guitarra pelo stem do perfil, filtro pelos rótulos do perfil,
+  notas do mesmo tique unidas antes do `ViterbiAcordes` (senão o exportador recusa depois dos minutos de CPU),
+  andamento pelo primeiro ataque de cada acorde, sem readmissão, monofonização nem conferência de oitava. - [x]
+  Relatório: `erro_de_rotulo` (outras guitarras), `contaminacao` (outras famílias no stem) e `acordes_impossiveis`,
+  vazios no baixo. - [x] Nada do baixo é sobrescrito: arquivos e cache de notas levam o perfil no nome
+  (`<nome>.guitarra-limpa.gp5`, `notas.guitarra-limpa.jsonl`); chaves de `artefatos` continuam `gp5`/`musicxml`;
+  stem e playback como `outros` e `sem-outros`. Auralização com o programa GM do perfil. - [x] CLI `--instrumento` e
+  API `instrumento`; `--afinacao` só vale para o baixo; perfis sem exportador (bateria, piano) recusados antes do
+  download. - [x] Ponta a ponta `slow` com `guitarra-limpa-mix`, Demucs e MuScriptor reais.
 
 #### M5 — compatibilidade e verificação de entrega
 
 - [x] Preservar o caminho atual do baixo byte a byte nas fixtures existentes; pronto quando os pisos atuais, contagens
-      de descarte e artefatos de round-trip não mudarem ao deixar `--instrumento` ausente. Verificado em 2026-09-25:
-      `d0d7015` (antes do `instrumento`) contra `8703c25`, fixtures `walking`, `misto`, `graves` e `oitavas`, com `bpm`
-      90 e estimado, a mesma transcrição real do MuScriptor nas duas e o separador dublado (o Demucs não se repete entre
-      rodadas). GP5, WAVs, cache de notas, contagens, andamento e tom idênticos byte a byte. O MusicXML só difere nos
-      ids `P…`/`I…` que o music21 sorteia a cada gravação — a versão antiga rodada duas vezes também difere de si mesma
-      —; com eles normalizados, os 8 arquivos são idênticos.
+  de descarte e artefatos de round-trip não mudarem ao deixar `--instrumento` ausente. Verificado em 2026-09-25:
+  `d0d7015` (antes do `instrumento`) contra `8703c25`, fixtures `walking`, `misto`, `graves` e `oitavas`, com `bpm`
+  90 e estimado, a mesma transcrição real do MuScriptor nas duas e o separador dublado (o Demucs não se repete entre
+  rodadas). GP5, WAVs, cache de notas, contagens, andamento e tom idênticos byte a byte. O MusicXML só difere nos
+  ids `P…`/`I…` que o music21 sorteia a cada gravação — a versão antiga rodada duas vezes também difere de si mesma
+  —; com eles normalizados, os 8 arquivos são idênticos.
 - [x] Adaptar a página apenas para formatos realmente suportados; pronto com teste `navegador` verificando seleção,
-      artefatos e mensagem explícita quando o alvo não tiver GP5 — sem exigir julgamento musical. - [x]
-      `<select id="instrumento">` com baixo e as três guitarras; afinação desabilitada fora do baixo e enviada como
-      `null`. - [x] Relato de `erro_de_rotulo`, `contaminacao` e `acordes_impossiveis`. - [x] Job sem `gp5` em
-      `formatos`: mensagem explícita, sem carregar. - [x] GP5 de guitarra (6 cordas, acorde) renderizado no Chromium
-      real.
+  artefatos e mensagem explícita quando o alvo não tiver GP5 — sem exigir julgamento musical. - [x]
+  `<select id="instrumento">` com baixo e as três guitarras; afinação desabilitada fora do baixo e enviada como
+  `null`. - [x] Relato de `erro_de_rotulo`, `contaminacao` e `acordes_impossiveis`. - [x] Job sem `gp5` em
+  `formatos`: mensagem explícita, sem carregar. - [x] GP5 de guitarra (6 cordas, acorde) renderizado no Chromium
+  real.
 - [x] Rodar `uv run pytest -n auto`, `uv run ruff check src/ tests/`, `uv run mypy src/`,
-      `uv run pytest -m "slow and not network"` e, se a página mudar, `uv run pytest -m navegador`; pronto somente com
-      saídas e números registrados, sem afirmar que a suíte padrão exercitou modelo, Demucs ou navegador. Verificado em
-      2026-09-25 em `8703c25`: suíte padrão 458 passando; ruff e mypy limpos; `-m "slow and not network"` 38 passando em
-      13 min, nenhum abaixo do piso (ponta a ponta da guitarra: nota F1 0,990, margem +0,030; `misto` do baixo com
-      separação: nota 0,968, margem +0,000). A página não mudou; `navegador` não se aplica ainda.
+  `uv run pytest -m "slow and not network"` e, se a página mudar, `uv run pytest -m navegador`; pronto somente com
+  saídas e números registrados, sem afirmar que a suíte padrão exercitou modelo, Demucs ou navegador. Verificado em
+  2026-09-25 em `8703c25`: suíte padrão 458 passando; ruff e mypy limpos; `-m "slow and not network"` 38 passando em
+  13 min, nenhum abaixo do piso (ponta a ponta da guitarra: nota F1 0,990, margem +0,030; `misto` do baixo com
+  separação: nota 0,968, margem +0,000). A página não mudou; `navegador` não se aplica ainda.
 
 ## Pendências para o Welington
 
@@ -460,10 +474,10 @@ Contrato de projeto para os agentes que trabalham neste repositório. `AGENTS.md
 exclusiva do Claude, e inverter a direção faria o Codex ler um ponteiro vazio **sem erro visível**.
 
 - [x] `AGENTS.md` — só os _deltas_ que um agente novo erraria: pt-BR no código, teto do Python, o que `pytest` **não**
-      roda por padrão, repositório público
+  roda por padrão, repositório público
 - [x] `CLAUDE.md` — `@AGENTS.md` + skills e fluxo `tasks/`
 - [x] `.claude/settings.json` — allowlist estreita, nada específico da estação (o repositório é público); o que for
-      local vai em `.claude/settings.local.json`, agora no `.gitignore`
+  local vai em `.claude/settings.local.json`, agora no `.gitignore`
 - [x] `.claude/commands/verificacao.md` — os três comandos da verificação de entrega
 - [x] Revisão do `AGENTS.md` pelo Codex contra o repositório
 
@@ -471,8 +485,8 @@ exclusiva do Claude, e inverter a direção faria o Codex ler um ponteiro vazio 
 repositório é versionado aqui e não entra no instalador.
 
 - [x] Três docstrings realinhados aos ADRs (2026-09-23): `services/rhythm.py` e `adapters/export/gp5.py` tratavam o BPM
-      como obrigatório (ADR-019/021) e `domain/ports.py` chamava a separação de opcional (ADR-010). Achado pela revisão
-      do Codex sobre o `AGENTS.md`.
+  como obrigatório (ADR-019/021) e `domain/ports.py` chamava a separação de opcional (ADR-010). Achado pela revisão
+  do Codex sobre o `AGENTS.md`.
 
 ## Fase 8 — Análise conjunta Claude + Codex (2026-09-23)
 
@@ -486,82 +500,82 @@ pipeline.
 ### Defeitos com correção definida
 
 - [x] **A1 — nota que cruza a barra é truncada, em GP5 e MusicXML.** (ADR-022) `eventos()` devolve a duração real; o GP5
-      fatia nas barras e liga com `NoteType.tie`, o MusicXML não precisou mudar — o `makeNotation` já ligava. Censo do
-      acervo: em Is It A Crime, 26,3% das notas saíam encurtadas e só 74,2% da duração soava. Verificado ponta a ponta
-      nessa música: 778 ataques para 778 notas de entrada, 215 compassos e nenhum fora de 4/4.
+  fatia nas barras e liga com `NoteType.tie`, o MusicXML não precisou mudar — o `makeNotation` já ligava. Censo do
+  acervo: em Is It A Crime, 26,3% das notas saíam encurtadas e só 74,2% da duração soava. Verificado ponta a ponta
+  nessa música: 778 ataques para 778 notas de entrada, 215 compassos e nenhum fora de 4/4.
 - [x] **B6 — teste de quantização ponta a ponta.** (ADR-023) `tests/integration/test_quantizacao_ponta_a_ponta.py`:
-      referência sintética em código (não em `cache/`, que é gitignorado) → rítmica → GP5 → releitura → `avaliar`. 2,9
-      s, na suíte padrão. Conferido: com o `rhythm.py` antigo, 3 dos 5 testes reprovam.
+  referência sintética em código (não em `cache/`, que é gitignorado) → rítmica → GP5 → releitura → `avaliar`. 2,9
+  s, na suíte padrão. Conferido: com o `rhythm.py` antigo, 3 dos 5 testes reprovam.
 - [x] **A2 — dobrar o andamento para 70–160 descarta metade das notas.** (ADR-024) `desdobrar()` em `tempo.py`, chamada
-      entre transcrever e `ajustar`, só no caminho estimado. Critério: colisão na grade acima de 10%, no máximo duas
-      dobras. Medido: colisão de 0,0–2,8% no BPM certo contra 20–37% na grade pela metade. `Resultado.desdobrado` +
-      linha na CLI. Limite declarado: música sem semicolcheia (0,0–4,5%) não é resgatável — é limite do sinal.
+  entre transcrever e `ajustar`, só no caminho estimado. Critério: colisão na grade acima de 10%, no máximo duas
+  dobras. Medido: colisão de 0,0–2,8% no BPM certo contra 20–37% na grade pela metade. `Resultado.desdobrado` +
+  linha na CLI. Limite declarado: música sem semicolcheia (0,0–4,5%) não é resgatável — é limite do sinal.
 - [x] **A11 — `--bpm 0` colapsa a música em uma nota.** (ADR-025) `BPM_MINIMO/MAXIMO` (20–300) em `tempo.py`, uma fonte
-      para CLI, API e pipeline; `transcrever` valida antes do download. `AFINACOES` na CLI com `typer.BadParameter` —
-      nome fora do catálogo não vira mais a afinação padrão calado (a chave virou nome no ADR-028).
+  para CLI, API e pipeline; `transcrever` valida antes do download. `AFINACOES` na CLI com `typer.BadParameter` —
+  nome fora do catálogo não vira mais a afinação padrão calado (a chave virou nome no ADR-028).
 - [x] **A3 — piso do teste da separação era 0,682 e o ADR-010 mediu 0,968.** (ADR-010, emenda 2026-09-23)
-      `COM_SEPARACAO_NOTA_F1 = 0.968`, exato — o F1 é discreto (~0,03 por nota em 16). O piso antigo fica com mensagem
-      própria: abaixo de 0,682 é o ADR desmentido, não regressão. Medido 2x: 0,968, margem +0,000, `ref=16 est=15`.
+  `COM_SEPARACAO_NOTA_F1 = 0.968`, exato — o F1 é discreto (~0,03 por nota em 16). O piso antigo fica com mensagem
+  própria: abaixo de 0,682 é o ADR desmentido, não regressão. Medido 2x: 0,968, margem +0,000, `ref=16 est=15`.
 - [x] **A4 — cache do Demucs não pertencia ao modelo** que o produziu. (ADR-026) `separate` procura em
-      `out_dir / self.model`; os dois modelos convivem no mesmo cache. Medido: stem de `mdx_extra` passava por
-      `htdemucs_ft`.
+  `out_dir / self.model`; os dois modelos convivem no mesmo cache. Medido: stem de `mdx_extra` passava por
+  `htdemucs_ft`.
 - [x] **A5 — nenhuma escrita de cache era atômica.** (ADR-026) `thoth/arquivos.py` com `escrita_atomica` e
-      `diretorio_atomico`, vizinhos do destino (o `/tmp` desta estação é outro ponto de montagem). Quatro sítios: notas,
-      WAV local, WAV do YouTube, stems. Três testes vermelhos antes de verdes.
+  `diretorio_atomico`, vizinhos do destino (o `/tmp` desta estação é outro ponto de montagem). Quatro sítios: notas,
+  WAV local, WAV do YouTube, stems. Três testes vermelhos antes de verdes.
 - [x] **A7 — `stderr` dos subprocessos era descartado** nos 6 pontos. (ADR-026) `thoth/processos.py` com `rodar` e
-      `ErroDeProcesso`; cada módulo mantém o próprio tipo de erro na fronteira. `FileNotFoundError` continua passando
-      direto.
+  `ErroDeProcesso`; cada módulo mantém o próprio tipo de erro na fronteira. `FileNotFoundError` continua passando
+  direto.
 - [x] **A6 — jobs concorrentes dividem arquivos**; dict `jobs` sem limite. ADR-027: execução serializada por
-      `threading.Lock`, `status` nasce `na fila`, histórico com teto de 50 descartando os concluídos mais antigos — e
-      nunca o que ainda não terminou. Teste de concorrência com threads reais, verificado vermelho (o segundo job
-      entrava no pipeline com o primeiro dentro).
+  `threading.Lock`, `status` nasce `na fila`, histórico com teto de 50 descartando os concluídos mais antigos — e
+  nunca o que ainda não terminou. Teste de concorrência com threads reais, verificado vermelho (o segundo job
+  entrava no pipeline com o primeiro dentro).
 - [x] **A9 — `pipeline.py` instancia adapters**; `AudioSource` não é injetável. `transcrever(source=...)` como os outros
-      quatro estágios: `source or resolver_fonte(ref)`. Sem ele, todo teste do pipeline arrastava ffmpeg ou rede.
+  quatro estágios: `source or resolver_fonte(ref)`. Sem ele, todo teste do pipeline arrastava ffmpeg ou rede.
 - [x] **A10/B4 — `PADRAO` e `TUNING_BASS_DROP_D` existem e não têm porta de entrada.** (ADR-028) Catálogos nomeados:
-      `AFINACOES` (`4`/`5`/`drop-d`) em `models.py` e `DIGITACOES` (`iniciante`/`experiente`) em `fretboard.py`.
-      `--afinacao`/`--digitacao` na CLI, campos no `Pedido`, dois `<select>` na página; `--cordas` sai (drop D tem
-      quatro cordas — contar cordas não a nomeia). O JS perdeu o `Number()`, e o formulário ganhou teste de navegador
-      que o dirige: `-m navegador` 3 passed.
+  `AFINACOES` (`4`/`5`/`drop-d`) em `models.py` e `DIGITACOES` (`iniciante`/`experiente`) em `fretboard.py`.
+  `--afinacao`/`--digitacao` na CLI, campos no `Pedido`, dois `<select>` na página; `--cordas` sai (drop D tem
+  quatro cordas — contar cordas não a nomeia). O JS perdeu o `Number()`, e o formulário ganhou teste de navegador
+  que o dirige: `-m navegador` 3 passed.
 - [x] **A8 — `octave_check` ignora `offset_s`** e analisa 0,6 s fixos. (ADR-029) `janela_s` virou teto: a janela é
-      `min(teto, offset - onset)`. Teste vermelho antes: nota de 0,3 s seguida de 30,9 Hz forte passava calada.
+  `min(teto, offset - onset)`. Teste vermelho antes: nota de 0,3 s seguida de 30,9 Hz forte passava calada.
 - [x] **A12 — `octave_check` lê o stem inteiro na memória.** (ADR-029) `setpos` + `readframes` por nota, arquivo aberto
-      uma vez. Medido com `tracemalloc` em 30 s de WAV: pico de 26,5 MB → menos de 2 MB.
+  uma vez. Medido com `tracemalloc` em 30 s de WAV: pico de 26,5 MB → menos de 2 MB.
 - [x] **B5 — nenhuma métrica de offset.** (ADR-023) `nota_offset_f1` e `duracao_ratio` em `Scores`, informativas e fora
-      de qualquer piso. Medido: com o corte na barra ativo, as duas métricas antigas dão 1,000 com 3 de 13 notas
-      encurtadas.
+  de qualquer piso. Medido: com o corte na barra ativo, as duas métricas antigas dão 1,000 com 3 de 13 notas
+  encurtadas.
 - [x] **B8 — oitava é diagnóstico, não sugestão.** (ADR-030) `pitch + 12` deixou de ser afirmado: a mesma razão é medida
-      para a candidata e a sugestão só sai quando ela explica melhor — senão `suggested_pitch` é `None`. A comparação é
-      entre as duas razões, não um segundo corte pelo `limiar` (calibrado só na original). O gatilho não mudou, então os
-      testes com modelo real seguem valendo. Exposto na CLI, no `_resumo` e na página; `inf` vira `null` (`Infinity`
-      quebra o `JSON.parse`). `-m navegador` 4 passed.
+  para a candidata e a sugestão só sai quando ela explica melhor — senão `suggested_pitch` é `None`. A comparação é
+  entre as duas razões, não um segundo corte pelo `limiar` (calibrado só na original). O gatilho não mudou, então os
+  testes com modelo real seguem valendo. Exposto na CLI, no `_resumo` e na página; `inf` vira `null` (`Infinity`
+  quebra o `JSON.parse`). `-m navegador` 4 passed.
 
 ### Pesquisa — ADR e medição antes do código
 
 - [x] **B9 — grafia sempre com sustenido.** (ADR-031) `services/tonalidade.py`: estimativa via music21 com **margem
-      contra a melhor interpretação de sinal oposto** (o sinal é o que muda a grafia; relativas escrevem igual), teto
-      0,05. Medido no acervo: 3 de 7 músicas são tom bemol (~476 notas mal escritas) e uma é empate exato — o único caso
-      recusado pela margem. Armadura errada imprime mais acidente que armadura nenhuma (11 contra 9 em 12 notas), então
-      abaixo da margem nada muda. `--tom`/campo na página/`Pedido.tom`; exportadores com `armadura`. `-m navegador` 5
-      passed.
+  contra a melhor interpretação de sinal oposto** (o sinal é o que muda a grafia; relativas escrevem igual), teto
+  0,05. Medido no acervo: 3 de 7 músicas são tom bemol (~476 notas mal escritas) e uma é empate exato — o único caso
+  recusado pela margem. Armadura errada imprime mais acidente que armadura nenhuma (11 contra 9 em 12 notas), então
+  abaixo da margem nada muda. `--tom`/campo na página/`Pedido.tom`; exportadores com `armadura`. `-m navegador` 5
+  passed.
 - [x] **B7 — digitação otimiza posição, não técnica.** (ADR-032) O estado do Viterbi virou `(corda, traste, mão)`: o
-      deslocamento é cobrado contra o último traste **pisado**, e mão ainda não posicionada não paga nada. O
-      `3 → 0 → 15` do enunciado não reproduz — a emissão limita o braço ao traste ≤10, e o pior salto escondido medido
-      é 8. No acervo (7924 notas): experiente 27 → 8 saltos acima de 4 trastes (os 8 restantes são genuínos, lidos um a
-      um), iniciante 19 → 17 (o `acima_da_janela` já prendia a mão). Posição muda em 0,28% das notas; custo de tempo
-      abaixo do ruído. Sem peso novo em `Custos`. A leitura ampla de "técnica" (articulação, dinâmica) é o B3.
+  deslocamento é cobrado contra o último traste **pisado**, e mão ainda não posicionada não paga nada. O
+  `3 → 0 → 15` do enunciado não reproduz — a emissão limita o braço ao traste ≤10, e o pior salto escondido medido
+  é 8. No acervo (7924 notas): experiente 27 → 8 saltos acima de 4 trastes (os 8 restantes são genuínos, lidos um a
+  um), iniciante 19 → 17 (o `acima_da_janela` já prendia a mão). Posição muda em 0,28% das notas; custo de tempo
+  abaixo do ruído. Sem peso novo em `Custos`. A leitura ampla de "técnica" (articulação, dinâmica) é o B3.
 - [x] **B3 — nada de dinâmica nem articulação.** (ADR-033) **Resultado negativo: pesquisa feita, nenhum código.** As
-      três hipóteses foram medidas e as três falham. Articulação é impossível: `offset_s` é preenchimento — provado
-      contra fixture de duração conhecida (notas de 0,45 s com 0,10 s de silêncio voltaram contíguas) e 83%–99,7% de
-      lacuna zero no acervo. Dinâmica não existe na saída do modelo (velocidade 120 contra 40 descartada) e, do áudio, é
-      IQR de 2,4–5,6 dB sem rótulo para calibrar corte. Deslize: o discriminador dispara igual ou mais no controle
-      (pares com silêncio, que não podem ser deslize). Reabre com tablatura de referência (Camada 3, ADR-007). O achado
-      sobre `offset_s` foi para `NoteEvent.duration_s`, `tonalidade.py` e uma emenda ao ADR-022.
+  três hipóteses foram medidas e as três falham. Articulação é impossível: `offset_s` é preenchimento — provado
+  contra fixture de duração conhecida (notas de 0,45 s com 0,10 s de silêncio voltaram contíguas) e 83%–99,7% de
+  lacuna zero no acervo. Dinâmica não existe na saída do modelo (velocidade 120 contra 40 descartada) e, do áudio, é
+  IQR de 2,4–5,6 dB sem rótulo para calibrar corte. Deslize: o discriminador dispara igual ou mais no controle (pares
+  com silêncio, que não podem ser deslize). Reabre com tablatura de referência (Camada 3, ADR-007). O achado
+  sobre `offset_s` foi para `NoteEvent.duration_s`, `tonalidade.py` e uma emenda ao ADR-022.
 - [x] **B2 — representação rítmica estreita.** ADR-034. **Resultado negativo: pesquisa feita, nenhum código.** A
-      premissa do item caiu: a semicolcheia ganha da tercina e das duas grades de swing nas sete músicas (10,4–30,8 ms
-      contra 27,2–58,6 e 23,9–88,4), e a fusa quase não melhora (0,1–2,9 ms em quatro) — o resíduo é jitter de ataque do
-      transcritor, não erro de quantização, então **grade mais fina não reabre o item**. Tercina some contra controle
-      interno em seis das sete. Andamento variável é real em 1 de 7 (degrau 103,0 → ~105), e a medida barata acusaria
-      primeiro a música errada: limiar de n=1, reprovado no mesmo piso do ADR-033.
+  premissa do item caiu: a semicolcheia ganha da tercina e das duas grades de swing nas sete músicas (10,4–30,8 ms
+  contra 27,2–58,6 e 23,9–88,4), e a fusa quase não melhora (0,1–2,9 ms em quatro) — o resíduo é jitter de ataque do
+  transcritor, não erro de quantização, então **grade mais fina não reabre o item**. Tercina some contra controle
+  interno em seis das sete. Andamento variável é real em 1 de 7 (degrau 103,0 → ~105), e a medida barata acusaria
+  primeiro a música errada: limiar de n=1, reprovado no mesmo piso do ADR-033.
 
 ### Verificado e descartado
 
@@ -587,12 +601,12 @@ Sondado antes de escrever código, com `mscore` de verdade:
   escolheria, e foi exatamente o que voltou.
 
 - [x] Testes primeiro: estrutura de duas pautas, linhas e afinação no XML cru, afinação de 5 cordas inteira, nome da
-      nota só na partitura, corda/traste só na tablatura, e um teste contra o `mscore` real (pulado se ausente).
+  nota só na partitura, corda/traste só na tablatura, e um teste contra o `mscore` real (pulado se ausente).
 - [x] `MusicXmlExporter` passa a montar `PartStaff` de notação + `PartStaff` de tablatura sob um `StaffGroup`, e injeta
-      `<staff-details>` após a escrita — o music21 10.5 emite `<staves>`, `<staff>` e a clave TAB, mas não o
-      `staff-details`.
+  `<staff-details>` após a escrita — o music21 10.5 emite `<staves>`, `<staff>` e a clave TAB, mas não o
+  `staff-details`.
 - [x] Testes existentes ancorados em `parts[0]` — sem isso passam a contar cada nota duas vezes e a asserção muda de
-      significado em silêncio.
+  significado em silêncio.
 - [x] ADR-035 em `tasks/decisions.md`.
 
 ### Fechada
@@ -613,7 +627,7 @@ Os sete artefatos em `out/` são anteriores a isto: ainda de uma pauta. Reexport
 > o MuseScore não precisa desde o ADR-035.
 
 - [x] Teste primeiro: nomes, mesma pasta dos exportadores, bytes iguais à origem, e não-symlink. No `slow` real, mix e
-      baixo diferentes entre si — asserção que o dublê não permite, porque lá o stem é o próprio mix.
+  baixo diferentes entre si — asserção que o dublê não permite, porque lá o stem é o próprio mix.
 - [x] `transcrever` copia os dois para `out_dir` e os devolve em `artefatos`.
 - [x] ADR-036 em `tasks/decisions.md`.
 - [x] Oito músicas já processadas preenchidas sem reprocessar, e os sete `.mscz` apagados.
@@ -625,12 +639,12 @@ Os sete artefatos em `out/` são anteriores a isto: ainda de uma pauta. Reexport
 > os wavs são mix, baixo, sem-baixo e a auralização.
 
 - [x] Teste primeiro: um dublê de `Progresso` coletando os nomes dos estágios na ordem; caminhos dentro de
-      `out/<nome>/`; os quatro wavs presentes e com os bytes da origem.
+  `out/<nome>/`; os quatro wavs presentes e com os bytes da origem.
 - [x] `Progresso` como `Protocol` em `domain/ports.py` — o pipeline anuncia o estágio, quem desenha é o CLI. Sem isso o
-      `rich` entraria num service.
+  `rich` entraria num service.
 - [x] `transcrever` grava numa pasta por música e copia os quatro wavs.
 - [x] Auralização dentro do pipeline, e falha dela **não** mata a corrida: o soundfont é opcional e são minutos de CPU
-      em jogo (ADR-014).
+  em jogo (ADR-014).
 - [x] `transcribe` com `rich`: um estágio por linha, tempo decorrido, ✓ ao fechar.
 - [x] ADR-037 em `tasks/decisions.md`, emendando o ADR-036 no que muda.
 - [x] As oito músicas já em `out/` movidas para o formato novo.
@@ -711,14 +725,14 @@ A amostra negativa é pequena (13), então isso é compatível com "cruzar o tem
 ### O que falta
 
 - [x] Teste de gramática sobre o XML escrito, por (pauta, voz, nível), incluindo `begin` que fica aberto. É o teste que
-      faltava: o round-trip pelo music21 não pega nada disso, porque ele relê o que escreveu.
+  faltava: o round-trip pelo music21 não pega nada disso, porque ele relê o que escreveu.
 - [x] (A): `makeRests(fillGaps=True)` antes do `makeNotation` em `_pauta`.
 - [x] (B): refazer por tempo só o compasso quebrado — ADR-039, 2496 → 0 nos 32767 compassos contíguos; nas nove músicas,
-      ver o fim desta seção. Era: decidir a abordagem — nenhuma foi escolhida ainda. Quebrar o grupo na fronteira de
-      tempo é o candidato, mas não está verificado que resolve, e não há botão para isso (conferido em
-      `meter/base.py::getBeams` e `stream/makeNotation.py::makeBeams`).
+  ver o fim desta seção. Era: decidir a abordagem — nenhuma foi escolhida ainda. Quebrar o grupo na fronteira de
+  tempo é o candidato, mas não está verificado que resolve, e não há botão para isso (conferido em
+  `meter/base.py::getBeams` e `stream/makeNotation.py::makeBeams`).
 - [x] Reexportar as músicas depois da correção — são **nove**, não oito; a conta anterior estava errada. Resultado
-      abaixo.
+  abaixo.
 - [x] ADR-038 com a medição. — escrito para (A); a parte (B) fica registrada como aberta.
 
 ### (A) fechada — medição controlada

@@ -81,9 +81,7 @@ def _escolher[T](catalogo: Mapping[str, T], nome: str, opcao: str) -> T:
     bastante para caber na mensagem.
     """
     if nome not in catalogo:
-        raise typer.BadParameter(
-            f"{nome!r} não existe; há {', '.join(catalogo)}", param_hint=opcao
-        )
+        raise typer.BadParameter(f"{nome!r} não existe; há {', '.join(catalogo)}", param_hint=opcao)
     return catalogo[nome]
 
 

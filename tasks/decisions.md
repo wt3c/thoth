@@ -81,7 +81,7 @@ O ADR-001 manteve a ingestão restrita a arquivo local e deixou o yt-dlp fora do
 explicitamente o suporte a link do YouTube, ciente de que isso contraria os termos de uso da plataforma.
 
 **Decisão:** `YtDlpSource` implementa `AudioSource` ao lado de `LocalFileSource`, e `resolver_fonte()` despacha pela
-forma da referência (URL http(s) → YouTube).
+forma da referência (URL http (s) → YouTube).
 
 **Decisão de implementação:** chamar o **binário do sistema**, não a biblioteca Python. O yt-dlp quebra sempre que o
 YouTube muda, e o binário do pacman se atualiza junto com o sistema, sem tocar no `uv.lock`. O custo é depender do PATH
@@ -765,7 +765,7 @@ vazia; tratá-la como F1 zero confundiria dado ausente com transcrição totalme
 Resultado separado como manda `tasks/corpus.md`:
 
 | grupo | faixas no corpus | auralizações validadas | notas estimadas |     duração | F1                          |
-| ----- | ---------------: | ---------------------: | --------------: | ----------: | --------------------------- |
+|-------|-----------------:|-----------------------:|----------------:|------------:|-----------------------------|
 | A     |                4 |                      2 |           1.651 |   624,216 s | não definido: 0 referências |
 | B     |                2 |                      2 |           1.837 | 1.034,310 s | não definido: 0 referências |
 | C     |                2 |                      2 |           4.377 | 1.223,373 s | não definido: 0 referências |
@@ -840,7 +840,7 @@ conteúdo (ao vivo, rubato) e não arquitetura, e agora dá para medir sem o err
 Verificado ponta a ponta no Equus (`--cordas 5`, a maior correção de andamento, 108 → 107,50): exporta sem estourar e
 mantém 3180 notas contra 3172 antes, com 28 descartes contra 36. A grade melhor alinhada preserva notas, não as perde.
 
-A busca é O(400 × 120 × notas), alguns segundos numa música longa, contra minutos de transcrição: irrelevante no total.
+A busca é O (400 × 120 × notas), alguns segundos numa música longa, contra minutos de transcrição: irrelevante no total.
 
 ### Emenda (2026-09-23)
 
@@ -1120,11 +1120,12 @@ tratava nem a falha nem a interrupção.
 - **`thoth/arquivos.py`**: `escrita_atomica(destino)` e `diretorio_atomico(destino)`, dois gerenciadores de contexto que
   dão um caminho **vizinho do destino** e promovem com `os.replace` só na saída sem erro. Convenção para toda escrita de
   cache daqui para frente.
-  - Vizinho, e nunca `tempfile`: `/tmp` nesta estação é outro ponto de montagem, e `os.replace` entre montagens levanta
-    `Invalid cross-device link`.
-  - A extensão é preservada (`mix.wav` → `mix.parcial.wav`): ffmpeg e yt-dlp escolhem o formato de saída por ela.
-  - `.parcial` fica fora de tudo que qualquer verificação de cache procura, então sobra de execução anterior nunca é
-    confundida com resultado.
+    - Vizinho, e nunca `tempfile`: `/tmp` nesta estação é outro ponto de montagem, e `os.replace` entre montagens
+      levanta
+      `Invalid cross-device link`.
+    - A extensão é preservada (`mix.wav` → `mix.parcial.wav`): ffmpeg e yt-dlp escolhem o formato de saída por ela.
+    - `.parcial` fica fora de tudo que qualquer verificação de cache procura, então sobra de execução anterior nunca é
+      confundida com resultado.
 - **`separate` procura em `out_dir / self.model`**, não em `out_dir`. O modelo já está no caminho que o demucs escreve;
   passou a estar no caminho que o Thoth lê. O diretório provisório se chama `<modelo>.parcial` — nunca `<modelo>` —, e o
   nível aninhado é promovido para que o resultado não fique em `<out>/<modelo>/<modelo>/`.
@@ -1514,7 +1515,7 @@ do traste 0, e atravessar o braço através de uma solta saía de graça.
 
 O enunciado do checklist (`3 → 0 → 15 sai de graça`) **não reproduz**: o custo de emissão limita o braço ao traste ≤10
 no acervo, então o teleporte existe mas é curto. Medido nas sete músicas de `cache/` (7924 notas de baixo de 4 cordas),
-contando pisada → solta(s) → pisada com distância acima de 4 trastes:
+contando pisada → solta (s) → pisada com distância acima de 4 trastes:
 
 | perfil     | saltos >4 trastes | saltos >2 trastes | pior salto | posição muda |
 |------------|-------------------|-------------------|------------|--------------|
@@ -1582,7 +1583,7 @@ quadro cujo f0 caia estritamente entre as duas alturas. Controle interno: o mesm
 150 ms de silêncio, que **não podem** ser deslize.
 
 | música         | candidatos | transita | controle | transita |
-| -------------- | ---------: | -------: | -------: | -------: |
+|----------------|-----------:|---------:|---------:|---------:|
 | yt_4dJz6U3_Xlk |         60 |      70% |        3 |      67% |
 | yt_4kd_eR4216g |         60 |      57% |       60 |  **72%** |
 | yt_5zqlgMh4aYs |         60 |      40% |       39 |  **46%** |
@@ -2761,9 +2762,9 @@ sem impossível.
 - **A guitarra fica sem readmissão, monofonização e conferência de oitava.** As três foram medidas no baixo e pressupõem
   uma nota por vez; na guitarra, um acorde é o próprio sinal.
 - **O relatório tem três campos**, vazios no baixo:
-  - `erro_de_rotulo`: outras guitarras que o modelo ouviu;
-  - `contaminacao`: outras famílias presentes no stem;
-  - `acordes_impossiveis`: acordes que não cabem no braço, com onset, alturas e motivo.
+    - `erro_de_rotulo`: outras guitarras que o modelo ouviu;
+    - `contaminacao`: outras famílias presentes no stem;
+    - `acordes_impossiveis`: acordes que não cabem no braço, com onset, alturas e motivo.
 
   Os três rótulos de guitarra nunca se fundem numa parte só.
 
@@ -2784,12 +2785,12 @@ sem impossível.
   há. Hoje nenhum alvo aceito cai nesse caso, porque bateria e piano são recusados na entrada. A guarda existe para
   quando o piano entregar só MusicXML, como está previsto acima.
 - **Verificado com Chromium real (`-m navegador`, 10 testes):**
-  - o formulário manda `instrumento` e manda `afinacao: null` na guitarra;
-  - a afinação fica desabilitada fora do baixo;
-  - um GP5 de guitarra com seis cordas e acorde aparece na tela (contagem de `#tab svg`, com a sessão viva por mais de
-    10 s);
-  - o relato traz as três causas;
-  - job sem GP5 mostra a mensagem e não abre os controles de estudo.
+    - o formulário manda `instrumento` e manda `afinacao: null` na guitarra;
+    - a afinação fica desabilitada fora do baixo;
+    - um GP5 de guitarra com seis cordas e acorde aparece na tela (contagem de `#tab svg`, com a sessão viva por mais de
+      10 s);
+    - o relato traz as três causas;
+    - job sem GP5 mostra a mensagem e não abre os controles de estudo.
 
 ### Emenda (2026-09-25) — revocação por tamanho de acorde e o teto do ADR-011
 
@@ -2871,14 +2872,14 @@ Item 2 da emenda anterior. A fixture `bateria-tons` (em `tests/sintetico_multi.p
 47, 48, 50), um por vez, oito vezes cada, em colcheias; cada volta gira a ordem e alterna o sentido. O `test_mede_tons`
 roda o `small` com o silêncio do ADR-045. Resultado, igual em duas rodadas:
 
-| tom da referência | 36  | 43  | 45  | perdido |
-|-------------------|-----|-----|-----|---------|
-| 41                | 3   | 5   |     |         |
-| 43                | 3   | 4   |     | 1       |
-| 45                |     | 5   | 2   | 1       |
-| 47                | 2   | 5   |     | 1       |
-| 48                | 2   | 6   |     |         |
-| 50                | 2   | 5   | 1   |         |
+| tom da referência | 36 | 43 | 45 | perdido |
+|-------------------|----|----|----|---------|
+| 41                | 3  | 5  |    |         |
+| 43                | 3  | 4  |    | 1       |
+| 45                |    | 5  | 2  | 1       |
+| 47                | 2  | 5  |    | 1       |
+| 48                | 2  | 6  |    |         |
+| 50                | 2  | 5  | 1  |         |
 
 Mais 17 ataques sem par na referência (15 como 45, 2 como 36). F1 micro 0,109, macro 0,061.
 
