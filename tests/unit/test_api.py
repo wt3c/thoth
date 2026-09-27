@@ -14,7 +14,7 @@ import pytest
 from fastapi.testclient import TestClient
 
 from tests.sintetico import SOUNDFONT, renderizar
-from thoth.api.app import LIMITE_DE_JOBS, Job, Pedido, criar_app, descartar_antigos
+from thoth.api.app import LIMITE_DE_JOBS, Job, Pedido, _afinacao, criar_app, descartar_antigos
 from thoth.domain.models import (
     TUNING_BASS_4,
     TUNING_BASS_DROP_D,
@@ -210,6 +210,13 @@ def test_sem_instrumento_o_pedido_e_de_baixo_na_afinacao_padrao(tmp_path: Path) 
 
     assert recebido["instrumento"] == "baixo"
     assert recebido["tuning"] == TUNING_BASS_4
+
+
+def test_pedido_todos_nao_aplica_afinacao_especifica() -> None:
+    pedido = Pedido(ref="x.mp3", instrumento="todos")
+
+    assert pedido.instrumento == "todos"
+    assert _afinacao(pedido) is None
 
 
 @pytest.mark.parametrize(

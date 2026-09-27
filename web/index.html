@@ -186,6 +186,7 @@
             <label for="instrumento">Instrumento</label>
             <select id="instrumento">
               <option value="baixo">baixo</option>
+              <option value="todos">todos — partitura multifaixa</option>
               <option value="guitarra-limpa">guitarra limpa</option>
               <option value="guitarra-distorcida">guitarra distorcida</option>
               <option value="guitarra-acustica">guitarra acústica</option>
@@ -468,6 +469,9 @@
       const relatar = (job) => {
         const partes = [`${job.status}`];
         if (job.notas != null) partes.push(`${job.notas} notas — ${JSON.stringify(job.rotulos)}`);
+        if (job.partes_ausentes?.length) {
+          partes.push(`sem eventos para: ${job.partes_ausentes.join(", ")}`);
+        }
         if (job.bpm_estimado) {
           partes.push(
             job.bpm_confiavel

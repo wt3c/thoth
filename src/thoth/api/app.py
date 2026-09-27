@@ -226,6 +226,7 @@ def _resumo(job: Job) -> dict[str, Any]:
         "avisos_de_oitava": [_oitava(a) for a in r.avisos_de_oitava] if r else None,
         "tom": _tom(r.tonalidade) if r else None,
         "formatos": sorted(r.artefatos) if r else [],
+        "partes_ausentes": r.partes_ausentes if r else [],
         "bpm_estimado": bool(r and r.andamento),
         "bpm_confiavel": bool(r and r.andamento and r.andamento.confiavel),
     }

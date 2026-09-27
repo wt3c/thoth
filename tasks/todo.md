@@ -28,6 +28,16 @@
 
 ## Continuidade — backlog ativo (revisado em 2026-09-26)
 
+### Partitura multifaixa com WAV focado no baixo (2026-09-27)
+
+- [x] Registrar a decisão arquitetural e o limite temporário do piano em GP5.
+- [x] Escrever primeiro testes estruturais para combinar baixo, guitarras e bateria em GP5 e MusicXML.
+- [x] Implementar compositores multifaixa preservando ritmo, nomes, programas e percussão.
+- [x] Adicionar o modo `todos` ao pipeline sem copiar nem auralizar WAVs das outras famílias.
+- [x] Expor `todos` na CLI, API e página e relatar partes ausentes sem perder as demais.
+- [x] Provar que o modo `baixo` preserva seus artefatos e que os WAVs do modo `todos` continuam focados no baixo.
+- [x] Executar testes reais aplicáveis, navegador, suíte padrão, Ruff e mypy.
+
 ### Animação no player interno da web (2026-09-27)
 
 - [x] Ampliar primeiro o teste de navegador para reprodução, pausa e parada do alphaTab.

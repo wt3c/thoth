@@ -3165,3 +3165,37 @@ posição da mídia externa em milissegundos e atualiza o cursor sem gerar áudi
 Aceitar a implementação quando: o teste real isolado lê posição/metadata, o teste de navegador comprova avanço visual
 sem áudio local e o caminho de reprodução local continua passando. A suíte padrão não prova compatibilidade de todos os
 players; VLC/Strawberry devem ser validados manualmente na estação Linux do usuário.
+
+---
+
+## ADR-047 — partitura multifaixa com entrega de áudio focada no baixo
+
+**Data:** 2026-09-27 · **Status:** Aceito · **Emenda:** ADR-044
+
+### Contexto
+
+O fluxo público escolhe um perfil por execução e produz uma partitura de uma única faixa. O usuário quer GP5 e MusicXML
+com todos os instrumentos suportados na mesma partitura, mas quer que os WAVs continuem servindo ao estudo e à auditoria
+do baixo. O ADR-044 evitava um job único durante a medição para não esconder a origem de regressões; as famílias já
+aprovadas agora têm contratos e testes próprios, então essa restrição deixa de valer para a composição final.
+
+### Decisão
+
+- Adicionar o perfil `todos`, que orquestra as partes de baixo, guitarra limpa, guitarra distorcida, guitarra acústica e
+  bateria, mantendo cada uma em faixa separada. Parte sem eventos é relatada e não impede as demais.
+- Compor um único `.gp5` e um único `.musicxml` a partir das partes já quantizadas pelos exportadores de cada família.
+  Cada faixa preserva nome, programa GM, afinação, ritmo e semântica de percussão.
+- Entregar como WAV somente `mix`, `baixo`, `sem-baixo` e a auralização do baixo. Stems `other` e `drums` continuam
+  intermediários no cache e não entram na pasta final; auralizações de guitarra e bateria também não são geradas.
+- O modo `baixo` continua com os mesmos nomes e bytes. `todos` é uma opção explícita na CLI, API e página.
+- Piano acústico entra no MusicXML multifaixa somente depois da integração do perfil ao pipeline. Ele não entra no GP5
+  enquanto o spike de round-trip do ADR-044 não provar alturas, acordes e vozes sem cordas ou trastes fictícios. O
+  sistema deve declarar esse limite, nunca fingir uma faixa de piano como guitarra.
+
+### Consequências
+
+- O custo em CPU cresce porque `bass`, `other` e `drums` precisam ser separados e transcritos. Resultados intermediários
+  continuam no cache para permitir otimização posterior sem mudar o contrato de saída.
+- Rótulos dos três perfis de guitarra podem representar timbres sucessivos ou instrumentos simultâneos; mantê-los em
+  faixas distintas preserva a evidência do modelo e permite edição manual posterior.
+- O foco do áudio permanece inequivocamente no baixo, enquanto os formatos editáveis carregam a visão multifaixa.

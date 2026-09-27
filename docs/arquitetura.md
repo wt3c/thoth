@@ -333,6 +333,22 @@ Depois do caminho específico do instrumento, o trecho comum:
 
 A auralização é um auxílio de auditoria: um canal toca o original e o outro, as notas sintetizadas. A falha de FluidSynth ou do soundfont é registrada, mas não invalida uma partitura já produzida.
 
+### 7.10 Partitura multifaixa
+
+O perfil `todos` executa o baixo como parte principal e acrescenta guitarra limpa,
+guitarra distorcida, guitarra acústica e bateria quando há eventos reconhecidos. Os
+exportadores produzem uma parte independente para cada perfil; os compositores de
+`adapters/export/multifaixa.py` reúnem essas partes em um GP5 e em um MusicXML.
+
+O baixo continua obrigatório e define andamento, pasta e áudio entregue. Uma parte
+opcional sem eventos é registrada em `partes_ausentes`, sem invalidar as demais. Os
+únicos WAVs copiados para a pasta final são a mix, o baixo, a faixa sem baixo e a
+auralização do baixo. Assim, ampliar a partitura não muda o foco auditivo do produto.
+
+O piano ainda não integra o GP5 de produção: o perfil experimental precisa validar
+digitação e round-trip antes de entrar no arquivo combinado. A limitação e o contrato
+multifaixa estão registrados no ADR-047.
+
 ## 8. Dados, cache e consistência
 
 ### 8.1 Separação entre `cache/` e `out/`

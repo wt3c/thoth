@@ -43,10 +43,11 @@ from __future__ import annotations
 
 import shutil
 from collections import Counter
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from pathlib import Path
 
 from thoth.adapters.export.gp5 import CORDAS_PERCUSSAO, Gp5Exporter, Gp5PercussaoExporter
+from thoth.adapters.export.multifaixa import CompositorGp5, CompositorMusicXml
 from thoth.adapters.export.musicxml import (
     MAPA_PERCUSSAO,
     MusicXmlExporter,
@@ -108,6 +109,20 @@ INSTRUMENTOS: dict[str, tuple[int, ...]] = {
     for nome, p in PERFIS.items()
     if p.familia == "bateria" or (p.familia in ("baixo", "guitarra") and p.afinacao)
 }
+INSTRUMENTOS["todos"] = ()
+
+_PARTES_MULTIFAIXA = (
+    "baixo",
+    "guitarra-limpa",
+    "guitarra-distorcida",
+    "guitarra-acustica",
+    "bateria",
+)
+_NOMES_DE_FAIXA = {
+    "guitarra-limpa": "Guitarra limpa",
+    "guitarra-distorcida": "Guitarra distorcida",
+    "guitarra-acustica": "Guitarra acústica",
+}
 
 #: O stem do Demucs no nome do áudio copiado. `other` não é "guitarra": é tudo que
 #: não é voz, bateria nem baixo, e as três guitarras e os pianos saem nele juntos.
@@ -156,6 +171,8 @@ class Resultado:
     #: Ataques de bateria fora da partitura, por motivo e no tempo do áudio: a mesma
     #: peça repetida no tique, peça fora do mapa de percussão, além de seis no tique.
     ataques_descartados: dict[str, list[EventoPercussivo]] = field(default_factory=dict)
+    #: Perfis opcionais sem eventos no modo multifaixa; o baixo continua obrigatório.
+    partes_ausentes: list[str] = field(default_factory=list)
 
 
 @dataclass(frozen=True, slots=True)
@@ -164,6 +181,20 @@ class _Silencio:
 
     def inicia(self, etapa: str, detalhe: str = "") -> None:
         return None
+
+
+@dataclass(slots=True)
+class _TranscritorComCache:
+    """Evita pagar três vezes pela mesma transcrição do stem `other`."""
+
+    base: Transcriber
+    por_audio: dict[Path, list[NoteEvent]] = field(default_factory=dict)
+
+    def transcribe(self, audio: Path, instrument: str | None = None) -> list[NoteEvent]:
+        if audio not in self.por_audio:
+            self.por_audio[audio] = self.base.transcribe(audio)
+        notas = self.por_audio[audio]
+        return [nota for nota in notas if instrument is None or nota.instrument == instrument]
 
 
 @dataclass(frozen=True, slots=True)
@@ -202,7 +233,7 @@ def transcrever(
     ref: str,
     out_dir: Path,
     *,
-    bpm: int | None = None,
+    bpm: float | None = None,
     tom: str | None = None,
     tuning: tuple[int, ...] | None = None,
     instrumento: str = "baixo",
@@ -214,6 +245,8 @@ def transcrever(
     atribuidor_de_acordes: AtribuidorDeAcordes | None = None,
     exporters: dict[str, Exporter] | None = None,
     progresso: Progresso | None = None,
+    _copiar_audios: bool = True,
+    _gerar_auralizacao: bool = True,
 ) -> Resultado:
     """Caminho ou URL → uma pasta por música em `out_dir`, nomeada pelo título (ADR-037).
 
@@ -224,7 +257,9 @@ def transcrever(
     pode depender de um diretório de hash continuar existindo (ADR-036/037).
 
     `instrumento` escolhe o perfil (ADR-044); `baixo` é o padrão e o caminho de
-    sempre. Uma guitarra sai do stem `other`, com o perfil no nome da partitura, da
+    sempre. `todos` combina baixo, os três perfis de guitarra e bateria numa única
+    partitura GP5/MusicXML, mas preserva somente os WAVs focados no baixo (ADR-047).
+    Uma guitarra sai do stem `other`, com o perfil no nome da partitura, da
     auralização e do cache de notas — `.guitarra-limpa.gp5` ao lado do `.gp5` do
     baixo, sem sobrescrevê-lo —, e o stem e o playback como `.outros.wav` e
     `.sem-outros.wav`. A bateria sai do stem `drums`, sem tablatura: `.bateria.gp5` e
@@ -248,6 +283,23 @@ def transcrever(
     # CPU, e não depois de tudo pronto na hora de exportar.
     if tom is not None:
         tom_de_texto(tom)
+
+    if instrumento == "todos":
+        return _transcrever_todas_as_partes(
+            ref,
+            out_dir,
+            bpm=bpm,
+            tom=tom,
+            cache_dir=cache_dir,
+            source=source,
+            separator=separator,
+            transcriber=transcriber,
+            assigner=assigner,
+            atribuidor_de_acordes=atribuidor_de_acordes,
+            exporters=exporters,
+            progresso=progresso,
+            gerar_auralizacao=_gerar_auralizacao,
+        )
 
     if instrumento not in INSTRUMENTOS:
         raise ValueError(
@@ -309,7 +361,8 @@ def transcrever(
     if exporters is None and guitarra:
         exporters = {
             "gp5": Gp5Exporter(
-                bpm=parte.bpm, armadura=armadura, titulo=asset.title, faixa="Guitarra",
+                bpm=parte.bpm, armadura=armadura, titulo=asset.title,
+                faixa=_NOMES_DE_FAIXA[instrumento],
                 programa_gm=perfil.programa_gm, acordes=True,
             ),
             "musicxml": MusicXmlExporter(
@@ -351,24 +404,26 @@ def transcrever(
     # e ela não pode depender de um diretório nomeado por hash continuar existindo.
     # O playback é opcional no contrato do `Separator` — quem dubla a separação não
     # é obrigado a produzi-lo para exercitar o resto.
-    audios = [("mix", asset.wav), (do_stem, stem)]
-    if (playback := stems.get(f"no_{perfil.stem}")) is not None:
-        audios.append((f"sem-{do_stem}", playback))
-    for chave, origem in audios:
-        artefatos[chave] = Path(shutil.copy2(origem, pasta / f"{nome}.{chave}.wav"))
+    if _copiar_audios:
+        audios = [("mix", asset.wav), (do_stem, stem)]
+        if (playback := stems.get(f"no_{perfil.stem}")) is not None:
+            audios.append((f"sem-{do_stem}", playback))
+        for chave, origem in audios:
+            artefatos[chave] = Path(shutil.copy2(origem, pasta / f"{nome}.{chave}.wav"))
 
     relator.inicia("auralizando", "original num canal, transcrição no outro")
     # Depende de fluidsynth e de soundfont, e nenhum dos dois vale os minutos de
     # CPU já gastos: a falha vira relato (ADR-014). As notas são as do tempo do
     # áudio — a grade da partitura dessincronizaria a comparação.
     falha = None
-    try:
-        artefatos["aural"] = auralizar(
-            asset.wav, parte.no_audio, pasta / f"{nome}{sufixo}.aural.wav",
-            programa=perfil.programa_gm, percussao=bateria,
-        )
-    except (AuralizacaoError, ValueError) as erro:
-        falha = str(erro)
+    if _gerar_auralizacao:
+        try:
+            artefatos["aural"] = auralizar(
+                asset.wav, parte.no_audio, pasta / f"{nome}{sufixo}.aural.wav",
+                programa=perfil.programa_gm, percussao=bateria,
+            )
+        except (AuralizacaoError, ValueError) as erro:
+            falha = str(erro)
     return Resultado(
         falha_na_auralizacao=falha,
         trechos_sem_baixo=parte.sem_baixo,
@@ -389,6 +444,100 @@ def transcrever(
         contaminacao=parte.contaminacao,
         acordes_impossiveis=parte.impossiveis,
         ataques_descartados=parte.ataques_descartados,
+    )
+
+
+def _transcrever_todas_as_partes(
+    ref: str,
+    out_dir: Path,
+    *,
+    bpm: float | None,
+    tom: str | None,
+    cache_dir: Path,
+    source: AudioSource | None,
+    separator: Separator | None,
+    transcriber: Transcriber | None,
+    assigner: FretAssigner | None,
+    atribuidor_de_acordes: AtribuidorDeAcordes | None,
+    exporters: dict[str, Exporter] | None,
+    progresso: Progresso | None,
+    gerar_auralizacao: bool,
+) -> Resultado:
+    """Orquestra partes independentes e entrega só os WAVs focados no baixo."""
+    resultados: list[Resultado] = []
+    baixo = transcrever(
+        ref,
+        out_dir,
+        bpm=bpm,
+        tom=tom,
+        cache_dir=cache_dir,
+        source=source,
+        separator=separator,
+        transcriber=transcriber,
+        assigner=assigner,
+        atribuidor_de_acordes=atribuidor_de_acordes,
+        exporters=exporters,
+        progresso=progresso,
+        instrumento="baixo",
+        _gerar_auralizacao=gerar_auralizacao,
+    )
+    resultados.append(baixo)
+
+    pasta_partes = cache_dir / baixo.asset.source_id / "partes-multifaixa"
+    ausentes: list[str] = []
+    transcritor_guitarras = _TranscritorComCache(transcriber or MuscriptorTranscriber())
+    for instrumento in _PARTES_MULTIFAIXA[1:]:
+        try:
+            resultados.append(
+                transcrever(
+                    ref,
+                    pasta_partes,
+                    bpm=baixo.bpm,
+                    tom=tom,
+                    cache_dir=cache_dir,
+                    source=source,
+                    separator=separator,
+                    transcriber=(
+                        transcriber if instrumento == "bateria" else transcritor_guitarras
+                    ),
+                    assigner=assigner,
+                    atribuidor_de_acordes=atribuidor_de_acordes,
+                    progresso=progresso,
+                    instrumento=instrumento,
+                    _copiar_audios=False,
+                    _gerar_auralizacao=False,
+                )
+            )
+        except ValueError as erro:
+            if not str(erro).startswith(("nenhuma nota", "nenhum ataque")):
+                raise
+            ausentes.append(instrumento)
+
+    nome = nome_de_arquivo(baixo.asset)
+    pasta = out_dir / nome
+    gp5 = CompositorGp5().combinar(
+        [resultado.artefatos["gp5"] for resultado in resultados],
+        pasta / f"{nome}.todos.gp5",
+    )
+    musicxml = CompositorMusicXml().combinar(
+        [resultado.artefatos["musicxml"] for resultado in resultados],
+        pasta / f"{nome}.todos.musicxml",
+    )
+    audios_de_baixo = {
+        chave: caminho
+        for chave, caminho in baixo.artefatos.items()
+        if chave not in {"gp5", "musicxml"}
+    }
+    rotulos = Counter[str]()
+    for resultado in resultados:
+        rotulos.update(resultado.rotulos)
+    return replace(
+        baixo,
+        artefatos={"gp5": gp5, "musicxml": musicxml, **audios_de_baixo},
+        notas=sum(resultado.notas for resultado in resultados),
+        rotulos=dict(rotulos),
+        instrumento="todos",
+        partes_ausentes=ausentes,
     )
 
 

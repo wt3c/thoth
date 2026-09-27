@@ -290,6 +290,9 @@ uv run thoth transcribe caminho/para/musica.mp3 --instrumento guitarra-limpa
 
 # Bateria em faixa de percussão, sem tablatura de cordas.
 uv run thoth transcribe caminho/para/musica.mp3 --instrumento bateria
+
+# Partitura multifaixa; os WAVs continuam focados no baixo.
+uv run thoth transcribe caminho/para/musica.mp3 --instrumento todos
 ```
 
 Este é o comando principal. Ele executa, em ordem:
@@ -312,7 +315,7 @@ Principais opções:
 
 | Opção | Padrão | Efeito |
 |---|---|---|
-| `--instrumento` | `baixo` | Escolhe `baixo`, `bateria`, `guitarra-acustica`, `guitarra-limpa` ou `guitarra-distorcida`. |
+| `--instrumento` | `baixo` | Escolhe `todos`, `baixo`, `bateria`, `guitarra-acustica`, `guitarra-limpa` ou `guitarra-distorcida`. |
 | `--afinacao` | `4` | Afinação do baixo: `4`, `5`, `6` ou `drop-d`; é recusada para outros instrumentos. |
 | `--digitacao` | `iniciante` | Define o custo de posicionamento no braço: `iniciante` ou `experiente`. |
 | `--bpm` | estimado | Fixa o andamento entre 20 e 300 BPM; informado, ele prevalece sobre a estimativa. |
@@ -331,11 +334,16 @@ Cada música recebe uma pasta `out/<título>/`. Os arquivos específicos depende
 | baixo | `<título>.gp5`, `<título>.musicxml` | `.baixo.wav`, `.sem-baixo.wav`, `.aural.wav` |
 | guitarra | `<título>.<perfil>.gp5`, `<título>.<perfil>.musicxml` | `.outros.wav`, `.sem-outros.wav`, `.<perfil>.aural.wav` |
 | bateria | `<título>.bateria.gp5`, `<título>.bateria.musicxml` | `.bateria.wav`, `.sem-bateria.wav`, `.bateria.aural.wav` |
+| todos | `<título>.todos.gp5`, `<título>.todos.musicxml` com uma faixa por perfil | `.baixo.wav`, `.sem-baixo.wav`, `.aural.wav` do baixo |
 
 Todas as variantes também copiam `<título>.mix.wav`. No baixo, o relatório aponta simultaneidades descartadas, notas
 fora do braço, trechos readmitidos e oitavas suspeitas. Na guitarra, separa erro de rótulo, contaminação do stem e
 acordes que não cabem no braço. Na bateria, informa ataques repetidos no mesmo tique, peças fora do kit GM de 35 a 59
 e grupos com mais de seis peças.
+
+No modo `todos`, uma parte sem eventos é relatada e as demais continuam. O piano acústico permanece fora do GP5
+multifaixa até o round-trip do formato provar acordes, vozes e extremos sem inventar cordas ou trastes; esse limite está
+registrado no ADR-047.
 
 ### `auralizar` — refazer a comparação auditiva
 

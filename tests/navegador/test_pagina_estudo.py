@@ -509,13 +509,16 @@ def test_player_externo_move_o_cursor_sem_tocar_audio_local(servidor: str) -> No
     assert local["rms"] > 0.01, f"voltar ao modo local não restaurou o áudio: {local}"
 
 
-def test_o_formulario_de_bateria_manda_o_instrumento_e_nao_a_afinacao(servidor: str) -> None:
+@pytest.mark.parametrize("instrumento", ["bateria", "todos"])
+def test_o_formulario_sem_afinacao_manda_o_instrumento(
+    servidor: str, instrumento: str
+) -> None:
     estado = avaliar(
         f"{servidor}/",
         """(async () => {
              document.getElementById('ref').value = 'x.wav';
              const escolha = document.getElementById('instrumento');
-             escolha.value = 'bateria';
+             escolha.value = 'INSTRUMENTO';
              escolha.dispatchEvent(new Event('change'));
              const desabilitada = document.getElementById('afinacao').disabled;
              document.getElementById('enviar').click();
@@ -528,13 +531,13 @@ def test_o_formulario_de_bateria_manda_o_instrumento_e_nao_a_afinacao(servidor: 
              }
              return {status: 'nenhum job criado', desabilitada,
                      texto: document.getElementById('estado').innerText};
-           })()""",
+           })()""".replace("INSTRUMENTO", instrumento),
         espera_s=6,
     )
 
     assert estado["status"] == "pronto", estado
     assert estado["desabilitada"] is True
-    assert RECEBIDOS[0]["instrumento"] == "bateria"
+    assert RECEBIDOS[0]["instrumento"] == instrumento
     assert RECEBIDOS[0]["tuning"] is None
 
 

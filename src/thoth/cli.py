@@ -291,6 +291,8 @@ def transcribe(
     if r.tonalidade:
         _diz(_tom(r.tonalidade))
     _diz(f"{r.notas} notas de {r.instrumento} em {r.rotulos}", "bold")
+    if r.partes_ausentes:
+        _diz(f"sem eventos para: {', '.join(r.partes_ausentes)}", "yellow")
     # Três causas, três linhas: somadas, não se saberia se o erro é do modelo, que
     # trocou uma guitarra pela outra, ou do stem, que trouxe outro instrumento.
     if r.erro_de_rotulo:
