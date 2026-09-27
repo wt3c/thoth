@@ -28,8 +28,10 @@ from fastapi.responses import FileResponse, PlainTextResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field, field_validator, model_validator
 
+from thoth.adapters.playback.mpris import LeitorMpris
 from thoth.domain.models import AFINACOES, AcordeImpossivel
 from thoth.domain.ports import AtribuidorDeAcordes, FretAssigner
+from thoth.domain.reproducao import LeitorDeReproducao
 from thoth.services import pipeline
 from thoth.services.acordes import ViterbiAcordes
 from thoth.services.fretboard import DIGITACOES, ViterbiFretAssigner
@@ -246,8 +248,10 @@ def criar_app(
     cache_dir: Path = Path("cache"),
     executar: Executor | None = None,
     web_dir: Path = WEB_PADRAO,
+    leitor_reproducao: LeitorDeReproducao | None = None,
 ) -> FastAPI:
     estado = _Estado(out_dir, cache_dir, executar or pipeline.transcrever)
+    leitor = leitor_reproducao or LeitorMpris()
     app = FastAPI(title="Thoth", summary="Áudio → tablatura de contrabaixo e guitarra.")
 
     def _rodar(job: Job) -> None:
@@ -287,6 +291,23 @@ def criar_app(
     @app.get("/jobs")
     def listar() -> list[dict[str, Any]]:
         return [_resumo(j) for j in estado.jobs.values()]
+
+    @app.get("/playback/players")
+    async def players_de_reproducao() -> list[dict[str, Any]]:
+        """Estado de players MPRIS locais; sem player/barramento, a lista é vazia."""
+        return [
+            {
+                "nome": player.nome,
+                "identidade": player.identidade,
+                "estado": player.estado,
+                "posicao_s": player.posicao_s,
+                "duracao_s": player.duracao_s,
+                "titulo": player.titulo,
+                "artista": player.artista,
+                "album": player.album,
+            }
+            for player in await leitor.listar()
+        ]
 
     @app.get("/jobs/{ident}")
     def consultar(ident: str) -> dict[str, Any]:

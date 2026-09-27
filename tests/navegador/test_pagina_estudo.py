@@ -32,6 +32,7 @@ from thoth.domain.models import (
     NoteEvent,
     TabNote,
 )
+from thoth.domain.reproducao import ReproducaoExterna
 from thoth.services.acordes import ViterbiAcordes
 from thoth.services.fretboard import PADRAO
 from thoth.services.octave_check import OctaveWarning
@@ -134,10 +135,30 @@ def servidor(tmp_path: Path) -> Iterator[str]:
         s.bind(("127.0.0.1", 0))
         porta = int(s.getsockname()[1])
 
+    class LeitorPlayerDeTeste:
+        chamadas = 0
+
+        async def listar(self) -> list[ReproducaoExterna]:
+            self.chamadas += 1
+            return [
+                ReproducaoExterna(
+                    nome="org.mpris.MediaPlayer2.teste",
+                    identidade="Player de teste",
+                    estado="Playing",
+                    posicao_s=min(self.chamadas * 0.2, 4.0),
+                    duracao_s=30.0,
+                    titulo="Música de teste",
+                    artista="Banda",
+                    album=None,
+                    url=None,
+                )
+            ]
+
     app = criar_app(
         out_dir=tmp_path / "out",
         cache_dir=tmp_path / "cache",
         executar=lambda ref, out_dir, **kw: _partitura_real(out_dir, **kw),
+        leitor_reproducao=LeitorPlayerDeTeste(),
     )
     server = uvicorn.Server(uvicorn.Config(app, host="127.0.0.1", port=porta, log_level="warning"))
     thread = threading.Thread(target=server.run, daemon=True)
@@ -319,6 +340,28 @@ def test_a_partitura_de_guitarra_com_acorde_aparece_na_tela(servidor: str) -> No
     assert estado["svg"] > 0, f"a partitura de guitarra não foi desenhada: {estado}"
 
 
+def test_job_pronto_oferece_a_transcricao_para_download(servidor: str) -> None:
+    ident = _pronto(servidor, {"ref": "x.wav", "bpm": BPM})
+
+    estado = avaliar(
+        f"{servidor}/?job={ident}",
+        "({oculto: document.getElementById('salvarTranscricao').classList.contains('oculto'),"
+        " links: [...document.querySelectorAll('#downloadsTranscricao a')].map((a) => ({"
+        " texto: a.innerText, href: a.getAttribute('href')}))})",
+        espera_s=12,
+    )
+
+    assert estado == {
+        "oculto": False,
+        "links": [
+            {
+                "texto": "Salvar GP5",
+                "href": f"/jobs/{ident}/artifacts/gp5",
+            }
+        ],
+    }
+
+
 def test_a_pagina_relata_as_tres_causas_de_nota_fora(servidor: str) -> None:
     acorde = (
         NoteEvent(40, 12.0, 12.4, "clean_electric_guitar"),
@@ -345,13 +388,14 @@ def test_job_sem_gp5_diz_por_que_nao_ha_partitura_na_tela(servidor: str) -> None
     ident = _pronto(servidor, {"ref": "x.wav", "bpm": BPM})
     job = httpx.get(f"{servidor}/jobs/{ident}", timeout=5).json()
     assert job["formatos"] == ["gp5"]
-    TROCAS["artefatos"] = {}  # só para o próximo job
+    TROCAS["artefatos"] = {"musicxml": Path("estudo.musicxml")}  # só para o próximo job
     ident = _pronto(servidor, {"ref": "y.wav", "bpm": BPM})
 
     estado = avaliar(
         f"{servidor}/?job={ident}",
         "({texto: document.getElementById('estado').innerText,"
         " oculto: document.getElementById('controles').classList.contains('oculto'),"
+        " download: document.querySelector('#downloadsTranscricao a')?.innerText,"
         " viva_por_ms: performance.now()})",
         espera_s=6,
     )
@@ -359,6 +403,7 @@ def test_job_sem_gp5_diz_por_que_nao_ha_partitura_na_tela(servidor: str) -> None
     assert estado["viva_por_ms"] > 5_000, estado
     assert "sem GP5" in estado["texto"], estado
     assert estado["oculto"] is True, estado
+    assert estado["download"] == "Salvar MusicXML", estado
 
 
 #: Injetado antes da página: toda ligação à saída de som ganha um analisador, e o volume
@@ -389,7 +434,10 @@ LEITURA = """(() => {
   const c = document.querySelector('.at-cursor-beat');
   const x = c && /translate\\(([-\\d.]+)px/.exec(c.style.transform);
   return {rms: Math.max(0, ...window.__rms.slice(-10)), saidas: window.__saidas,
-          cursor_x: x ? Number(x[1]) : null};
+          cursor_x: x ? Number(x[1]) : null,
+          reproducao_externa: document.getElementById('tab').dataset.reproducaoExterna || null,
+          reproducao_local: document.getElementById('tab').dataset.reproducaoLocal || null,
+          animacao_cursor: c ? getComputedStyle(c).animationName : null};
 })()"""
 
 
@@ -398,13 +446,15 @@ def test_tocar_faz_sair_som_e_andar_o_cursor_e_parar_cala(servidor: str) -> None
     ident = httpx.post(
         f"{servidor}/jobs", json={"ref": "x.wav", "bpm": BPM}, timeout=10
     ).json()["id"]
-    antes, _, tocando_1, tocando_2, _, parado = sessao(
+    antes, _, tocando_1, tocando_2, _, pausado, _, parado = sessao(
         f"{servidor}/?job={ident}",
         [
             (12, LEITURA),
             (0, "document.getElementById('tocar').click()"),
             (1, LEITURA),
             (1, LEITURA),
+            (0, "document.getElementById('tocar').click()"),
+            (0.5, LEITURA),
             (0, "document.getElementById('parar').click()"),
             (1.5, LEITURA),
         ],
@@ -419,7 +469,44 @@ def test_tocar_faz_sair_som_e_andar_o_cursor_e_parar_cala(servidor: str) -> None
     assert tocando_2["cursor_x"] > tocando_1["cursor_x"], (
         f"o cursor não andou: {tocando_1} → {tocando_2}"
     )
+    assert tocando_2["reproducao_local"] == "playing", tocando_2
+    assert tocando_2["animacao_cursor"] == "pulso-cursor-reproducao", tocando_2
+    assert pausado["reproducao_local"] == "paused", pausado
+    assert pausado["animacao_cursor"] == "none", pausado
+    assert parado["reproducao_local"] is None, parado
+    assert parado["animacao_cursor"] == "none", parado
     assert parado["rms"] < 0.001, f"parar não calou: {parado}"
+
+
+def test_player_externo_move_o_cursor_sem_tocar_audio_local(servidor: str) -> None:
+    ident = httpx.post(
+        f"{servidor}/jobs", json={"ref": "x.wav", "bpm": BPM}, timeout=10
+    ).json()["id"]
+    antes, _, _, depois, _, _, local = sessao(
+        f"{servidor}/?job={ident}",
+        [
+            (12, LEITURA),
+            (0, "document.getElementById('ativarExterno').click()"),
+            (0.2, "document.getElementById('seguirPlayer').click()"),
+            (1.2, LEITURA),
+            (0, "document.getElementById('voltarLocal').click()"),
+            (2, "document.getElementById('tocar').click()"),
+            (1, LEITURA),
+        ],
+        script_inicial=OUVIDO,
+    )
+
+    assert depois["cursor_x"] is not None, depois
+    assert depois["cursor_x"] > antes["cursor_x"], (
+        f"o cursor externo não avançou: {antes} → {depois}"
+    )
+    assert depois["rms"] == 0, f"modo externo emitiu áudio local: {depois}"
+    assert depois["reproducao_externa"] == "playing", depois
+    assert depois["animacao_cursor"] == "pulso-cursor-reproducao", depois
+    assert local["reproducao_externa"] is None, local
+    assert local["reproducao_local"] == "playing", local
+    assert local["animacao_cursor"] == "pulso-cursor-reproducao", local
+    assert local["rms"] > 0.01, f"voltar ao modo local não restaurou o áudio: {local}"
 
 
 def test_o_formulario_de_bateria_manda_o_instrumento_e_nao_a_afinacao(servidor: str) -> None:

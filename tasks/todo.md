@@ -26,65 +26,114 @@
     - [x] `git diff --check`, `thoth --help`, Ruff e mypy.
     - [x] Suíte padrão: 530 testes passaram em 26,87 s na repetição de 2026-09-26.
 
-## Próxima sessão — o que está aberto (atualizado em 2026-09-25)
+## Continuidade — backlog ativo (revisado em 2026-09-26)
 
-### 0. Retomar aqui — ADR-044, M3 (piano)
+### Animação no player interno da web (2026-09-27)
 
-Estado em 2026-09-25: suíte padrão com 530 passed, `ruff` e `mypy` limpos, os 44 testes de MusicXML com `-m ""` verdes
-(o `mscore` real inclusive). M2 (bateria) fechado. No M3 estão feitos o item 1 (medição parte a parte) e o item 2
-(`MusicXmlPianoExporter`, com no máximo 4 vozes por pauta; ver as emendas do ADR-044 de 2026-09-25).
+- [x] Ampliar primeiro o teste de navegador para reprodução, pausa e parada do alphaTab.
+- [x] Observar o estado real pelo evento `playerStateChanged`, inclusive encerramento automático.
+- [x] Compartilhar o destaque visual entre reprodução interna e externa, preservando redução de movimento.
+- [x] Executar navegador (14 passaram), suíte padrão (535 passaram), Ruff e mypy.
 
-Próximos passos, em ordem (detalhe em "M3 — piano depois", abaixo):
+### Salvar a transcrição pela página (2026-09-27)
 
-1. **Spike do GP5 de piano (item 3 do M3).** Gravar com PyGuitarPro A0, C8, um acorde de dez notas e duas vozes; reler
-   com PyGuitarPro e com um leitor independente (`mscore` importa `.gp5`). Critério: tudo preservado, sem corda nem
-   traste fictício visível. Se falhar, o teste passa a exigir o erro "GP5 não suportado para piano", e o MusicXML fica
-   sendo o canônico. Lembrar de `BeatStatus.normal` (`tasks/lessons/exportadores.md`).
-2. **Integrar `--instrumento piano-acustico` (item 4 do M3).** Transcrever o stem `other`, com diagnóstico de
-   contaminação por outros rótulos e sem chamar o atribuidor de trastes; exportar com o `ExportadorDePiano`. Seguir o
-   padrão do `--instrumento bateria` (commit `fc44da9`: CLI, API e página). O `piano-eletrico` continua recusado
-   (decisão do usuário). Se a página mudar, rodar `-m navegador`.
-3. Depois: os dois itens abertos do M1 (`Transcriber` com a transcrição livre completa; contrato de acordes separado do
-   `FretAssigner` monofônico), e então o M5.
+- [x] Escrever primeiro o teste de navegador para os downloads disponíveis no job concluído.
+- [x] Exibir uma área de salvamento criada a partir dos formatos realmente produzidos.
+- [x] Manter os downloads disponíveis mesmo quando o alphaTab não puder exibir o formato.
+- [x] Documentar o uso e executar navegador (14 passaram), suíte padrão (535 passaram), Ruff e mypy.
 
-Regra permanente: o caminho do baixo nunca pode ser degradado. Verificação de entrega: suíte padrão, `ruff`, `mypy`,
-mais o marcador da camada tocada (`-m "slow and not network"` para modelos, `-m ""` para os testes do `mscore`).
+### Animação do cursor no player externo (2026-09-27)
 
-### Estado anterior (2026-09-24)
+- [x] Escrever primeiro o teste de navegador para a animação ativa e sua remoção ao voltar ao player local.
+- [x] Aplicar brilho pulsante ao cursor em `Playing`, manter destaque estático em `Paused` e remover em `Stopped`.
+- [x] Respeitar `prefers-reduced-motion` e não alterar o comportamento do cursor ou do áudio.
+- [x] Executar teste de navegador (13 passaram), suíte padrão (535 passaram), Ruff e mypy.
 
-Verificação de entrega verde (343 passed na suíte padrão, ruff e mypy limpos; varredura `slow` de beams 32767/0). As
-nove músicas reexportadas em `out/` em 2026-09-24 com o conserto de beams: **0 mal-formados**.
+### Implementação — acompanhar player MPRIS (2026-09-26)
 
-Em 2026-09-24 fecharam: a forma (B) dos beams (ADR-039 — 2496 → 0 na varredura de todos os 32767 compassos contíguos),
-README alinhado à CLI e licença MIT, `demucs@4.1.0` pregado, e o custo da auralização na API aceito (emenda do ADR-037).
-O MuseScore 4.7.4 já está instalado (`/usr/bin/mscore`).
+**Plano (execução não interativa):** 1) confirmar contrato AlphaTab/MPRIS e limites de correspondência; 2) registrar a decisão arquitetural; 3) escrever testes primeiro para consulta real ao barramento e transições/ausência de player; 4) implementar adaptador MPRIS opcional, endpoint local e controles na página; 5) documentar instalação/uso Linux e executar suíte, lint, tipagem e teste com barramento D-Bus isolado.
 
-Nada do que resta é barato: tudo depende de material externo ou de sessão manual.
+- [x] Pesquisa de MPRIS e AlphaTab concluída; solução restrita a players locais compatíveis no Linux, com Spotify excluído e sem OAuth/Web API.
+- [x] ADR da leitura MPRIS, isolamento local e sincronização manual registrados (ADR-046).
+- [x] Testes escritos antes do adaptador e da interface; inclui teste D-Bus real em sessão isolada.
+- [x] Endpoint lista players e informa estado, faixa e posição; barramento/players ausentes não derrubam a aplicação.
+- [x] Página permite escolher um player, iniciar/parar acompanhamento e observar o cursor sem áudio local do AlphaTab.
+- [x] README e arquitetura explicam compatibilidade, instalação no Linux, uso e limites de alinhamento.
+- [x] Suíte padrão (535 testes), navegador (13 testes), D-Bus real (1 teste), Ruff e mypy executados.
 
-### 1. Bloqueados em material externo
+**Ponto de pausa:** implementação e testes automatizados concluídos; alterações permanecem locais e sem commit. Falta
+validar com um player de música real na sessão Linux da estação antes de considerar a feature aceita em uso cotidiano.
 
-- ~~Validar o limiar de oitava fora do Equus~~ — feito em 2026-09-25 com as três tabs alinhadas ao stem. A primeira
-  medição pegou o módulo quebrado; remedido (segunda emenda do ADR-030): separa fraco (AUC 0,75), alarma de 8 a 27%.
-  Diagnóstico, não triagem.
-- Tab clássica **humana** para conferir oitava e notas — só por download seu (`.gp5` do UG Pro ou Songsterr Plus).
-  Automatizar o Songsterr está fora (emenda do ADR-007: `robots.txt` e `ai.txt` deles). A da SOJA é `aiGenerated: true`
-  e não serve.
+#### Retomar daqui
 
-### 2. Verificação manual — navegador; nada que exija ouvido treinado
+- [ ] No Linux desktop, abrir um player que anuncie MPRIS (por exemplo, VLC ou Strawberry) e tocar uma faixa que também
+  tenha sido usada para gerar uma partitura. Spotify está fora do escopo.
+- [ ] Iniciar `uv run thoth serve`, abrir a partitura, usar **Usar player externo**, atualizar a lista e conferir que
+  título e artista do player correto aparecem.
+- [ ] Clicar **Seguir player** e conferir na página que `Playing` move o cursor, `Paused` o mantém no lugar e `Stopped`
+  o retorna ao início; confirmar também que o alphaTab não emite áudio no modo externo.
+- [ ] Se houver diferença fixa no início da gravação, ajustar **Deslocamento (segundos)**; observar e registrar deriva
+  durante a faixa, pois o deslocamento não corrige diferenças de andamento.
+- [ ] Registrar player/versão, resultado e qualquer incompatibilidade aqui; depois revisar o diff completo. Não fazer
+  commit ou push sem solicitação explícita.
 
-> O usuário não julga acerto musical (lição em `tasks/lessons/workflow.md`): o que exige ouvido treinado precisa virar
-> medição ou fica declarado como não verificado.
+O projeto está funcional para baixo, guitarra e bateria. A prioridade agora é concluir o suporte ao piano acústico e
+generalizar o contrato do transcritor. Bateria (M2), guitarra (M4), compatibilidade do baixo (M5), contêiner e Fase 5
+estão concluídos. O piano elétrico permanece fora do escopo por decisão registrada no ADR-044.
 
-- ~~Tocar e cursor~~ — virou teste `navegador` em 2026-09-25 (ver Fase 5).
-- ~~Passada perceptual (auralização) sobre o corpus, F1 por grupo~~ — encerrada como requisito inválido: auralização não
-  tem referência e não produz F1. A cobertura e o limite estão registrados acima e na emenda do ADR-020.
+### Próximas tarefas, nesta ordem
 
-### 3. Aberto sem urgência
+1. **Generalizar o contrato do transcritor (ADR-044, M1).** `Transcricao` já representa notas e ataques de bateria,
+   mas `Transcriber.transcribe()` ainda retorna `list[NoteEvent]` e aceita um filtro opcional de instrumento. Alterar o
+   contrato e o adapter para devolver a transcrição livre completa, separando notas de ataques na fronteira do domínio.
+   Remover o argumento de filtro depois de migrar os consumidores e testes. Critério: nenhuma chamada usa
+   `--instruments` nem filtra dentro do transcritor; teste real do JSONL confirma notas e percussão preservadas.
+2. **Fechar o spike GP5 de piano (ADR-044, M3).** Testar A0, C8, acorde de dez notas e duas vozes com gravação e
+   releitura PyGuitarPro, além de abertura/importação no MuseScore. Confirmar que não surgem cordas ou trastes fictícios.
+   Se o formato não preservar o conteúdo, registrar a limitação em teste e adotar MusicXML como único formato de piano.
+3. **Integrar `piano-acustico` ao pipeline (ADR-044, M3).** Usar o stem `other`, manter notas de piano separadas de
+   contaminação de outras famílias, chamar `ExportadorDePiano` sem atribuidor de braço e expor o instrumento na CLI, API
+   e página. Disponibilizar GP5 somente se o spike o aprovar; MusicXML continua disponível. O piano elétrico deve seguir
+   recusado antes de etapas caras. Cobrir cache de notas por perfil, nomes de saída e preservação byte a byte do fluxo
+   de baixo. Se a página/API mudar, rodar o marcador `navegador`.
+4. **Concluir o M5 para piano.** Atualizar a comparação de compatibilidade do baixo se a nova integração tocar código
+   compartilhado; confirmar que piano não altera as fixtures e os artefatos do baixo. Executar suítes padrão, lint,
+   tipagem, testes reais do MuseScore e o caminho pesado aplicável.
 
-- Fase 6: sync de cursor via Spotify (precisa de app e OAuth seus) e multi-instrumento (escopo grande, validação por
-  ouvido). O contêiner fechou (ADR-040).
-- Fora do contrato do ADR-039: fórmula não inteira (7/16) e anacruse no conserto de beams — só importa se a fórmula
-  deixar de ser 4/4 fixo.
+O detalhamento de requisitos e medições continua nas seções [M1](#m1--contrato-de-domínio-e-régua-comum-por-tdd),
+[M3](#m3--piano-depois) e [M5](#m5--compatibilidade-e-verificação-de-entrega) abaixo. O caminho do baixo é uma
+restrição permanente: qualquer mudança compartilhada precisa preservar os pisos, descartes e artefatos existentes.
+
+### Aguardando dados ou decisão — não bloqueia o trabalho acima
+
+- **Discriminador de erro de oitava para baixo (ADR-030):** o atual tem AUC 0,75 e é apenas diagnóstico. Candidatos
+  adicionais já foram descartados; faltam tablaturas humanas conclusivas em mais músicas. Retomar quando houver novas
+  referências, sem reabrir os candidatos medidos por diferença pequena em amostra insuficiente.
+- **Integração Spotify/Web API (ADR-043):** não adotada devido à restrição oficial de sincronização com conteúdo visual.
+  O recurso desejado foi implementado com outra fonte — MPRIS local, excluindo Spotify — no ADR-046.
+
+### Itens encerrados ou condicionais
+
+- **Contrato de acordes do M1:** já implementado como `AtribuidorDeAcordes`, independente do `FretAssigner`, com
+  `ViterbiAcordes` e testes de posicionamento/integração. A caixa aberta na seção M1 era registro desatualizado e foi
+  fechada abaixo.
+- **Tabs humanas adicionais:** não há ação automática prevista; se o usuário fornecer uma tab clássica válida, ela
+  pode alimentar a validação de oitava. Automatizar a coleta do Songsterr está descartado pelo ADR-007.
+- **MusicXML fora de 4/4 e anacruse:** fora do contrato atual do ADR-039; só reabrir se fórmulas variáveis entrarem no
+  escopo.
+- **Auralização como métrica:** encerrada como requisito inválido; não há ground truth para calcular F1 a partir dela.
+
+### Verificação padrão de entrega
+
+```bash
+uv run pytest -n auto
+uv run ruff check src/ tests/
+uv run mypy src/
+```
+
+Rodar também a seleção da integração tocada: `uv run pytest -m "slow and not network"` para modelos/ferramentas reais,
+`uv run pytest -m ""` para testes pesados como MuseScore e `uv run pytest -m navegador` quando a UI mudar. Registrar
+resultados e não atribuir à suíte padrão cobertura das camadas excluídas pelos marcadores.
 
 ## Fase 0 — Spike de viabilidade ✅ **CONCLUÍDA (2026-09-22) — veredito: SEGUIR**
 
@@ -302,7 +351,10 @@ avisos de oitava no relatório.
 
 ## Fase 6 — Opcionais
 
-- [ ] Sync do cursor via Spotify `currently-playing`
+- [x] Avaliar sync do cursor via Spotify `currently-playing` (ADR-043): não seguir com a Web API, pois a referência
+  oficial proíbe sincronizar gravações do Spotify com conteúdo visual.
+- [x] Implementar player externo via MPRIS (ADR-046): somente Linux, somente leitura e com Spotify excluído; manter a
+  reprodução local do alphaTab. VLC/Strawberry ainda precisam de validação manual na estação do usuário.
 - [x] Containerfile + compose (CPU) — ADR-040, job real verificado dentro do contêiner
 
 ### Multi-instrumento: guitarra polifônica, piano e bateria — plano (ADR-044)
@@ -339,9 +391,10 @@ avisos de oitava no relatório.
 - [x] Manter `Separator.separate()` retornando stems nomeados, mas retirar do contrato a suposição de “baixo”; pronto
   quando os perfis resolverem `bass`, `drums` ou `other` e um stem ausente produzir erro explícito antes da
   transcrição.
-- [ ] Preservar o `FretAssigner` monofônico do baixo e criar um contrato distinto para acordes de guitarra; pronto
+- [x] Preservar o `FretAssigner` monofônico do baixo e criar um contrato distinto para acordes de guitarra; pronto
   quando o tipo impedir piano e bateria de passarem por atribuição de corda e impedir o baixo de herdar polifonia
-  por acidente.
+  por acidente. → `AtribuidorDeAcordes` em `domain/ports.py`, `ViterbiAcordes` em `services/acordes.py` e cobertura
+  em `tests/unit/test_acordes.py`, `test_pipeline_guitarra.py` e testes de exportação.
 - [x] Generalizar `Exporter` para receber uma `ParteMusical`, não apenas `list[TabNote] + tuning`; pronto quando
   exportadores falsos provarem por teste que piano e bateria não exigem afinação e que baixo/guitarra não perdem
   posições. → Bateria resolvida com `ExportadorDePercussao` à parte (emenda do ADR-044, 2026-09-25); a

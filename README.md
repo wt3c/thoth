@@ -55,7 +55,8 @@ A instalação diretamente no Windows, por PowerShell ou Prompt de Comando, **n�
 das dependências Python possa funcionar, esse caminho não foi validado e a auralização procura a soundfont no caminho
 Linux fixo `/usr/share/soundfonts/FluidR3_GM.sf2`. Também seria necessário instalar e manter `ffmpeg`, `ffprobe`,
 `fluidsynth`, `yt-dlp`, Node.js e npm no `PATH`. Portanto, use WSL2 ou Docker Desktop até existir suporte nativo
-testado.
+testado. A sincronização com player externo descrita abaixo é ainda mais específica: depende do barramento MPRIS/D-Bus
+da sessão Linux e não acompanha um player do Windows, do WSL ou do host a partir do contêiner.
 
 ### O que será instalado
 
@@ -67,6 +68,8 @@ testado.
 | `yt-dlp`                        |               só para YouTube | baixar a faixa de áudio de uma URL                                       |
 | `fluidsynth` + `FluidR3_GM.sf2` |                   recomendado | gerar a auralização; sem eles, GP5 e MusicXML continuam sendo exportados |
 | Node.js + npm                   |         só para `thoth serve` | baixar o alphaTab uma vez; Node não participa da execução da aplicação   |
+| `dbus-next`                     | só para sincronização externa | biblioteca Python instalada automaticamente pelo `uv sync`             |
+| Sessão D-Bus + player MPRIS     | só para sincronização externa | ler estado/posição de um player no Linux; instalado à parte             |
 | Docker + Compose                | só na instalação em contêiner | construir e executar a imagem local                                      |
 
 Demucs e MuScriptor **não** são instalados globalmente. O pipeline chama versões fixadas por `uvx` e guarda os
@@ -389,12 +392,34 @@ uv run thoth serve --port 8080 --out out --cache cache
 O `serve` inicia uma API FastAPI e a página de estudo com o alphaTab local. Por padrão, escuta somente em
 <http://127.0.0.1:8000>, sem expor a aplicação na rede. A página permite informar o caminho de um arquivo local ou uma
 URL do YouTube, escolher o instrumento, iniciar a transcrição, acompanhar o estado do job, abrir a partitura e controlar
-a velocidade de estudo.
+a velocidade de estudo. Quando o job termina, **Salvar transcrição** oferece os formatos de partitura produzidos pelo
+pipeline, como GP5 e MusicXML, preservando no download o nome do arquivo gerado.
 
 Os jobs ficam apenas na memória e são executados um por vez, pois compartilham caches e caminhos de saída. Encerrar o
 servidor apaga o histórico de jobs, mas não remove os artefatos de `out/` nem o conteúdo de `cache/`. A página exige que
 o alphaTab tenha sido instalado com `uv run python scripts/vendor_alphatab.py`; sem ele, a raiz responde 503 e mostra
 esse comando.
+
+#### Acompanhar a reprodução de outro player no Linux
+
+Depois de gerar uma partitura GP5, escolha **Usar player externo** para trocar o alphaTab para o modo de mídia externa.
+Abra um player compatível com MPRIS 2 — por exemplo, VLC ou Strawberry — na mesma sessão Linux e clique em **Atualizar
+players**. Selecione o player/faixa e clique em **Seguir player**. O cursor acompanha `Playing`, pausa junto com `Paused`
+e volta ao início em `Stopped`. **Voltar ao player do Thoth** restaura o áudio sintetizado e os controles de estudo
+locais.
+
+O Thoth lê apenas estado, posição e metadados que o player publica no barramento D-Bus local; não toca, grava nem obtém
+o áudio externo. O pacote Python `dbus-next` é instalado pelo `uv sync`. **Spotify é excluído**, inclusive quando tenta
+aparecer como player local. Não há OAuth, token, credencial ou chamada à Web API do Spotify. A compatibilidade depende
+de o player implementar [MPRIS 2](https://specifications.freedesktop.org/mpris/latest/)
+e da sessão Linux disponibilizar um barramento D-Bus ao processo do Thoth. O [Strawberry](https://github.com/strawberrymusicplayer/strawberry)
+é um exemplo de player cujo projeto documenta suporte MPRIS2/D-Bus no Linux.
+
+O recurso não comprova que a faixa selecionada é a mesma gravação usada na transcrição. Confira o título e o artista
+mostrados, selecione a mesma versão e ajuste **Deslocamento (segundos)** se a gravação começar com uma introdução ou
+silêncio que não esteja na partitura. Isso corrige o ponto inicial, não deriva acumulada de andamento. Sem player MPRIS,
+o Thoth informa que a lista está vazia e a reprodução local continua disponível. O modo externo não é suportado no
+Windows nem no Docker Compose porque a aplicação não acessa a sessão D-Bus do host.
 
 Opções:
 

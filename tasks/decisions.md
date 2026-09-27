@@ -11,6 +11,13 @@ devolva PCM. Extrair exigiria re-gravação de loopback ou circunvenção de DRM
 **Consequência:** o Spotify permanece útil só para sincronizar o cursor de reprodução (`/me/player/currently-playing`),
 nunca para obter áudio.
 
+### Emenda (2026-09-26)
+
+A consequência acima registrava uma possibilidade antiga, não uma integração aprovada. A proposta de Web API do Spotify
+foi rejeitada no ADR-043. Para acompanhar reprodução externa, o Thoth implementa somente MPRIS local conforme o ADR-046;
+serviços e metadados identificados como Spotify são filtrados. A entrada de áudio continua sendo arquivo local ou fonte
+explicitamente permitida, nunca áudio obtido do player.
+
 ---
 
 ## ADR-002 — CPU-only; ROCm descartado
@@ -2329,9 +2336,9 @@ Os números por janela reproduzem os do script de medição.
 
 ---
 
-## ADR-043 — sincronização do cursor com a reprodução do Spotify
+## ADR-043 — proposta não adotada: sincronização do cursor com a reprodução do Spotify
 
-**Data:** 2026-09-25 · **Status:** Proposto · **Revisa, se aceito:** ADR-001 e o contrato de rede/secrets do `AGENTS.md`
+**Data:** 2026-09-25 · **Status:** Não adotado; substituído pelo ADR-046
 
 ### Contexto
 
@@ -3107,3 +3114,54 @@ sofreria a mesma troca de rótulo, e ela dobra o custo de CPU.
   nos tons.
 - Fica registrado como risco conhecido que o rótulo do áudio inteiro depende do começo dele. Se uma música real sair com
   o baixo rotulado como outro instrumento, este ADR é o primeiro lugar para olhar.
+
+---
+
+## ADR-046 — acompanhar player local via MPRIS, sem sincronização Spotify/Web API
+
+**Data:** 2026-09-26 · **Status:** Aceito · **Substitui a proposta:** ADR-043 · **Revisa:** ADR-001
+
+### Contexto
+
+A página de estudo já reproduz o áudio MIDI do alphaTab e move seu cursor. Queremos que o cursor também possa acompanhar
+uma reprodução externa, sem obter nem retransmitir o áudio do player. A opção anterior sugeria a Web API do Spotify; a
+referência oficial dessa API proíbe sincronizar conteúdo Spotify com mídia visual. Também exigiria OAuth e tráfego remoto,
+desnecessários para o objetivo local.
+
+O MPRIS 2 é um protocolo local de D-Bus usado por players Linux. Ele publica o estado (`Playing`, `Paused`, `Stopped`), a
+posição em microssegundos e metadados opcionais da faixa. O alphaTab 1.8.4 inclui `EnabledExternalMedia`, que recebe a
+posição da mídia externa em milissegundos e atualiza o cursor sem gerar áudio local.
+
+### Decisão
+
+- Manter a reprodução atual do Thoth como padrão. O usuário ativa explicitamente o modo externo; a página recria o
+  alphaTab em `EnabledExternalMedia` e instala um handler sem saída de áudio. Há ação explícita para voltar ao modo local.
+- Implementar um leitor MPRIS genérico atrás do `Protocol LeitorDeReproducao`. O adaptador consulta o barramento de sessão
+  do mesmo usuário, fecha a conexão após cada consulta e devolve lista vazia quando está fora do Linux, sem barramento ou
+  sem player. Spotify é filtrado pelo nome do serviço, identidade ou URL e não é uma fonte suportada. Não há controle de
+  transporte do player externo nesta versão.
+- A página consulta a API local a cada 300 ms. Ao selecionar um player e iniciar o acompanhamento, `Playing` atualiza a
+  posição do alphaTab; `Paused` pausa o cursor no instante informado; `Stopped` reinicia o cursor. O deslocamento manual
+  em segundos serve para compensar introdução ou silêncio diferentes.
+- A associação é decisão explícita do usuário: o Thoth não presume que título ou artista iguais provem que a gravação é
+  a mesma. A página exibe os metadados disponíveis e avisa para escolher a mesma gravação e conferir o alinhamento.
+- A primeira implementação é somente Linux com uma sessão D-Bus acessível no mesmo usuário. Windows e contêiner não
+  ganham acesso ao player do host; a reprodução local da partitura continua disponível neles.
+- Não adicionar exceção ao contrato de secrets ou rede: MPRIS é local e não requer token, conta, OAuth ou acesso HTTPS.
+
+### Consequências e limites
+
+- Qualquer player que publique MPRIS 2 pode funcionar; VLC e Strawberry são exemplos, não dependências do Thoth. A
+  interface deve tolerar campos de metadata ausentes e players que desaparecem entre descoberta e consulta.
+- A posição da mídia e o tempo quantizado da partitura podem divergir. O deslocamento corrige um ponto inicial, mas não
+  resolve deriva de BPM, versões diferentes ou mudanças locais de andamento. O recurso não promete precisão de áudio.
+- Abrir uma conexão D-Bus por consulta simplifica reconexão após troca/encerramento do player. A carga é pequena no uso
+  pessoal; se a medição real revelar latência perceptível, reavaliar conexão persistente e extrapolação local.
+- Um teste marcado `slow` exercita descoberta e leitura contra um serviço MPRIS de teste real num barramento privado
+  iniciado por `dbus-run-session`; ele nunca deve se conectar ao barramento normal do desktop.
+
+### Verificação
+
+Aceitar a implementação quando: o teste real isolado lê posição/metadata, o teste de navegador comprova avanço visual
+sem áudio local e o caminho de reprodução local continua passando. A suíte padrão não prova compatibilidade de todos os
+players; VLC/Strawberry devem ser validados manualmente na estação Linux do usuário.

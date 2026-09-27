@@ -69,6 +69,18 @@
       button:hover:not(:disabled) {
         border-color: var(--destaque);
       }
+      a.botao {
+        display: inline-block;
+        color: var(--texto);
+        background: #23272e;
+        border: 1px solid var(--borda);
+        border-radius: 7px;
+        padding: 8px 10px;
+        text-decoration: none;
+      }
+      a.botao:hover {
+        border-color: var(--destaque);
+      }
       button:disabled {
         opacity: 0.45;
         cursor: default;
@@ -100,6 +112,42 @@
         padding: 8px;
         overflow-x: auto;
         min-height: 120px;
+      }
+      #tab[data-reproducao-externa="playing"] .at-cursor-beat,
+      #tab[data-reproducao-local="playing"] .at-cursor-beat {
+        border-radius: 3px;
+        box-shadow: 0 0 0 2px rgb(20 22 26 / 75%);
+        animation: pulso-cursor-reproducao 900ms ease-in-out infinite alternate;
+      }
+      #tab[data-reproducao-externa="paused"] .at-cursor-beat,
+      #tab[data-reproducao-local="paused"] .at-cursor-beat {
+        border-radius: 3px;
+        box-shadow:
+          0 0 0 2px rgb(20 22 26 / 75%),
+          0 0 12px 4px rgb(110 168 254 / 70%);
+      }
+      @keyframes pulso-cursor-reproducao {
+        from {
+          filter: brightness(1);
+          box-shadow:
+            0 0 0 2px rgb(20 22 26 / 75%),
+            0 0 4px 1px rgb(110 168 254 / 45%);
+        }
+        to {
+          filter: brightness(1.2);
+          box-shadow:
+            0 0 0 2px rgb(20 22 26 / 75%),
+            0 0 18px 7px rgb(110 168 254 / 90%);
+        }
+      }
+      @media (prefers-reduced-motion: reduce) {
+        #tab[data-reproducao-externa="playing"] .at-cursor-beat,
+        #tab[data-reproducao-local="playing"] .at-cursor-beat {
+          animation: none;
+          box-shadow:
+            0 0 0 2px rgb(20 22 26 / 75%),
+            0 0 12px 4px rgb(110 168 254 / 70%);
+        }
       }
       #andamento {
         width: 100%;
@@ -168,7 +216,7 @@
       </section>
 
       <section class="painel oculto" id="controles">
-        <div class="linha">
+        <div class="linha" id="controlesLocais">
           <div class="largo">
             <label for="andamento">Andamento de estudo — <span class="valor" id="rotuloAndamento">60%</span></label>
             <input id="andamento" type="range" min="25" max="100" step="5" value="60" />
@@ -177,7 +225,36 @@
           <div><button id="parar">Parar</button></div>
           <div><label for="metronomo">Metrônomo</label><input id="metronomo" type="checkbox" /></div>
           <div><label for="repetir">Repetir</label><input id="repetir" type="checkbox" /></div>
+          <div><button id="ativarExterno">Usar player externo</button></div>
         </div>
+      </section>
+
+      <section class="painel oculto" id="salvarTranscricao">
+        <h2>Salvar transcrição</h2>
+        <p>Baixe a partitura gerada para abrir depois no seu editor musical.</p>
+        <div class="linha" id="downloadsTranscricao"></div>
+      </section>
+
+      <section class="painel oculto" id="controlesExternos">
+        <h2>Sincronização com player externo</h2>
+        <p>
+          O Thoth acompanha a posição publicada por um player MPRIS local, sem tocar áudio. Escolha a mesma gravação
+          usada para gerar a partitura; versões diferentes podem sair do tempo. Ajuste o deslocamento se necessário.
+        </p>
+        <div class="linha">
+          <div class="largo">
+            <label for="playerExterno">Player e faixa</label>
+            <select id="playerExterno"></select>
+          </div>
+          <div>
+            <label for="deslocamentoExterno">Deslocamento (segundos)</label>
+            <input id="deslocamentoExterno" type="number" step="0.1" value="0" />
+          </div>
+          <div><button id="atualizarPlayers">Atualizar players</button></div>
+          <div><button id="seguirPlayer">Seguir player</button></div>
+          <div><button id="voltarLocal">Voltar ao player do Thoth</button></div>
+        </div>
+        <div id="estadoExterno" role="status">A sincronização externa está desligada.</div>
       </section>
 
       <section class="painel"><div id="tab"></div></section>
@@ -189,15 +266,64 @@
       const $ = (id) => document.getElementById(id);
       const estado = $("estado");
 
-      const api = new alphaTab.AlphaTabApi($("tab"), {
-        core: { fontDirectory: "vendor/alphatab/font/" },
-        player: {
+      let api;
+      let partitura;
+      let seguirPlayer = false;
+      let posicaoExternaAtiva = false;
+      let reproducaoLocalIniciada = false;
+
+      const definirEstadoLocal = (estadoAtual) => {
+        if (estadoAtual) {
+          $("tab").dataset.reproducaoLocal = estadoAtual;
+        } else {
+          delete $("tab").dataset.reproducaoLocal;
+        }
+      };
+
+      const criarApi = (externa) => {
+        if (api) api.destroy();
+        $("tab").replaceChildren();
+        reproducaoLocalIniciada = false;
+        definirEstadoLocal(null);
+        const player = {
           enablePlayer: true,
           enableCursor: true,
           enableUserInteraction: true,
-          soundFont: "vendor/alphatab/soundfont/sonivox.sf3",
-        },
-      });
+          ...(externa
+            ? { playerMode: alphaTab.PlayerMode.EnabledExternalMedia }
+            : { soundFont: "vendor/alphatab/soundfont/sonivox.sf3" }),
+        };
+        api = new alphaTab.AlphaTabApi($("tab"), {
+          core: { fontDirectory: "vendor/alphatab/font/" },
+          player,
+        });
+        api.playerStateChanged.on((evento) => {
+          if (externa) return;
+          if (evento.stopped) {
+            reproducaoLocalIniciada = false;
+            definirEstadoLocal(null);
+          } else if (evento.state === alphaTab.synth.PlayerState.Playing) {
+            reproducaoLocalIniciada = true;
+            definirEstadoLocal("playing");
+          } else if (reproducaoLocalIniciada) {
+            definirEstadoLocal("paused");
+          }
+        });
+        if (externa) {
+          // O modo external-media atualiza a partitura, mas este handler não emite áudio.
+          api.player.output.handler = {
+            backingTrackDuration: 0,
+            playbackRate: 1,
+            masterVolume: 1,
+            seekTo() {},
+            play() {},
+            pause() {},
+          };
+        }
+        if (partitura) api.load(partitura);
+      };
+
+      criarApi(false);
 
       // O andamento de estudo é o recurso central (ADR-006): 60% é o ponto de partida
       // recomendado para iniciante, e 100% só depois que a mão souber o caminho.
@@ -214,6 +340,118 @@
       });
       $("repetir").addEventListener("change", (e) => {
         api.isLooping = e.target.checked;
+      });
+
+      const estadoExterno = $("estadoExterno");
+      const definirEstadoReproducao = (estadoAtual) => {
+        if (estadoAtual === "Playing" || estadoAtual === "Paused") {
+          $("tab").dataset.reproducaoExterna = estadoAtual.toLowerCase();
+        } else {
+          delete $("tab").dataset.reproducaoExterna;
+        }
+      };
+      const atualizarPlayers = async () => {
+        const resposta = await fetch("/playback/players");
+        if (!resposta.ok) throw new Error(await resposta.text());
+        const players = await resposta.json();
+        const selecao = $("playerExterno");
+        const anterior = selecao.value;
+        selecao.replaceChildren();
+        for (const playerAtual of players) {
+          const opcao = document.createElement("option");
+          opcao.value = playerAtual.nome;
+          const faixa = [playerAtual.titulo, playerAtual.artista].filter(Boolean).join(" — ");
+          opcao.textContent = `${playerAtual.identidade}${faixa ? ` · ${faixa}` : ""}`;
+          selecao.append(opcao);
+        }
+        if (players.some((playerAtual) => playerAtual.nome === anterior)) selecao.value = anterior;
+        if (!players.length) {
+          estadoExterno.textContent =
+            "Nenhum player MPRIS encontrado. Abra um player compatível no mesmo desktop Linux e atualize a lista.";
+        } else if (!seguirPlayer) {
+          estadoExterno.textContent = `${players.length} player(s) encontrado(s). Confirme a gravação antes de seguir.`;
+        }
+        return players;
+      };
+
+      const esperar = (ms) => new Promise((resolver) => setTimeout(resolver, ms));
+      const acompanharPlayer = async () => {
+        seguirPlayer = true;
+        posicaoExternaAtiva = false;
+        $("seguirPlayer").textContent = "Parar acompanhamento";
+        while (seguirPlayer) {
+          try {
+            const players = await atualizarPlayers();
+            if (!seguirPlayer) break;
+            const atual = players.find((p) => p.nome === $("playerExterno").value);
+            if (!atual) {
+              definirEstadoReproducao(null);
+              estadoExterno.textContent = "O player selecionado não está disponível.";
+            } else {
+              const valorDeslocamento = Number($("deslocamentoExterno").value || 0);
+              const deslocamento = Number.isFinite(valorDeslocamento) ? valorDeslocamento : 0;
+              const posicaoMs = Math.max(0, atual.posicao_s + deslocamento) * 1000;
+              const faixa = [atual.titulo, atual.artista].filter(Boolean).join(" — ");
+              estadoExterno.textContent = `${atual.identidade}${faixa ? ` · ${faixa}` : ""} — ${atual.estado}`;
+              definirEstadoReproducao(atual.estado);
+              if (atual.estado === "Playing") {
+                if (!posicaoExternaAtiva) api.play();
+                api.player.output.updatePosition(posicaoMs);
+                posicaoExternaAtiva = true;
+              } else if (atual.estado === "Paused") {
+                if (posicaoExternaAtiva) api.pause();
+                api.player.output.updatePosition(posicaoMs);
+                posicaoExternaAtiva = false;
+              } else {
+                if (posicaoExternaAtiva) api.stop();
+                posicaoExternaAtiva = false;
+              }
+            }
+          } catch (erro) {
+            definirEstadoReproducao(null);
+            estadoExterno.textContent = `Não foi possível ler o player: ${erro.message}`;
+          }
+          await esperar(300);
+        }
+      };
+
+      $("ativarExterno").addEventListener("click", async () => {
+        api.stop();
+        criarApi(true);
+        $("controlesLocais").classList.add("oculto");
+        $("controlesExternos").classList.remove("oculto");
+        try {
+          await atualizarPlayers();
+        } catch (erro) {
+          estadoExterno.textContent = `Não foi possível consultar players: ${erro.message}`;
+        }
+      });
+      $("seguirPlayer").addEventListener("click", () => {
+        if (seguirPlayer) {
+          seguirPlayer = false;
+          posicaoExternaAtiva = false;
+          definirEstadoReproducao(null);
+          $("seguirPlayer").textContent = "Seguir player";
+        } else {
+          void acompanharPlayer();
+        }
+      });
+      $("atualizarPlayers").addEventListener("click", async () => {
+        try {
+          await atualizarPlayers();
+        } catch (erro) {
+          estadoExterno.textContent = `Não foi possível consultar players: ${erro.message}`;
+        }
+      });
+      $("voltarLocal").addEventListener("click", () => {
+        seguirPlayer = false;
+        posicaoExternaAtiva = false;
+        definirEstadoReproducao(null);
+        $("seguirPlayer").textContent = "Seguir player";
+        criarApi(false);
+        $("controlesExternos").classList.add("oculto");
+        $("controlesLocais").classList.remove("oculto");
+        aplicarAndamento();
       });
 
       // A guitarra usa a afinação do perfil; o servidor recusa `afinacao` nela (ADR-044).
@@ -283,7 +521,26 @@
         );
       };
 
+      const prepararDownloads = (ident, formatos) => {
+        const nomes = { gp5: "GP5", musicxml: "MusicXML" };
+        const disponiveis = formatos.filter((formato) => nomes[formato]);
+        const downloads = $("downloadsTranscricao");
+        downloads.replaceChildren();
+        for (const formato of disponiveis) {
+          const recipiente = document.createElement("div");
+          const link = document.createElement("a");
+          link.className = "botao";
+          link.href = `/jobs/${ident}/artifacts/${formato}`;
+          link.download = "";
+          link.textContent = `Salvar ${nomes[formato]}`;
+          recipiente.append(link);
+          downloads.append(recipiente);
+        }
+        $("salvarTranscricao").classList.toggle("oculto", !disponiveis.length);
+      };
+
       const carregar = async (ident, formatos) => {
+        prepararDownloads(ident, formatos);
         // O alphaTab só lê GP5. Alvo sem ele tem os outros arquivos, mas não a tela (ADR-044).
         if (!formatos.includes("gp5")) {
           estado.textContent += `\nsem GP5 para exibir aqui — arquivos: ${formatos.join(", ") || "nenhum"}`;
@@ -291,7 +548,8 @@
           return;
         }
         const resposta = await fetch(`/jobs/${ident}/artifacts/gp5`);
-        api.load(new Uint8Array(await resposta.arrayBuffer()));
+        partitura = new Uint8Array(await resposta.arrayBuffer());
+        api.load(partitura);
         $("controles").classList.remove("oculto");
         aplicarAndamento();
       };
@@ -320,6 +578,8 @@
       $("enviar").addEventListener("click", async () => {
         const botao = $("enviar");
         botao.disabled = true;
+        $("salvarTranscricao").classList.add("oculto");
+        $("downloadsTranscricao").replaceChildren();
         estado.textContent = "separando e transcrevendo…";
         try {
           const resposta = await fetch("/jobs", {

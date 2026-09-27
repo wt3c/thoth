@@ -11,6 +11,7 @@ authors = [
 # Teto em 3.13: o MuScriptor exige Python 3.10–3.12.
 requires-python = ">=3.12,<3.13"
 dependencies = [
+    "dbus-next>=0.2.3",
     "fastapi>=0.141.1",
     "librosa>=1.0.0",
     "music21>=10.5.0",

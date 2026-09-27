@@ -221,7 +221,7 @@ A CLI não implementa regras musicais. Isso permite reutilizar o mesmo comportam
 
 ### 6.10 `api/app.py` e `web/`
 
-A API FastAPI envolve o pipeline em jobs locais. A página estática usa alphaTab vendorizado para mostrar e reproduzir a partitura sem depender de CDN.
+A API FastAPI envolve o pipeline em jobs locais. A página estática usa alphaTab vendorizado para mostrar e reproduzir a partitura sem depender de CDN. Como opção Linux, um adapter MPRIS lê a posição de um player externo e a página a entrega ao modo `EnabledExternalMedia` do alphaTab.
 
 Estados de um job:
 
@@ -242,7 +242,16 @@ Endpoints:
 | `GET /jobs` | lista o histórico em memória |
 | `GET /jobs/{id}` | informa estado, diagnósticos e formatos disponíveis |
 | `GET /jobs/{id}/artifacts/{formato}` | entrega um artefato pronto |
+| `GET /playback/players` | consulta snapshots dos players locais que anunciam MPRIS no barramento D-Bus |
 | `GET /` | serve a interface web ou explica como instalar o alphaTab |
+
+#### Sincronização com player externo (ADR-046)
+
+O caminho opcional é `player MPRIS → adapters/playback/mpris.py → GET /playback/players → web/index.html → alphaTab`. O contrato `LeitorDeReproducao` isola D-Bus do FastAPI e permite testes com dados controlados. A leitura é local, somente informativa: não envia comandos ao player e não captura áudio.
+
+A página mantém a reprodução alphaTab existente como padrão. Ao entrar no modo externo, destrói e recria a API do alphaTab com `EnabledExternalMedia` e um handler sem áudio. O usuário seleciona o player e inicia o acompanhamento; a página aplica a posição em milissegundos. Um deslocamento manual compensa somente uma diferença fixa no início. Ao voltar ao modo local, a página recria o alphaTab com sintetizador e soundfont usuais.
+
+MPRIS é próprio do desktop Linux: o Thoth e o player precisam compartilhar a mesma sessão D-Bus. Esse acesso não é encaminhado do Docker nem do Windows/WSL. O adaptador exclui Spotify. Título e artista facilitam a escolha, mas não provam que a versão da gravação corresponde à transcrição; a checagem continua manual. Veja o fluxo atualizado no [ADR-046](../tasks/decisions.md#adr-046--acompanhar-player-local-via-mpris-sem-sincronização-spotifyweb-api).
 
 ## 7. Pipeline em detalhes
 

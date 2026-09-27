@@ -22,6 +22,7 @@ from thoth.domain.models import (
     AudioAsset,
     NoteEvent,
 )
+from thoth.domain.reproducao import ReproducaoExterna
 from thoth.services.acordes import ViterbiAcordes
 from thoth.services.fretboard import PADRAO
 from thoth.services.octave_check import OctaveWarning
@@ -69,6 +70,64 @@ def test_job_roda_e_relata_o_que_o_pipeline_descartou(tmp_path: Path) -> None:
     assert job["descartadas"] == 1
     assert job["formatos"] == ["gp5"]
     assert job["trechos_sem_baixo"] == []
+
+
+def test_lista_players_mpris_sem_dependencia_de_player_instalado(tmp_path: Path) -> None:
+    class LeitorFalso:
+        async def listar(self) -> list[ReproducaoExterna]:
+            return [
+                ReproducaoExterna(
+                    nome="org.mpris.MediaPlayer2.vlc",
+                    identidade="VLC media player",
+                    estado="Playing",
+                    posicao_s=12.5,
+                    duracao_s=180.0,
+                    titulo="Música de teste",
+                    artista="Banda",
+                    album="Álbum",
+                    url="file:///tmp/musica.flac",
+                )
+            ]
+
+    cliente = TestClient(
+        criar_app(
+            out_dir=tmp_path / "out",
+            cache_dir=tmp_path / "cache",
+            leitor_reproducao=LeitorFalso(),
+        )
+    )
+
+    resposta = cliente.get("/playback/players")
+
+    assert resposta.status_code == 200
+    assert resposta.json() == [
+        {
+            "nome": "org.mpris.MediaPlayer2.vlc",
+            "identidade": "VLC media player",
+            "estado": "Playing",
+            "posicao_s": 12.5,
+            "duracao_s": 180.0,
+            "titulo": "Música de teste",
+            "artista": "Banda",
+            "album": "Álbum",
+        }
+    ]
+
+
+def test_lista_players_mpris_vazia_quando_nao_ha_player(tmp_path: Path) -> None:
+    class LeitorVazio:
+        async def listar(self) -> list[ReproducaoExterna]:
+            return []
+
+    cliente = TestClient(
+        criar_app(
+            out_dir=tmp_path / "out",
+            cache_dir=tmp_path / "cache",
+            leitor_reproducao=LeitorVazio(),
+        )
+    )
+
+    assert cliente.get("/playback/players").json() == []
 
 
 def test_job_relata_trecho_sem_baixo(tmp_path: Path) -> None:
