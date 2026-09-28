@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import shutil
 from collections.abc import Mapping
 from dataclasses import dataclass
 from pathlib import Path
@@ -30,6 +31,7 @@ from thoth.services.rotulos import TrechoSemBaixo
 from thoth.services.tab_referencia import ler_tab
 from thoth.services.tempo import BPM_MAXIMO, BPM_MINIMO
 from thoth.services.tonalidade import Tonalidade, tom_de_texto
+from thoth.services.vocais import separar as _separar_vocais
 
 app = typer.Typer(help="Áudio → partitura e tablatura, com foco em contrabaixo.")
 
@@ -94,10 +96,27 @@ def main() -> None:
 def fetch(
     ref: str = typer.Argument(..., help="Caminho do áudio ou URL do YouTube."),
     cache: Path = typer.Option(CACHE_PADRAO, help="Diretório de cache."),
+    out: Path = typer.Option(Path("out"), help="Diretório de saída para WAVs publicados."),
 ) -> None:
-    """Normaliza o áudio para WAV 44.1 kHz estéreo no cache."""
+    """Normaliza o áudio e publica uma cópia WAV em `out` (preservando o cache)."""
     ativo = resolver_fonte(ref).fetch(ref, cache)
-    typer.echo(f"{ativo.source_id}  {ativo.duration_s:.1f}s  {ativo.wav}")
+    nome = nome_de_arquivo(ativo)
+    pasta = out / nome
+    pasta.mkdir(parents=True, exist_ok=True)
+    mix_publicada = pasta / f"{nome}.mix.wav"
+    shutil.copy2(ativo.wav, mix_publicada)
+    typer.echo(f"{ativo.source_id}  {ativo.duration_s:.1f}s  {mix_publicada}")
+
+
+@app.command()
+def separar_vocais(
+    ref: str = typer.Argument(..., help="Caminho do áudio ou URL do YouTube."),
+    out: Path = typer.Option(Path("out"), help="Onde gravar os três WAVs."),
+    cache: Path = typer.Option(CACHE_PADRAO, help="Diretório de cache."),
+) -> None:
+    """Separa o stem vocal e o playback, sem inferir notas ou letra."""
+    resultado = _separar_vocais(ref, out, cache_dir=cache)
+    _artefatos(resultado.artefatos)
 
 
 @app.command()

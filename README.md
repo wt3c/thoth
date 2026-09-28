@@ -169,8 +169,8 @@ uv run python scripts/vendor_alphatab.py
 test -f web/vendor/alphatab/alphaTab.min.mjs
 ```
 
-Depois disso, a página funciona sem CDN. Se você pretende usar somente `fetch`, `transcribe`, `auralizar` e `comparar`,
-pode omitir Node.js, npm e esta etapa.
+Depois disso, a página funciona sem CDN. Se você pretende usar somente `fetch`, `separar-vocais`, `transcribe`,
+`auralizar` e `comparar`, pode omitir Node.js, npm e esta etapa.
 
 #### 6. Valide a instalação
 
@@ -239,6 +239,7 @@ subcomando para consultar a interface instalada:
 
 ```bash
 uv run thoth --help
+uv run thoth separar-vocais --help
 uv run thoth transcribe --help
 ```
 
@@ -260,17 +261,33 @@ O `fetch` executa somente a ingestão. Ele:
 
 1. identifica a fonte como arquivo local ou YouTube;
 2. converte o áudio para WAV estéreo, 44,1 kHz;
-3. grava o resultado em `cache/<source_id>/mix.wav`;
-4. imprime o identificador da fonte, a duração e o caminho do WAV.
+3. preserva o resultado em `cache/<source_id>/mix.wav` e publica uma cópia em `out/<título>/<título>.mix.wav`;
+4. imprime o identificador da fonte, a duração e o caminho do WAV publicado.
 
 Ele **não** separa instrumentos, não transcreve notas e não produz partitura. É útil para validar a entrada, antecipar o
 download do YouTube ou aquecer o cache. O `transcribe` chama essa mesma etapa automaticamente, portanto não é
 obrigatório executar `fetch` antes. Se o WAV normalizado já estiver íntegro no cache, ele é reutilizado sem novo
 download ou conversão.
 
-Opção própria:
+Opções próprias:
 
 - `--cache PATH`: troca o diretório de cache; o padrão é `cache`.
+- `--out PATH`: troca o diretório de entrega; o padrão é `out`.
+
+### `separar-vocais` — entregar o stem vocal
+
+```bash
+uv run thoth separar-vocais caminho/para/musica.mp3
+uv run thoth separar-vocais caminho/para/musica.mp3 --out out --cache cache
+```
+
+O comando usa o `htdemucs_ft` em CPU e entrega três arquivos em `out/<título>/`: `<título>.mix.wav`,
+`<título>.vocais.wav` e `<título>.sem-vocais.wav`. O resultado `vocais` é a fonte agregada do Demucs: pode reunir voz
+principal, gutural, harmonias e dobragens, além de conter vazamento. Ele não transcreve melodia ou letra e não adiciona
+uma faixa vocal à partitura.
+
+Na primeira execução, a separação leva alguns múltiplos da duração do áudio; as seguintes reutilizam o cache identificado
+por modelo e versão. `--out` troca a pasta de entrega e `--cache`, a dos arquivos intermediários.
 
 ### `transcribe` — executar o pipeline completo
 

@@ -33,6 +33,28 @@ ROCm, e o ROCm não está instalado — só há RADV (Vulkan). Habilitá-lo exig
 **Consequência:** o tamanho do modelo é um trade-off de tempo, medido na Fase 0. Cache por estágio deixa de ser conforto
 e vira requisito.
 
+### Emenda (2026-09-28) — TheRock experimental para `gfx1012`, sem mudar a decisão CPU-only
+
+Uma pesquisa posterior encontrou uma opção que não constava no ADR original: o projeto AMD ROCm/TheRock publica
+ambientes e wheels de desenvolvimento que incluem Linux `gfx1012`. A matriz de desenvolvimento atual marca esse alvo
+como *build passing*, *sanity tested* e *release ready*; o índice de pacotes oferece o extra PyTorch
+`device-gfx1012`. Isso não equivale ao suporte da distribuição estável do ROCm: a matriz estável da AMD ainda não
+lista a RX 5500 XT, e o próprio TheRock alerta que o projeto segue em desenvolvimento ativo e não é estável para
+produção. A designação da placa para esse alvo é confirmada pelo guia AMD de arquitetura LLVM.
+
+A instalação experimental pode ser isolada em um virtualenv Python, sem instalar o SDK ROCm globalmente. Ainda assim,
+depende de acesso do processo ao driver e aos dispositivos `/dev/kfd` e `/dev/dri`, usa wheels noturnos maiores e
+precisa de validação real de PyTorch, Demucs e MuScriptor em conjunto. Não há benchmark CPU/GPU concluído; detectar a
+placa ou instalar os wheels não prova que os kernels executaram nela.
+
+**Decisão mantida:** Thoth continua CPU-only. A possibilidade experimental fica documentada, mas não será instalada,
+configurada nem integrada nesta estação; portanto, não altera os adaptadores, dependências ou comando padrão.
+
+Fontes consultadas em 2026-09-28: [matriz de GPUs do TheRock](https://github.com/ROCm/TheRock/blob/main/SUPPORTED_GPUS.md),
+[instruções dos wheels ROCm/PyTorch](https://github.com/ROCm/TheRock/blob/main/RELEASES.md),
+[compatibilidade da distribuição ROCm estável](https://rocm.docs.amd.com/en/latest/compatibility/compatibility-matrix.html)
+e [guia AMD de alvos LLVM](https://rocm.docs.amd.com/projects/llvm-project/en/latest/LLVM/llvm/html/AMDGPUUsage.html).
+
 ---
 
 ## ADR-003 — MuScriptor como motor de transcrição
@@ -3199,3 +3221,141 @@ aprovadas agora têm contratos e testes próprios, então essa restrição deixa
 - Rótulos dos três perfis de guitarra podem representar timbres sucessivos ou instrumentos simultâneos; mantê-los em
   faixas distintas preserva a evidência do modelo e permite edição manual posterior.
 - O foco do áudio permanece inequivocamente no baixo, enquanto os formatos editáveis carregam a visão multifaixa.
+
+### Emenda (2026-09-27) — uma separação Demucs para as partes adicionais
+
+O primeiro reprocessamento do corpus mostrou que executar `--two-stems other` e
+depois `--two-stems drums` repetia toda a inferência do `htdemucs_ft`, que leva
+dezenas de minutos por música em CPU. O modo `todos` agora mantém o baixo no cache
+compatível existente e usa uma única separação completa para `other`, `drums` e
+`vocals`; guitarra e bateria compartilham esse resultado. A chave
+`<versão>-multifaixa` evita confundir o novo produto com os caches históricos de
+dois stems.
+
+## ADR-048 — _Eyrie_ como laboratório multifaixa real, não como único gate
+
+**Data:** 2026-09-28 · **Status:** aceito · **Complementa:** ADR-006, ADR-007, ADR-044 e ADR-047
+
+### Contexto
+
+O caminho do baixo amadureceu com fixtures determinísticas, corpus real, tablaturas humanas e medições por camada. A
+expansão para outras partes precisa repetir esse método sem presumir que um stem do separador equivale a um instrumento
+ou que uma partitura plausível está correta. O acervo local tem duas candidatas extremas de Ne Obliviscaris:
+
+- _Equus_ (`yt_4dJz6U3_Xlk`, 756 s) é um **playthrough de baixo**. É a melhor fronteira do baixo, mas sua mix foi
+  produzida para destacar justamente o instrumento já dominado;
+- _Eyrie_ (`yt__RMax1LS3pM`, 711 s) é a versão de estúdio completa, sem esse viés, com arranjo denso e partes que
+  disputam o mesmo stem. Ela já expôs o maior buraco de cobertura conhecido do MuScriptor, entre 557 e 671 s.
+
+### Decisão
+
+_Eyrie_ será o laboratório real principal para aprender a extrair as partes da música. “Todos os instrumentos” significa
+cada parte efetivamente confirmada no arranjo, não os quatro nomes de saída do `htdemucs_ft`. O inventário inicial
+esperado inclui baixo, bateria, guitarras, violino e vozes; cello e viola entram como candidatos após consulta aos
+créditos específicos de `Urn`. Piano/teclas continuam hipótese sem confirmação documental para `Eyrie`. Cada parte
+precisa ser confirmada no áudio e ter limites temporais mapeados antes de virar escopo implementado.
+
+A validação será por parte e por trecho, em três camadas:
+
+1. fixtures sintéticas com referência exata, para regressão mecânica;
+2. _Eyrie_ como teste de estresse de separação, cobertura, contaminação e polifonia;
+3. referência humana independente e legitimamente obtida para afirmar acerto musical.
+
+Sem referência da camada 3, é permitido concluir que uma parte está audível e separada; é proibido concluir que suas
+notas, ataques ou palavras estão corretos. Baixo permanece o controle de regressão. Bateria, guitarras e piano seguem
+os contratos do ADR-044; violino e vozes começam como pesquisa, pois não têm perfil validado no pipeline atual.
+
+### Consequências
+
+- A música mais difícil revela limites, mas não define sozinha limiares nem substitui o corpus anterior.
+- O trabalho avança uma família por vez. Isso permite atribuir cada erro ao separador, transcritor, quantizador ou
+  exportador, em vez de esconder a causa numa partitura grande.
+- `other` não poderá ser chamado de guitarra, piano ou violino sem uma etapa adicional que separe ou classifique essas
+  fontes. `vocals` também não implica uma única linha vocal.
+- O primeiro resultado será uma linha de base reproduzível e uma matriz de lacunas. Mudanças no pipeline só começam
+  depois dessa medição e sempre com teste real correspondente.
+
+### Emenda (2026-09-28) — primeiro vocais como áudio, depois melodia e letra
+
+O primeiro incremento vocal entrega somente a separação auditável: mix, stem `vocals` e playback `no_vocals`. Ele usa
+o `DemucsSeparator(stem="vocals")` já existente atrás do `Separator` e ganha resultado e serviço próprios. Não entra em
+`PerfilInstrumento`, `transcrever --instrumento` nem na partitura multifaixa, porque esses contratos prometem eventos
+musicais e formatos que ainda não foram validados para voz.
+
+Transcrição melódica e letra são experimentos posteriores e independentes. O candidato inicial para melodia é o Basic
+Pitch sobre o stem isolado; reconhecimento e alinhamento textual serão avaliados separadamente, sem versionar ou
+redistribuir letra protegida. Vocal limpo, vocal extremo e vozes sobrepostas recebem métricas e vereditos próprios.
+
+### Emenda (2026-09-28) — sem novos perfis até nova cobertura
+
+O usuário decidiu manter somente os perfis já cobertos e deixar o restante para depois. Não serão adicionados nesta
+etapa perfis de violino, viola ou cello, nem inferida sua transcrição a partir de `other`. Esta decisão não remove nem
+altera perfis, resultados ou medições existentes; apenas congela a expansão enquanto o processo atual é consolidado.
+O levantamento de _Eyrie_ pode permanecer como pesquisa, sem compromisso de suporte. Reabrir a expansão exige uma
+decisão posterior e validação por TDD com referência adequada.
+
+### Emenda (2026-09-28) — publicação padrão dos WAVs
+
+Todo WAV produzido para uso/inspeção do usuário deve ser publicado sob `out/` por padrão. `fetch` também publica a mix
+normalizada em `out/<título>/<título>.mix.wav`; a cópia canônica de ingestão continua em `cache/<source_id>/mix.wav`.
+Stems e demais intermediários necessários para reuso permanecem em `cache/`. `--out` permite trocar a pasta de entrega.
+
+#### Medição inicial em `_Eyrie_` (2026-09-28)
+
+`DemucsSeparator(stem="vocals")` e `DemucsMultifaixaSeparator` foram executados em CPU sobre a mix local em cache.
+Cada execução levou aproximadamente 17 minutos. Os WAVs auditados (mix, baixo, bateria, `other`, `vocals` e
+`no_vocals`) têm 31.358.977 frames, 44,1 kHz, estéreo, PCM 16-bit e 711,088 s. RMS medidos: mix 0,2713; baixo
+0,0788; bateria 0,1092; `other` 0,1534; vocais 0,0725; `no_vocals` 0,1987.
+
+As duas estimativas de `vocals` têm cosseno 0,997359 e diferença RMS 0,005264 (7,274% do RMS da primeira), variação
+entre inferências que não mede fidelidade: não há stem vocal de referência para `_Eyrie_`. Os arquivos estão em
+`cache/` e `out/`, ignorados pelo Git. Fica provada a execução e a integridade técnica dos WAVs, não a ausência de
+vazamento nem a exatidão de melodia, técnica vocal ou letra.
+
+Uma passada livre do MuScriptor `small` sobre `vocals` devolveu 288 eventos: 286 `voice` e 2 `drums`, entre 111,24 s
+e 593,64 s. O JSONL exploratório está em `cache/9771390c94c585ce/notas.vocais.muscriptor.jsonl`. Esse resultado
+estabelece que o decoder emite o rótulo vocal no stem desta música; cobertura e qualidade continuam sem veredito até
+serem comparadas a uma referência anotada.
+
+#### Triagem do MuScriptor por stem (2026-09-28)
+
+Passadas livres sobre os stems completos, sem `--instruments`, com `small` e `detect-tempo=false`. As notas foram
+preservadas no cache ignorado. A tabela é uma inspeção de distribuição de rótulos, não avaliação musical. O cache
+`notas.jsonl` do baixo já passou pelos filtros/readmissão do pipeline; os três JSONLs nomeados por stem são saída bruta
+do MuScriptor, então suas contagens não são comparáveis como F1 nem como totais de parte.
+
+| Entrada | Eventos | Rótulos / contagem | Cobertura dos eventos |
+|---------|--------:|--------------------|-----------------------|
+| baixo (cache do pipeline) | 1.809 | `electric_bass` 1.796; `clean_electric_guitar` 13 | 55,35–659,23 s |
+| `vocals` | 288 | `voice` 286; `drums` 2 | 111,24–593,64 s |
+| `other` | 14.639 | `acoustic_guitar` 12.478; `drums` 1.872; `clean_electric_guitar` 126; `string_ensemble` 100; `program_105` 48; `electric_bass` 9; `soprano_and_alto_sax` 6 | 12,72–700,03 s |
+| `drums` | 2.451 | `drums` 2.451 | 62,78–649,94 s |
+
+`other` exigiu a segunda passada sem prelude forcing: a primeira deixou buracos longos. Os 1.872 ataques `drums` em
+`other` e os 9 `electric_bass` são sinais de contaminação ou troca de rótulo a investigar, não prova de vazamento físico.
+As 12.478 notas rotuladas `acoustic_guitar` também precisam de comparação com referência antes de serem chamadas de
+guitarra correta. Nenhuma família ganha status de suporte com esta tabela.
+
+#### Inventário inicial por créditos de gravação — intervalos ainda pendentes (2026-09-28)
+
+A página oficial do álbum `Urn` confirma que `Eyrie` é a faixa de 11:51. Os créditos do encarte, conforme transcritos
+pelo [Metal Archives](https://www.metal-archives.com/albums/Ne_Obliviscaris/Urn/662850) e corroborados pelo anúncio
+editorial da [Metal Forces](https://www.metalforcesmagazine.com/site/news-ne-obliviscaris-release-third-studio-album-urn/),
+indicam para a gravação: bateria (Dan Presland), duas partes de guitarra (Matt Klavins e Benjamin Baret), baixo (Robin
+Zielhorst), vocais limpos, violino e viola (Tim Charles), vocais extremos (Xenoyr), cello (Tim Hennessy) e violinos
+adicionais (Emma Charles e Natalija May). A [página oficial do álbum no Bandcamp](https://neobliviscarissom.bandcamp.com/album/urn)
+é a fonte para faixa, duração e lançamento; a identificação instrumental por faixa vem dos créditos do encarte, não da
+página promocional.
+
+Isso confirma famílias candidatas, não sua presença contínua nem seus timestamps. Os créditos consultados não atribuem
+piano/teclado nem coro a `Eyrie`; não os incluímos no inventário confirmado, mas ausência na lista não prova ausência
+audível. A passada exploratória do MuScriptor em `other` emitiu 100 eventos `string_ensemble`, compatíveis com cordas
+mas incapazes de distinguir violino, viola e cello; em `vocals`, os 286 eventos `voice` também não separam voz limpa de
+extrema. São pistas para inspecionar, não confirmações. A próxima medição continua sendo mapear entrada/saída de cada
+parte no áudio local, sem inferir isso pelos quatro stems do Demucs ou pelos rótulos do MuScriptor. Não há anotação
+humana independente ainda, então nenhuma nota/transcrição recebeu veredito de acerto.
+
+Uma busca somente de leitura em `cache/` e `out/` não encontrou GP5, MIDI, MusicXML ou PDF de referência para `Eyrie`;
+o acervo contém uma referência de baixo para `Equus`, não para esta faixa. A consulta inicial aos canais oficiais
+também não localizou uma partitura/tab licenciada de `Urn`. Isso não prova que tal publicação inexista: por ora, a
+referência humana de `Eyrie` permanece pendente, e não substituímos essa lacuna por tabs colaborativas sem proveniência.

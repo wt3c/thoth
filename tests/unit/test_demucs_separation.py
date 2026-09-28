@@ -8,7 +8,7 @@ from pathlib import Path
 import pytest
 
 from tests.sintetico import SOUNDFONT, renderizar
-from thoth.adapters.separation import DemucsSeparator, localizar_stems
+from thoth.adapters.separation import DemucsMultifaixaSeparator, DemucsSeparator, localizar_stems
 from thoth.processos import ErroDeProcesso
 
 
@@ -90,6 +90,21 @@ def test_stem_real_sai_em_pcm_16_bits(tmp_path: Path) -> None:
     with wave.open(str(stems["bass"])) as f:
         assert f.getsampwidth() == 2
         assert f.getframerate() == 44100
+
+
+@pytest.mark.slow
+@pytest.mark.skipif(not SOUNDFONT.exists(), reason="soundfont ausente")
+def test_stem_vocal_real_entrega_vocal_e_playback_com_a_duracao_da_mix(tmp_path: Path) -> None:
+    """Prova o contrato binário real; a fixture instrumental não mede qualidade vocal."""
+    wav, _ = renderizar("escala", tmp_path)
+
+    stems = DemucsSeparator(stem="vocals").separate(wav, tmp_path / "stems")
+
+    assert set(stems) == {"vocals", "no_vocals"}
+    with wave.open(str(wav)) as mix, wave.open(str(stems["vocals"])) as vocal:
+        assert vocal.getframerate() == mix.getframerate() == 44_100
+        assert vocal.getnframes() == mix.getnframes()
+        assert vocal.getsampwidth() == 2
 
 
 def test_stem_de_outro_modelo_nao_conta_como_cache(tmp_path: Path) -> None:
@@ -222,3 +237,23 @@ def test_localizar_stems_procura_o_stem_pedido(tmp_path: Path) -> None:
     assert localizar_stems(tmp_path, "drums") == {"drums": esperado}
     with pytest.raises(FileNotFoundError, match=r"other\.wav"):
         localizar_stems(tmp_path, "other")
+
+
+def test_multifaixa_separa_todos_os_stems_em_uma_unica_execucao(tmp_path: Path) -> None:
+    finge = (
+        "sh",
+        "-c",
+        'mkdir -p "$6/htdemucs_ft/a" && '
+        'for stem in bass drums other vocals; do : > "$6/htdemucs_ft/a/$stem.wav"; done',
+        "demucs",
+    )
+    separador = DemucsMultifaixaSeparator(binary=finge)
+
+    achado = separador.separate(Path("a.wav"), tmp_path)
+
+    assert sorted(achado) == ["bass", "drums", "other", "vocals"]
+    assert "--two-stems" not in separador._comando(Path("a.wav"), tmp_path)
+    # O segundo acesso prova que bateria e `other` compartilham o mesmo cache.
+    assert DemucsMultifaixaSeparator(binary=("false",)).separate(
+        Path("a.wav"), tmp_path
+    ) == achado

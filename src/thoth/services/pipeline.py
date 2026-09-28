@@ -54,7 +54,7 @@ from thoth.adapters.export.musicxml import (
     MusicXmlPercussaoExporter,
 )
 from thoth.adapters.ingest import resolver_fonte
-from thoth.adapters.separation import DemucsSeparator
+from thoth.adapters.separation import DemucsMultifaixaSeparator, DemucsSeparator
 from thoth.adapters.transcription.muscriptor import MuscriptorTranscriber
 from thoth.domain.instrumentos import PERFIS, PerfilInstrumento
 from thoth.domain.models import (
@@ -290,6 +290,7 @@ def transcrever(
             out_dir,
             bpm=bpm,
             tom=tom,
+            tuning=tuning,
             cache_dir=cache_dir,
             source=source,
             separator=separator,
@@ -453,6 +454,7 @@ def _transcrever_todas_as_partes(
     *,
     bpm: float | None,
     tom: str | None,
+    tuning: tuple[int, ...] | None,
     cache_dir: Path,
     source: AudioSource | None,
     separator: Separator | None,
@@ -470,6 +472,7 @@ def _transcrever_todas_as_partes(
         out_dir,
         bpm=bpm,
         tom=tom,
+        tuning=tuning,
         cache_dir=cache_dir,
         source=source,
         separator=separator,
@@ -486,6 +489,7 @@ def _transcrever_todas_as_partes(
     pasta_partes = cache_dir / baixo.asset.source_id / "partes-multifaixa"
     ausentes: list[str] = []
     transcritor_guitarras = _TranscritorComCache(transcriber or MuscriptorTranscriber())
+    separador_de_partes = separator or DemucsMultifaixaSeparator()
     for instrumento in _PARTES_MULTIFAIXA[1:]:
         try:
             resultados.append(
@@ -496,7 +500,7 @@ def _transcrever_todas_as_partes(
                     tom=tom,
                     cache_dir=cache_dir,
                     source=source,
-                    separator=separator,
+                    separator=separador_de_partes,
                     transcriber=(
                         transcriber if instrumento == "bateria" else transcritor_guitarras
                     ),

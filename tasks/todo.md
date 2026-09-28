@@ -2,6 +2,84 @@
 
 > Áudio → partitura e tablatura, foco em contrabaixo. Uso pessoal. CPU-only. Decisões em `tasks/decisions.md`.
 
+## WAVs publicados por padrão e perfis adiados (2026-09-28)
+
+**Escopo:** manter somente os perfis já cobertos pelo trabalho e adiar novas famílias sem inventário/validação independente,
+incluindo violino e cello. Todo WAV entregue ao usuário deve ter cópia padrão sob `out/`; cópias técnicas para cache e
+processamento continuam em `cache/`. `fetch` publicará a mix normalizada em `out/<música>/`, além de preservá-la no cache.
+
+1. [x] Registrar o adiamento das famílias não cobertas sem remover perfis ou medições existentes.
+2. [x] Escrever teste de regressão para `fetch` publicar a mix WAV por padrão e respeitar `--out`.
+3. [x] Implementar a publicação e atualizar documentação/ajuda da CLI.
+4. [x] Rodar testes focados, suíte padrão, Ruff e mypy: 543 testes passaram; Ruff e mypy limpos.
+
+## Laboratório multifaixa real — _Eyrie_ (2026-09-28)
+
+**Plano (execução não interativa):** usar _Ne Obliviscaris — Eyrie_ (`yt__RMax1LS3pM`, versão de estúdio, 711 s) como
+teste de estresse para aprender a extrair cada parte musical. A escolha e a régua estão no ADR-048. A música não vira
+o único gate: sua complexidade serve para revelar limites; fixtures sintéticas e referências humanas independentes
+decidem se cada instrumento está correto.
+
+### Etapas
+
+1. [x] Escolher a gravação sem viés de instrumento e registrar por que _Eyrie_ vence _Equus_ e os covers do acervo.
+2. [x] Confirmar disponibilidade técnica dos quatro stems em `_Eyrie_`, todos com a duração da mix; inventário musical
+   por escuta e intervalos ainda pendente.
+3. [ ] Manter o trabalho nos perfis já cobertos pelo pipeline e suas medições. Não adicionar perfis para violino,
+   viola ou cello nesta etapa; ficam adiados. O inventário de _Eyrie_ pode continuar como pesquisa, sem virar compromisso
+   de suporte ou mudança de código.
+   - [x] Consultar créditos do encarte de `Urn`: baixo, bateria, duas guitarras, violino, viola, cello e vozes são
+     candidatos confirmados para `Eyrie`; não há crédito de piano/teclado ou coro confirmado para esta faixa.
+   - [ ] Mapear timestamps de entrada/saída no áudio local; os créditos não substituem escuta nem anotação de referência.
+4. [ ] Obter referência humana independente por parte quando existir e registrar cobertura temporal, afinação e
+   confiabilidade. Sem referência, limitar o veredito a separação/audibilidade e marcar a transcrição como
+   inconclusiva.
+   - [x] Procurar referência local de `Eyrie` em GP5/MIDI/MusicXML/PDF e consultar canais oficiais; nenhuma partitura
+     licenciada foi localizada nesta busca inicial. Não tratar isso como prova de inexistência.
+5. [ ] Congelar uma linha de base por família, antes de ajustes: duração coberta, distribuição de rótulos, eventos,
+   polifonia, silêncio indevido, contaminação e métricas contra a referência. Executar mix e stem quando o ADR-044 ainda
+   não tiver decidido a melhor entrada.
+6. [ ] Tratar apenas perfis existentes e já cobertos, uma família por vez, por TDD; não ampliar a matriz nesta etapa.
+   Preservar o baixo como controle de regressão. Qualquer família nova exige retomada explícita e teste real com veredito.
+7. [ ] Integrar apenas as famílias aprovadas na partitura multifaixa; manter partes inconclusivas como stems/diagnóstico,
+   nunca como notação apresentada como correta.
+8. [ ] Validar a entrega com os testes pesados aplicáveis, suíte padrão, Ruff e mypy; publicar uma tabela por parte e
+   por trecho, sem condensar tudo em um F1 único.
+
+### Benchmark GPU nesta estação — suspenso por decisão do usuário (2026-09-28)
+
+- [x] Registrar que a RX 5500 XT (`gfx1012`) tem caminho experimental via wheels ROCm/TheRock, sem suporte equivalente
+  na distribuição ROCm estável; ver emenda do ADR-002.
+- [x] Manter a configuração CPU-only: não instalar/configurar ROCm, não alterar dependências e não iniciar benchmark GPU.
+- [ ] Se o usuário reabrir esta investigação, começar por preflight no host (`/dev/kfd`, `/dev/dri`, permissões),
+  virtualenv descartável com versão noturna fixada, teste de kernel GPU e só depois comparação curta CPU/GPU.
+
+### Incremento V1 — stem vocal auditável
+
+1. [x] Escrever primeiro os testes do serviço e da CLI para entregar mix, vocal e playback sem vocal.
+2. [x] Implementar `separar-vocais` atrás do `Separator`, sem perfil instrumental ou partitura fictícia.
+3. [x] Adicionar teste real `slow` com Demucs sobre fixture local e documentar uso e limites.
+4. [x] Executar suíte padrão, seleção real aplicável, Ruff e mypy: 542 testes passaram; canário real, 1 teste em
+   43,84 s; Ruff e mypy limpos.
+5. [x] Reexecutar `_Eyrie_` e registrar a linha de base observável. O primeiro wrapper desapareceu sem core dump nem
+   evento OOM; a repetição acompanhada ficou ativa por 17min17s e concluiu. Todos os stems têm 711,088 s, 44,1 kHz,
+   estéreo e PCM 16-bit. RMS: baixo 0,0788; bateria 0,1092; `other` 0,1534; vocais 0,0725; mix 0,2713.
+6. [x] Fazer uma passada livre do MuScriptor no stem vocal: 288 eventos (286 `voice`, 2 `drums`), 111,24–593,64 s;
+   guardar JSONL no cache ignorado. Resultado exploratório, sem referência para julgar acerto.
+7. [x] Fazer passadas livres em `other` e `drums`: `other` devolveu 14.639 eventos (incluindo 1.872 `drums` e 12.478
+   `acoustic_guitar`); o stem de bateria, 2.451 `drums`. Guardar JSONL e registrar como distribuição bruta de rótulos,
+   não como qualidade medida.
+
+### Riscos e trade-offs
+
+- `htdemucs_ft` entrega `bass`, `drums`, `vocals` e `other`, não uma faixa por instrumento; `other` é o principal
+  gargalo para guitarra, teclas e violino.
+- O MuScriptor conhece baixo, bateria, piano e guitarra, mas não oferece contrato já validado para violino ou voz.
+- _Eyrie_ já revelou silêncio indevido do transcritor entre 557 e 671 s; a segunda passada corrige cobertura, mas a
+  qualidade desse trecho continua sem referência conclusiva.
+- Uma faixa extrema é ótima para achar falhas e ruim para calibrar sozinha. Nenhum ajuste entra se melhorar _Eyrie_ e
+  regredir as fixtures ou o corpus já medido.
+
 ## Documentação arquitetural completa (2026-09-26)
 
 - [x] Inventariar módulos, contratos, dependências, fluxos, testes e ADRs do estado atual.

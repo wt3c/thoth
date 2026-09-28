@@ -13,11 +13,38 @@ from thoth.cli import app
 from thoth.domain.models import TUNING_BASS_6, TUNING_BASS_DROP_D, AudioAsset
 from thoth.services import pipeline
 from thoth.services.fretboard import PADRAO
+from thoth.services.vocais import ResultadoVocais
 
 runner = CliRunner()
 
 
-def test_fetch_e_subcomando(tmp_path: Path) -> None:
+def test_separar_vocais_relata_os_tres_audios(tmp_path: Path, monkeypatch) -> None:
+    from thoth import cli as modulo
+
+    asset = AudioAsset(wav=tmp_path / "mix.wav", source_id="voz", title="Música")
+    artefatos = {
+        nome: tmp_path / "Música" / f"Música.{nome}.wav"
+        for nome in ("mix", "vocais", "sem-vocais")
+    }
+    monkeypatch.setattr(
+        modulo,
+        "_separar_vocais",
+        lambda *args, **kwargs: ResultadoVocais(
+            asset=asset,
+            stem=artefatos["vocais"],
+            artefatos=artefatos,
+        ),
+    )
+
+    resultado = runner.invoke(app, ["separar-vocais", "x.mp3", "--out", str(tmp_path)])
+
+    assert resultado.exit_code == 0, resultado.output
+    assert "Música.mix.wav" in resultado.output
+    assert "Música.vocais.wav" in resultado.output
+    assert "Música.sem-vocais.wav" in resultado.output
+
+
+def test_fetch_publica_mix_wav_em_out_configuravel(tmp_path: Path) -> None:
     origem = tmp_path / "t.mp3"
     subprocess.run(
         ["ffmpeg", "-y", "-f", "lavfi", "-i", "sine=frequency=110:duration=1",
@@ -25,10 +52,26 @@ def test_fetch_e_subcomando(tmp_path: Path) -> None:
         check=True,
     )
 
+    destino = tmp_path / "out"
+    resultado = runner.invoke(
+        app, ["fetch", str(origem), "--cache", str(tmp_path / "c"), "--out", str(destino)]
+    )
+
+    assert resultado.exit_code == 0, resultado.output
+    mix_publicada = destino / "t" / "t.mix.wav"
+    assert mix_publicada.is_file()
+    assert "t.mix.wav" in resultado.output
+    source_id = resultado.output.split()[0]
+    assert (tmp_path / "c" / source_id / "mix.wav").is_file()
+
+
+def test_fetch_publica_mix_wav_em_out_por_padrao(tmp_path: Path, monkeypatch) -> None:
+    origem = _wav(tmp_path / "padrao.wav", segundos=1)
+    monkeypatch.chdir(tmp_path)
     resultado = runner.invoke(app, ["fetch", str(origem), "--cache", str(tmp_path / "c")])
 
     assert resultado.exit_code == 0, resultado.output
-    assert "mix.wav" in resultado.output
+    assert (tmp_path / "out/padrao/padrao.mix.wav").is_file()
 
 
 def test_transcribe_relata_descartes_e_avisos(tmp_path: Path, monkeypatch) -> None:

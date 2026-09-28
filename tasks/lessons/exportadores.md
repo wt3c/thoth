@@ -83,3 +83,8 @@ round-trip, porém, o music21 expande cada pauta como um objeto `Part`: baixo ma
 bateria são duas `<part>` no XML e três objetos em `score.parts`. Testes do
 compositor devem afirmar os dois níveis separadamente para não confundir a
 representação da biblioteca com duplicação no arquivo.
+
+No modo `todos`, encaminhar a afinação explicitamente até a execução interna do
+baixo. Usar silenciosamente quatro cordas descartou a extensão grave que o
+_Equus_ exige. O teste de integração deve reler o GP5 combinado e contar as
+cordas da faixa de baixo.

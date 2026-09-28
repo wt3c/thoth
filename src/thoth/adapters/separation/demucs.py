@@ -112,5 +112,57 @@ class DemucsSeparator:
         return localizar_stems(meu, self.stem)
 
 
+@dataclass(frozen=True, slots=True)
+class DemucsMultifaixaSeparator:
+    """Mix → todos os stems numa execução, para a partitura multifaixa."""
+
+    model: str = "htdemucs_ft"
+    device: str = "cpu"
+    versao: str = "4.1.0"
+    binary: tuple[str, ...] | None = None
+
+    def _escopo(self, out_dir: Path) -> Path:
+        return out_dir / self.model / f"{self.versao}-multifaixa"
+
+    def _comando(self, audio: Path, out_dir: Path) -> list[str]:
+        programa = self.binary or ("uvx", "--with", "numpy<2", f"demucs@{self.versao}")
+        return [
+            *programa,
+            "-n", self.model,
+            "-d", self.device,
+            "-o", str(out_dir),
+            str(audio),
+        ]
+
+    def _localizar(self, escopo: Path) -> dict[str, Path]:
+        encontrados = {
+            caminho.stem: caminho
+            for stem in STEMS_DO_HTDEMUCS
+            for caminho in escopo.rglob(f"{stem}.wav")
+        }
+        ausentes = STEMS_DO_HTDEMUCS.difference(encontrados)
+        if ausentes:
+            raise FileNotFoundError(f"stems ausentes sob {escopo}: {sorted(ausentes)}")
+        return encontrados
+
+    def separate(self, audio: Path, out_dir: Path) -> dict[str, Path]:
+        """Separa as quatro fontes uma vez e compartilha o resultado entre perfis."""
+        out_dir.mkdir(parents=True, exist_ok=True)
+        meu = self._escopo(out_dir)
+        try:
+            return self._localizar(meu)
+        except FileNotFoundError:
+            pass
+        with diretorio_atomico(meu) as parcial:
+            rodar(self._comando(audio, parcial))
+            produzido = parcial / self.model
+            if produzido.is_dir():
+                for item in produzido.iterdir():
+                    item.rename(parcial / item.name)
+                produzido.rmdir()
+        return self._localizar(meu)
+
+
 if TYPE_CHECKING:  # pragma: no cover — trava a assinatura contra o Protocol
-    _: Separator = DemucsSeparator()
+    _separador: Separator = DemucsSeparator()
+    _separador_multifaixa: Separator = DemucsMultifaixaSeparator()

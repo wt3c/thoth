@@ -10,7 +10,7 @@ import guitarpro as gp
 import numpy as np
 import soundfile as sf
 
-from thoth.domain.models import AudioAsset, NoteEvent
+from thoth.domain.models import TUNING_BASS_5, AudioAsset, NoteEvent
 from thoth.services.pipeline import transcrever
 
 
@@ -64,6 +64,7 @@ def test_todos_combina_partes_e_entrega_somente_wavs_de_baixo(tmp_path: Path) ->
         tmp_path / "out",
         bpm=120,
         instrumento="todos",
+        tuning=TUNING_BASS_5,
         cache_dir=tmp_path / "cache",
         source=FonteLocal(asset),
         separator=SeparadorDeTodasAsFamilias(),
@@ -79,6 +80,7 @@ def test_todos_combina_partes_e_entrega_somente_wavs_de_baixo(tmp_path: Path) ->
         "Guitarra acústica",
         "Bateria",
     ]
+    assert len(musica.tracks[0].strings) == 5
     assert resultado.instrumento == "todos"
     assert resultado.notas == 7
     assert {chave for chave in resultado.artefatos if chave not in {"gp5", "musicxml"}} <= {
