@@ -3336,6 +3336,41 @@ do MuScriptor, então suas contagens não são comparáveis como F1 nem como tot
 As 12.478 notas rotuladas `acoustic_guitar` também precisam de comparação com referência antes de serem chamadas de
 guitarra correta. Nenhuma família ganha status de suporte com esta tabela.
 
+#### Primeira execução multifaixa de _Eyrie_ (2026-09-28) — perfis cobertos
+
+Executado `transcribe --instrumento todos` em CPU sobre a mix já normalizada (`source_id=9771390c94c585ce`); os stems
+Demucs existentes foram reutilizados. A referência foi o caminho local `cache/9771390c94c585ce/mix.wav`, por isso o
+título interno das partituras ficou `mix`; os nomes dos arquivos foram organizados em
+`out/Ne Obliviscaris - Eyrie/` sem nova inferência. Além do baixo, a pasta contém as quatro cópias dos stems multifaixa
+(`baixo-multifaixa`, `bateria-stem`, `outros`, `vocais-multifaixa`), os WAVs publicados previamente (`mix`, `baixo`,
+`sem-baixo`, `vocais`, `sem-vocais`) e a auralização. O cache original foi preservado.
+
+| Parte do perfil existente | Eventos gravados no cache | Intervalo dos eventos | Observação |
+|----------------------------|--------------------------:|-----------------------|------------|
+| baixo | 1.578 | 55,35–659,23 s | 1.565 `electric_bass`; 13 eventos mantiveram o rótulo `clean_electric_guitar` após readmissão/quantização |
+| guitarra acústica | 6.757 | 36,71–680,01 s | `acoustic_guitar` |
+| guitarra limpa | 112 | 12,72–159,31 s | `clean_electric_guitar` |
+| guitarra distorcida | 0 | — | perfil sem eventos; omitido da partitura |
+| bateria | 2.351 | 62,79–544,83 s | `drums` dentro do mapa de percussão |
+
+O total entregue pelo CLI foi 10.798 eventos. A execução estimou 97,49 BPM com pouca confiança (segundo método: 129)
+e Lá menor com margem 0,37. O caminho do baixo relatou 383 descartes e 186 alertas de oitava; também informou 26
+eventos `clean_electric_guitar` readmitidos no trecho sem baixo entre 55 e 66 s. O cache final do baixo contém 13
+eventos desse rótulo, após posicionamento/quantização — diferença que merece inspeção quando houver referência.
+
+A transcrição de `other` levou 25min27s, a do stem de baixo 7min13s e a da bateria 4min31s; os stems foram lidos do
+cache. O resultado demonstra que o caminho integrado produz artefatos para os perfis cobertos, não que as notas estão
+corretas. A guitarra distorcida sem eventos, os longos silêncios entre eventos e os alertas do baixo são lacunas
+observadas. Não há referência humana independente de _Eyrie_, então fica proibido converter estes números em precisão,
+revocação ou aprovação musical. Os rótulos `string_ensemble` e `voice` não foram promovidos a perfis instrumentais.
+
+O GP5 combinado foi relido pelo PyGuitarPro com quatro faixas identificadas: `Baixo`, `Guitarra limpa`,
+`Guitarra acústica` e `Bateria` (faixa de percussão). O MusicXML combinado também foi analisado como XML válido e tem
+quatro partes, mas seus três primeiros elementos `<part-name>` estão vazios; `instrument-name` mantém nomes GM
+genéricos. Esse artefato ainda precisa de melhoria de rotulagem antes de ser considerado apresentação final. Como a
+fonte passada à CLI era `mix.wav`, o título embutido é igualmente `mix`, apesar do nome externo do arquivo. Esses são
+problemas de apresentação/metadados, não evidência sobre a qualidade das notas.
+
 #### Inventário inicial por créditos de gravação — intervalos ainda pendentes (2026-09-28)
 
 A página oficial do álbum `Urn` confirma que `Eyrie` é a faixa de 11:51. Os créditos do encarte, conforme transcritos

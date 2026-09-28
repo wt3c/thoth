@@ -25,7 +25,7 @@ decidem se cada instrumento está correto.
 1. [x] Escolher a gravação sem viés de instrumento e registrar por que _Eyrie_ vence _Equus_ e os covers do acervo.
 2. [x] Confirmar disponibilidade técnica dos quatro stems em `_Eyrie_`, todos com a duração da mix; inventário musical
    por escuta e intervalos ainda pendente.
-3. [ ] Manter o trabalho nos perfis já cobertos pelo pipeline e suas medições. Não adicionar perfis para violino,
+3. [x] Manter o trabalho nos perfis já cobertos pelo pipeline e suas medições. Não adicionar perfis para violino,
    viola ou cello nesta etapa; ficam adiados. O inventário de _Eyrie_ pode continuar como pesquisa, sem virar compromisso
    de suporte ou mudança de código.
    - [x] Consultar créditos do encarte de `Urn`: baixo, bateria, duas guitarras, violino, viola, cello e vozes são
@@ -36,15 +36,16 @@ decidem se cada instrumento está correto.
    inconclusiva.
    - [x] Procurar referência local de `Eyrie` em GP5/MIDI/MusicXML/PDF e consultar canais oficiais; nenhuma partitura
      licenciada foi localizada nesta busca inicial. Não tratar isso como prova de inexistência.
-5. [ ] Congelar uma linha de base por família, antes de ajustes: duração coberta, distribuição de rótulos, eventos,
-   polifonia, silêncio indevido, contaminação e métricas contra a referência. Executar mix e stem quando o ADR-044 ainda
-   não tiver decidido a melhor entrada.
+5. [x] Congelar uma linha de base exploratória por família, antes de ajustes; durações de eventos e contagens estão na
+   emenda do ADR-048. Sem referência humana independente, não há métrica de acerto. As entradas mix/stem seguem o ADR-044.
 6. [ ] Tratar apenas perfis existentes e já cobertos, uma família por vez, por TDD; não ampliar a matriz nesta etapa.
    Preservar o baixo como controle de regressão. Qualquer família nova exige retomada explícita e teste real com veredito.
-7. [ ] Integrar apenas as famílias aprovadas na partitura multifaixa; manter partes inconclusivas como stems/diagnóstico,
-   nunca como notação apresentada como correta.
-8. [ ] Validar a entrega com os testes pesados aplicáveis, suíte padrão, Ruff e mypy; publicar uma tabela por parte e
-   por trecho, sem condensar tudo em um F1 único.
+7. [x] Exportar a partitura multifaixa apenas com os perfis existentes. A guitarra distorcida não gerou eventos e não
+   foi incluída; violino, viola, cello e melodia vocal não foram inferidos.
+8. [x] Execução real do pipeline concluída e resultados por parte registrados na emenda do ADR-048; 543 testes,
+   Ruff e mypy passaram no checkpoint do commit. Isso valida a execução, não a exatidão musical sem referência.
+9. [ ] Antes de considerar a entrega MusicXML final, corrigir e testar os nomes vazios de baixo/guitarras nas partes
+   multifaixa e evitar o título interno `mix` quando a fonte for um WAV já normalizado em cache.
 
 ### Benchmark GPU nesta estação — suspenso por decisão do usuário (2026-09-28)
 
