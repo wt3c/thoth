@@ -2,6 +2,33 @@
 
 > Áudio → partitura e tablatura, foco em contrabaixo. Uso pessoal. CPU-only. Decisões em `tasks/decisions.md`.
 
+## Publicação do guia didático (2026-09-28)
+
+1. [ ] Revisar o diff e executar a verificação de entrega antes do commit.
+2. [ ] Criar commit da implementação e publicar `develop` em `origin`.
+3. [ ] Integrar no branch de produção indicado pelo usuário e confirmar o estado remoto.
+
+## Teste do guia com _Eyrie_ (2026-09-28)
+
+1. [x] Gerar Markdown a partir dos GP5 de baixo solo e multifaixa já existentes em `out/Ne Obliviscaris - Eyrie/`.
+2. [x] Conferir as saídas: ambas selecionam `Baixo`, apresentam 1.578 ataques, primeiro ataque no compasso 23, afinação E1-A1-D2-G2 e tom candidato A menor (margem de grafia 0,37). A comparação de altura, corda, casa, compasso, posição e duração encontrou zero diferenças entre os ataques. As pausas escritas são 154 na tab solo e 163 na multifaixa.
+3. [x] Corrigir o título `mix` herdado dos GP5 antigos, explicar a entrada tardia do baixo e verificar: 561 testes padrão, Ruff e mypy passaram. Os dois guias finais estão ao lado dos respectivos GP5.
+
+## Guia didático de tablatura de baixo (2026-09-28)
+
+**Plano (execução não interativa):** criar `thoth estudar <arquivo.gp5>` para ler uma tablatura local já produzida e gerar Markdown em português, sem repetir a transcrição. O relatório distinguirá observações da tab, conceitos gerais e hipóteses musicais. Técnicas de execução e intenção harmônica não serão apresentadas como fatos quando não estiverem codificadas no arquivo.
+
+1. [x] Pesquisar teoria e técnica de baixo; conferir as limitações do GP5 e os ADRs.
+2. [x] Escrever testes de leitura real do GP5 e das explicações por nota, inclusive intervalos, oitavas, quintas, ritmo e incerteza de técnica.
+3. [x] Implementar o gerador Markdown e o comando CLI com seleção de faixa e caminho de saída.
+4. [x] Documentar uso, registrar decisão arquitetural e verificar: 557 testes padrão, Ruff e mypy passaram; `thoth estudar` gerou Markdown de `out/misto/misto.gp5`.
+
+### Emenda — estimar o tom a partir da tablatura
+
+1. [x] Testar com GP5 real a estimativa automática, a indicação de incerteza e a precedência de `--tom`.
+2. [x] Reutilizar `estimar_tom` sobre as notas lidas do GP5; mostrar origem e margem no guia sem tratar a margem como confirmação de tônica/modo.
+3. [x] Atualizar README, ADR e lição; 559 testes padrão, Ruff e mypy passaram; comando real gerou o guia de `out/misto/misto.gp5`.
+
 ## Contrato livre do transcritor e metadados MusicXML (2026-09-28)
 
 **Plano (execução não interativa):** ignorar suporte a piano conforme orientação do usuário; registrar MPRIS como aceito conforme confirmação do usuário; generalizar a saída do transcritor para notas e ataques de bateria, remover o seletor de instrumento do contrato e corrigir nomes/título das partes no MusicXML multifaixa.

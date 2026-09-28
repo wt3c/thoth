@@ -25,6 +25,7 @@ from thoth.services.cache_notas import ler
 from thoth.services.comparacao import JanelaDeNota, veredito_de_nota
 from thoth.services.comparacao import comparar as _comparar
 from thoth.services.fretboard import DIGITACOES, ViterbiFretAssigner
+from thoth.services.guia_estudo import gerar_guia
 from thoth.services.nomes import nome_de_arquivo
 from thoth.services.octave_check import OctaveWarning
 from thoth.services.rotulos import TrechoSemBaixo
@@ -191,6 +192,25 @@ def comparar(
         return
     estimativa = ler(notas_jsonl)
     _relatar_nota_errada(veredito_de_nota(alinhar_ao_stem(referencia.notas, stem), estimativa))
+
+
+@app.command()
+def estudar(
+    tab: Path = typer.Argument(..., help="Tablatura .gp5 de baixo já construída."),
+    saida: Path | None = typer.Option(None, help="Markdown de saída; padrão: ao lado da tab."),
+    faixa: int | None = typer.Option(None, min=1, help="Faixa do baixo (1 = primeira)."),
+    tom: str | None = typer.Option(None, help="Tom conhecido, p.ex. 'E menor' ou 'Bb maior'."),
+) -> None:
+    """Cria um guia de teoria e prática, nota por nota, a partir de uma tab GP5."""
+    try:
+        guia = gerar_guia(tab, faixa=faixa, tom=tom)
+    except ValueError as erro:
+        _diz(str(erro), "bold red")
+        raise typer.Exit(code=1) from erro
+    destino = saida or tab.with_name(f"{tab.stem}.estudo.md")
+    destino.parent.mkdir(parents=True, exist_ok=True)
+    destino.write_text(guia, encoding="utf-8")
+    _diz(str(destino), "green")
 
 
 def _relatar_nota_errada(janelas: list[JanelaDeNota]) -> None:

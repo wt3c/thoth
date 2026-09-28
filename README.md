@@ -362,6 +362,31 @@ No modo `todos`, uma parte sem eventos é relatada e as demais continuam. O pian
 multifaixa até o round-trip do formato provar acordes, vozes e extremos sem inventar cordas ou trastes; esse limite está
 registrado no ADR-047.
 
+### `estudar` — criar guia de teoria e contrabaixo a partir da tab
+
+```bash
+# Depois de transcribe: gera out/Música/Música.estudo.md ao lado do GP5.
+uv run thoth estudar out/Música/Música.gp5
+
+# Com tonalidade conhecida e destino escolhido.
+uv run thoth estudar out/Música/Música.gp5 --tom "E menor" --saida out/guia.md
+
+# Em uma partitura multifaixa, escolha a faixa do baixo se a seleção for ambígua.
+uv run thoth estudar out/Música/Música.todos.gp5 --faixa 1
+```
+
+O comando lê o GP5 já gerado, sem repetir o processamento de áudio. O Markdown apresenta afinação, ritmo, corda e casa,
+figura musical, nome de cada nota, intervalo em relação à anterior, quintas, oitavas, escalas, legato e técnicas de baixo.
+Ele comenta cada ataque na ordem escrita, destaca o desenho fundamental-quinta-oitava quando aparece e propõe um roteiro
+de prática. O padrão de saída é `<nome>.estudo.md` ao lado do GP5; `--saida` muda o caminho.
+
+Sem `--tom`, o guia estima um **tom candidato** das notas escritas no GP5, mostra a margem e apresenta os graus como
+hipóteses condicionais. Essa margem ajuda a escolher a grafia com sustenidos ou bemóis; ela não confirma a tônica nem
+o modo. Use `--tom` quando tiver uma tonalidade conhecida por outra fonte: ela prevalece sobre a estimativa. O guia
+nunca atribui função de acorde a cada nota sem conhecer a harmonia. Técnicas como hammer-on e slide só são
+apresentadas como execução usada quando há marcação explícita no GP5; uma ligadura de duração não prova legato real.
+O guia inclui fontes didáticas e lembra que uma transcrição automática deve ser conferida com o áudio.
+
 ### `auralizar` — refazer a comparação auditiva
 
 ```bash

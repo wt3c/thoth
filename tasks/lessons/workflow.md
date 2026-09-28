@@ -1,5 +1,15 @@
 # Lições — workflow
 
+## Não exigir que o iniciante saiba o tom antes de estudar a tab
+
+**2026-09-28.** O primeiro guia só mostrava graus quando o usuário informava `--tom`. O usuário perguntou se o tom
+não podia ser extraído da tablatura — justamente a necessidade de quem está começando teoria musical. O GP5 gerado não
+grava a tonalidade estimada em sua armadura, mas suas notas permitem reutilizar a estimativa já existente no pipeline.
+
+**Como aplicar:** oferecer a análise disponível automaticamente, identificando-a como candidato e mostrando seus
+limites. Um dado conhecido informado pelo usuário prevalece. Não transferir ao iniciante um pré-requisito que a
+ferramenta consegue estimar; tampouco apresentar a hipótese como fato musical.
+
 ## Port de estímulo: copiar a fonte, nunca reescrever de memória
 
 **2026-09-22.** Ao promover as fixtures da Fase 0 a teste de regressão, reescrevi a fixture `misto` de memória em vez de

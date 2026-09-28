@@ -3420,3 +3420,42 @@ Uma busca somente de leitura em `cache/` e `out/` não encontrou GP5, MIDI, Musi
 o acervo contém uma referência de baixo para `Equus`, não para esta faixa. A consulta inicial aos canais oficiais
 também não localizou uma partitura/tab licenciada de `Urn`. Isso não prova que tal publicação inexista: por ora, a
 referência humana de `Eyrie` permanece pendente, e não substituímos essa lacuna por tabs colaborativas sem proveniência.
+
+## ADR-049 — guia didático do baixo lê o GP5 e separa observação de hipótese
+
+**Data:** 2026-09-28 · **Status:** aceito · **Complementa:** ADR-022, ADR-031, ADR-033 e ADR-047
+
+### Contexto
+
+O usuário está começando teoria musical e contrabaixo e quer estudar as tablaturas que o Thoth já constrói.
+O cache de notas guarda alturas e tempos, mas não corda, casa, figura, pausa nem ligadura. O GP5 contém esses dados,
+inclusive no arquivo multifaixa, e pode ser relido pelo PyGuitarPro sem repetir o processamento de áudio. A linha do
+baixo isolada não contém, por si só, os acordes da banda, a intenção da escolha de cada nota nem a técnica original.
+O ADR-033 mediu que duração e áudio transcrito não distinguem articulação com confiança.
+
+### Decisão
+
+`thoth estudar <tab.gp5>` produz `<nome>.estudo.md` ao lado do GP5, ou no caminho `--saida`. O serviço lê a faixa de
+baixo selecionada por `--faixa` ou pela detecção já usada em `comparar`; enumera ataques por compasso, posição, figura,
+corda, casa, nota, intervalo e relação com escala. `--tom` é opcional e informado pelo usuário; só nesse caso há grau da
+escala maior ou menor natural. O relatório ensina os demais conceitos em um glossário e fornece roteiro de prática.
+
+Há três níveis de afirmação: (1) dados codificados no GP5; (2) relações calculadas, como semitons, oitava e padrão de
+quinta; (3) hipóteses de função ou intenção, sempre escritas como possibilidades. Uma ligadura de duração soma à nota
+anterior e não cria ataque. Técnicas de execução só são atribuídas quando marcadas explicitamente como efeito GP5;
+sem marcação, aparecem como não determinadas. O desenho fundamental-quinta-oitava é nome de exercício e de padrão
+intervalar; a primeira nota só é fundamental **do acorde** se a harmonia confirmar. Repetições do GP5 não são
+desdobradas: o guia percorre o que está escrito, não a ordem de reprodução.
+
+O serviço é separado do pipeline e não altera partitura, transcrição ou métricas. O GP5 é a fonte apropriada para a
+posição no braço; o MusicXML continua disponível para leitura visual, mas não é entrada deste comando.
+
+### Emenda (2026-09-28) — candidato de tonalidade calculado da tab
+
+O guia agora estima o tom quando `--tom` não é informado, reutilizando `estimar_tom` sobre as notas lidas do GP5 por
+`tab_referencia._notas`. O arquivo gerado pelo Thoth deixa `Song.key` e `MeasureHeader.keySignature` no default de dó
+maior; esse campo não representa o tom que o pipeline estimou e não é usado. A estimativa aparece como **candidato**,
+com a margem de grafia e graus condicionais. A margem do ADR-031 compara a melhor grafia de sinal oposto; não foi
+calibrada para provar tônica ou modo. Quando é curta, os nomes cromáticos da leitura permanecem com sustenidos por
+cautela. `--tom` informado continua prevalecendo e é identificado como dado do usuário, sem margem. Nenhuma função
+de acorde é afirmada só pela linha do baixo.
