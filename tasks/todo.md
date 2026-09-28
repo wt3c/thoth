@@ -46,6 +46,8 @@ decidem se cada instrumento está correto.
    Ruff e mypy passaram no checkpoint do commit. Isso valida a execução, não a exatidão musical sem referência.
 9. [ ] Antes de considerar a entrega MusicXML final, corrigir e testar os nomes vazios de baixo/guitarras nas partes
    multifaixa e evitar o título interno `mix` quando a fonte for um WAV já normalizado em cache.
+10. [x] Registrar o veredito do usuário de que GP5 do baixo solo e GP5 multifaixa estão perfeitos no uso observado;
+    manter esse resultado separado do aviso ainda não diagnosticado do MusicXML no MuseScore.
 
 ### Benchmark GPU nesta estação — suspenso por decisão do usuário (2026-09-28)
 

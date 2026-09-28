@@ -3371,6 +3371,16 @@ genéricos. Esse artefato ainda precisa de melhoria de rotulagem antes de ser co
 fonte passada à CLI era `mix.wav`, o título embutido é igualmente `mix`, apesar do nome externo do arquivo. Esses são
 problemas de apresentação/metadados, não evidência sobre a qualidade das notas.
 
+#### Veredito de uso dos GP5 (2026-09-28)
+
+O usuário confirmou que os GP5 de baixo solo e multifaixa de _Eyrie_ estão perfeitos no uso observado. Mantemos essa
+avaliação como evidência prática positiva desses artefatos, junto aos testes estruturais e ao round-trip PyGuitarPro;
+ela não é uma afirmação de acurácia musical independente nem de compatibilidade universal com todo leitor. O aviso
+remanescente foi reportado ao abrir o MusicXML no MuseScore, que ainda abre o arquivo; não é um defeito observado nos
+GP5. A tentativa local de executar `mscore` abortou inclusive em `--version`, logo não foi possível reproduzir ou
+diagnosticar a mensagem do importador nesta estação. Alterar manualmente os `<part-name>` vazios do MusicXML não
+eliminou o aviso reportado; a causa permanece desconhecida e separada do veredito dos GP5.
+
 #### Inventário inicial por créditos de gravação — intervalos ainda pendentes (2026-09-28)
 
 A página oficial do álbum `Urn` confirma que `Eyrie` é a faixa de 11:51. Os créditos do encarte, conforme transcritos

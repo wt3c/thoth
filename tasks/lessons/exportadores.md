@@ -88,3 +88,19 @@ No modo `todos`, encaminhar a afinação explicitamente até a execução intern
 baixo. Usar silenciosamente quatro cordas descartou a extensão grave que o
 _Equus_ exige. O teste de integração deve reler o GP5 combinado e contar as
 cordas da faixa de baixo.
+
+## GP5 de baixo solo e multifaixa em música real (2026-09-28)
+
+Na execução de _Ne Obliviscaris — Eyrie_, o usuário confirmou que tanto o GP5
+do baixo solo quanto o GP5 multifaixa estão perfeitos no uso observado. O
+combinado contém baixo, guitarra limpa, guitarra acústica e bateria; perfis sem
+eventos não viram faixa vazia. O round-trip automatizado pelo PyGuitarPro
+confirma a estrutura do combinado, mas não substitui a conferência de abertura
+no aplicativo usado pelo músico.
+
+Não misturar esse veredito com o aviso do MusicXML: são formatos e caminhos de
+leitura distintos. O MusicXML de Eyrie abriu em leitores XML/music21, mas o
+aviso específico do MuseScore não foi reproduzido nesta estação. Uma edição
+manual dos nomes das partes no arquivo gerado não comprovou que eles fossem a
+causa do aviso. Não alterar o GP5 para contornar um aviso que ocorreu no
+MusicXML.
