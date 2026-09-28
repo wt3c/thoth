@@ -23,7 +23,7 @@ import soundfile as sf
 from tests.sintetico import BPM as BPM_FIXTURE
 from tests.sintetico import SOUNDFONT, renderizar
 from tests.sintetico_multi import FIXTURES_MULTI, referencia, renderizar_multi
-from thoth.domain.models import AudioAsset, NoteEvent
+from thoth.domain.models import AudioAsset, NoteEvent, Transcricao
 from thoth.services.cache_notas import ler
 from thoth.services.evaluation import avaliar_polifonico
 from thoth.services.pipeline import transcrever
@@ -56,8 +56,8 @@ class SeparadorFalso:
 class TranscritorFalso:
     notas: tuple[NoteEvent, ...]
 
-    def transcribe(self, audio: Path, instrument: str | None = None) -> list[NoteEvent]:
-        return list(self.notas)
+    def transcribe(self, audio: Path) -> Transcricao:
+        return Transcricao.do_muscriptor(list(self.notas))
 
 
 @dataclass(frozen=True, slots=True)

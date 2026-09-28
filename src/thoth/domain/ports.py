@@ -11,6 +11,7 @@ from thoth.domain.models import (
     NoteEvent,
     Posicionamento,
     TabNote,
+    Transcricao,
 )
 
 
@@ -21,9 +22,9 @@ class AudioSource(Protocol):
 
 
 class Transcriber(Protocol):
-    """Áudio → eventos de nota."""
+    """Áudio → transcrição livre, com notas e ataques de bateria separados."""
 
-    def transcribe(self, audio: Path, instrument: str | None = None) -> list[NoteEvent]: ...
+    def transcribe(self, audio: Path) -> Transcricao: ...
 
 
 class Separator(Protocol):

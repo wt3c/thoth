@@ -33,7 +33,7 @@ from typing import TYPE_CHECKING
 import numpy as np
 import soundfile as sf
 
-from thoth.domain.models import NoteEvent
+from thoth.domain.models import NoteEvent, Transcricao
 from thoth.domain.ports import Transcriber
 from thoth.processos import rodar
 
@@ -49,12 +49,17 @@ _VIZINHANCA_S = 2
 _BURACO_MINIMO_S = 10
 
 
-def parse_jsonl(texto: str, instrument: str | None = None) -> list[NoteEvent]:
-    """Converte o JSONL do MuScriptor em notas, ordenadas por onset.
+def parse_jsonl(texto: str) -> Transcricao:
+    """Converte o JSONL livre em notas e ataques de bateria.
 
     O formato separa início e fim em duas linhas, ligadas por `index` ↔
     `start_event_index`.
     """
+    return Transcricao.do_muscriptor(_eventos_jsonl(texto))
+
+
+def _eventos_jsonl(texto: str) -> list[NoteEvent]:
+    """Preserva os intervalos crus até aplicar ajustes de tempo na borda do adapter."""
     inicios: dict[int, dict[str, object]] = {}
     fins: dict[int, float] = {}
     for linha in texto.splitlines():
@@ -74,9 +79,8 @@ def parse_jsonl(texto: str, instrument: str | None = None) -> list[NoteEvent]:
             instrument=str(e["instrument"]),
         )
         for i, e in inicios.items()
-        if instrument is None or e["instrument"] == instrument
     ]
-    return sorted(notas, key=lambda n: (n.onset_s, n.pitch))
+    return notas
 
 
 def trechos_sem_nota(energia_db: list[float], onsets: list[float]) -> list[tuple[int, int]]:
@@ -145,7 +149,7 @@ class MuscriptorTranscriber:
             *([] if prelude else ["--no-prelude-forcing"]),
         ]
 
-    def _passada(self, audio: Path, *, prelude: bool) -> list[NoteEvent]:
+    def _passada(self, audio: Path, *, prelude: bool) -> Transcricao:
         frente = self.silencio_inicial_s
         with tempfile.TemporaryDirectory() as tmp:
             entrada, saida = audio, Path(tmp) / "notas.jsonl"
@@ -156,35 +160,40 @@ class MuscriptorTranscriber:
                 sf.write(entrada, np.concatenate([zeros, y]), taxa, subtype="FLOAT")
             rodar(self._comando(entrada, saida, prelude=prelude))
             # Nota que termina dentro do silêncio não existe no áudio original.
-            return [
+            notas = [
                 NoteEvent(
                     pitch=n.pitch,
                     onset_s=max(0.0, n.onset_s - frente),
                     offset_s=n.offset_s - frente,
                     instrument=n.instrument,
                 )
-                for n in parse_jsonl(saida.read_text())
-                if n.offset_s > frente
+                for n in _eventos_jsonl(saida.read_text()) if n.offset_s > frente
             ]
+            return Transcricao.do_muscriptor(notas)
 
-    def transcribe(self, audio: Path, instrument: str | None = None) -> list[NoteEvent]:
-        notas = self._passada(audio, prelude=True)
-        buracos = trechos_sem_nota(_energia_por_segundo(audio), [n.onset_s for n in notas])
+    def transcribe(self, audio: Path) -> Transcricao:
+        primeira = self._passada(audio, prelude=True)
+        onsets = [n.onset_s for n in primeira.notas] + [a.instante_s for a in primeira.ataques]
+        buracos = trechos_sem_nota(_energia_por_segundo(audio), onsets)
         if buracos:
             # Stem inteiro de novo, sem fatiar: o rótulo depende de contexto (ADR-008).
             # A vizinhança atrasa o início e adianta o fim de cada buraco; sem
             # devolvê-la, os 2 s de cada borda não viriam de passada nenhuma.
-            def no_buraco(n: NoteEvent) -> bool:
+            def no_buraco(instante: float) -> bool:
                 return any(
-                    a - _VIZINHANCA_S <= n.onset_s < b + _VIZINHANCA_S for a, b in buracos
+                    a - _VIZINHANCA_S <= instante < b + _VIZINHANCA_S for a, b in buracos
                 )
 
             segunda = self._passada(audio, prelude=False)
-            notas = [n for n in notas if not no_buraco(n)] + [n for n in segunda if no_buraco(n)]
-        return sorted(
-            (n for n in notas if instrument is None or n.instrument == instrument),
-            key=lambda n: (n.onset_s, n.pitch),
-        )
+            return Transcricao(
+                notas=tuple(
+                    n for n in primeira.notas if not no_buraco(n.onset_s)
+                ) + tuple(n for n in segunda.notas if no_buraco(n.onset_s)),
+                ataques=tuple(
+                    a for a in primeira.ataques if not no_buraco(a.instante_s)
+                ) + tuple(a for a in segunda.ataques if no_buraco(a.instante_s)),
+            )
+        return primeira
 
 
 if TYPE_CHECKING:  # pragma: no cover — trava a assinatura contra o Protocol

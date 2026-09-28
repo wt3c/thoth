@@ -179,9 +179,15 @@ def test_mede_perfil(perfil: str, condicao: str, tmp_path: Path) -> None:
     bruto = MuscriptorTranscriber(model="small", silencio_inicial_s=silencio).transcribe(audio)
     segundos = time.monotonic() - inicio
 
-    rotulos = Counter(n.instrument for n in bruto)
-    do_perfil = Transcricao.do_muscriptor(
-        [n for n in bruto if n.instrument in PERFIS[perfil].rotulos]
+    rotulos = Counter(n.instrument for n in bruto.notas)
+    if bruto.ataques:
+        rotulos["drums"] += len(bruto.ataques)
+    do_perfil = (
+        Transcricao((), bruto.ataques)
+        if PERFIS[perfil].familia == "bateria"
+        else Transcricao(
+            tuple(n for n in bruto.notas if n.instrument in PERFIS[perfil].rotulos), ()
+        )
     )
     ref = referencia(FIXTURES_MULTI[f"{perfil}-{'isolada' if condicao == 'isolada' else 'mix'}"])
 
@@ -215,10 +221,10 @@ def test_mede_perfil(perfil: str, condicao: str, tmp_path: Path) -> None:
         f"piso={piso} margem={f1 - piso:+.3f}"
     )
 
-    assert bruto, f"MuScriptor não devolveu nada para {perfil} {condicao}"
+    assert bruto.notas or bruto.ataques, f"MuScriptor não devolveu nada para {perfil} {condicao}"
     assert f1 >= piso, f"{perfil} {condicao} regrediu: {f1} < {piso} medido no ADR-044"
     if PERFIS[perfil].familia == "piano":
-        _confere_partes_do_piano(perfil, condicao, ref.notas, bruto)
+        _confere_partes_do_piano(perfil, condicao, ref.notas, list(bruto.notas))
     if (perfil, condicao) in MEDIDO_SEIS_NOTAS:
         seis = por_acorde[6][0]
         piso_seis = MEDIDO_SEIS_NOTAS[(perfil, condicao)] - (condicao == "mix-stem")
@@ -253,10 +259,9 @@ def test_mede_tons(tmp_path: Path) -> None:
     bruto = MuscriptorTranscriber(model="small", silencio_inicial_s=SILENCIO_BATERIA).transcribe(
         audio
     )
-    rotulos = Counter(n.instrument for n in bruto)
-    do_perfil = Transcricao.do_muscriptor(
-        [n for n in bruto if n.instrument in PERFIS["bateria"].rotulos]
-    )
+    rotulos = Counter(n.instrument for n in bruto.notas)
+    rotulos["drums"] += len(bruto.ataques)
+    do_perfil = Transcricao((), bruto.ataques)
     ref = referencia(FIXTURES_MULTI["bateria-tons"])
 
     b = avaliar_bateria(ref.ataques, do_perfil.ataques)
@@ -291,7 +296,7 @@ MEDIDO_EXTREMOS: dict[str, tuple[int, int, int]] = {
 def test_mede_extremos_do_piano(perfil: str, tmp_path: Path) -> None:
     """A0 e C8 no meio do áudio: separa o limite de altura da perda na borda."""
     nome = f"{perfil}-extremos"
-    bruto = MuscriptorTranscriber(model="small").transcribe(renderizar_multi(nome, tmp_path))
+    bruto = MuscriptorTranscriber(model="small").transcribe(renderizar_multi(nome, tmp_path)).notas
     ref = referencia(FIXTURES_MULTI[nome]).notas
 
     def achadas(alturas: tuple[int, ...], rotulos: frozenset[str] | None) -> int:

@@ -36,7 +36,7 @@ def _no_buraco(onsets: list[float]) -> int:
 
 def test_o_forcing_ainda_emudece_este_trecho() -> None:
     """Sem isto, o teste de baixo passaria mesmo que o buraco tivesse sumido sozinho."""
-    notas = MuscriptorTranscriber()._passada(TRECHO, prelude=True)
+    notas = MuscriptorTranscriber()._passada(TRECHO, prelude=True).notas
 
     medidas = _no_buraco([n.onset_s for n in notas])
     print(f"com o forcing: {medidas} notas no buraco")
@@ -44,7 +44,7 @@ def test_o_forcing_ainda_emudece_este_trecho() -> None:
 
 
 def test_segunda_passada_preenche_o_buraco() -> None:
-    notas = MuscriptorTranscriber().transcribe(TRECHO)
+    notas = MuscriptorTranscriber().transcribe(TRECHO).notas
 
     medidas = _no_buraco([n.onset_s for n in notas])
     print(f"transcribe: {medidas} notas no buraco (piso {NOTAS_NO_BURACO_MINIMO})")

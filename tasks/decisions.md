@@ -3190,6 +3190,22 @@ players; VLC/Strawberry devem ser validados manualmente na estação Linux do us
 
 ---
 
+### Emenda (2026-09-28) — nomes explícitos das partes e fonte local em cache
+
+O primeiro MusicXML de _Eyrie_ mostrou `<part-name/>` vazio nas partes de cordas. O compositor multifaixa apenas copia
+as declarações dos arquivos de cada parte; portanto, o nome precisa ser definido pelo exportador antes da composição.
+No modo `todos`, cada arquivo de cordas agora recebe o mesmo nome legível da faixa GP5 (Baixo, Guitarra limpa,
+Guitarra distorcida ou Guitarra acústica). A parte de bateria já declara `Bateria`. O modo de baixo isolado não muda.
+
+Uma referência direta a `cache/<id>/mix.wav` também não contém o título original no nome do arquivo. `LocalFileSource`
+reaproveita título e artista de `meta.json` quando presente; sem metadados, usa o identificador estável do conteúdo,
+em vez de publicar o nome técnico `mix`. Arquivos locais comuns continuam usando o nome do arquivo.
+
+A porta e o adapter `Transcriber` agora devolvem `Transcricao` completa: notas com altura e ataques de bateria separados,
+sem parâmetro de seleção por instrumento. A escolha dos rótulos continua no pipeline. A rotina legada de grade de
+bateria ainda recebe uma representação interna `NoteEvent`; sua duração técnica de 10 ms serve ao cache/auralização e
+não é apresentada como sustentação musical.
+
 ## ADR-047 — partitura multifaixa com entrega de áudio focada no baixo
 
 **Data:** 2026-09-27 · **Status:** Aceito · **Emenda:** ADR-044

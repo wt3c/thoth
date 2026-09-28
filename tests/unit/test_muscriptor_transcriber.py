@@ -19,6 +19,7 @@ from thoth.adapters.transcription.muscriptor import (
     parse_jsonl,
     trechos_sem_nota,
 )
+from thoth.domain.models import Transcricao
 
 JSONL = """\
 {"type": "start", "pitch": 23, "start_time": 0.22, "index": 0, "instrument": "electric_bass"}
@@ -31,22 +32,33 @@ JSONL = """\
 
 
 def test_le_notas_de_todos_os_instrumentos() -> None:
-    notas = parse_jsonl(JSONL)
+    transcricao = parse_jsonl(JSONL)
 
-    assert [n.pitch for n in notas] == [60, 23, 35]
-    assert [n.instrument for n in notas] == ["acoustic_piano", "electric_bass", "electric_bass"]
+    assert isinstance(transcricao, Transcricao)
+    assert [n.pitch for n in transcricao.notas] == [60, 23, 35]
+    assert [n.instrument for n in transcricao.notas] == [
+        "acoustic_piano", "electric_bass", "electric_bass"
+    ]
 
 
 def test_ordena_por_onset_e_nao_pela_ordem_do_arquivo() -> None:
     """O piano aparece depois no arquivo e antes no tempo."""
-    assert [n.onset_s for n in parse_jsonl(JSONL)] == [0.10, 0.22, 0.50]
+    assert [n.onset_s for n in parse_jsonl(JSONL).notas] == [0.10, 0.22, 0.50]
 
 
-def test_filtra_por_instrumento() -> None:
-    notas = parse_jsonl(JSONL, instrument="electric_bass")
+def test_parser_separa_notas_de_ataques_de_bateria() -> None:
+    jsonl = JSONL + (
+        '{"type": "start", "pitch": 38, "start_time": 0.30, "index": 3, '
+        '"instrument": "drums"}\n'
+        '{"type": "end", "end_time": 0.31, "start_event_index": 3}\n'
+    )
 
-    assert [n.pitch for n in notas] == [23, 35]
-    assert [(n.onset_s, n.offset_s) for n in notas] == [(0.22, 0.36), (0.50, 0.75)]
+    transcricao = parse_jsonl(jsonl)
+
+    assert [(n.pitch, n.instrument) for n in transcricao.notas] == [
+        (60, "acoustic_piano"), (23, "electric_bass"), (35, "electric_bass")
+    ]
+    assert [(a.instante_s, a.peca_gm) for a in transcricao.ataques] == [(0.30, 38)]
 
 
 def test_nota_sem_evento_de_fim_nao_some_nem_tem_duracao_negativa() -> None:
@@ -55,14 +67,14 @@ def test_nota_sem_evento_de_fim_nao_some_nem_tem_duracao_negativa() -> None:
         '{"type": "start", "pitch": 40, "start_time": 1.0, "index": 0, "instrument": "drums"}\n'
     )
 
-    (nota,) = parse_jsonl(truncado)
+    transcricao = parse_jsonl(truncado)
 
-    assert nota.pitch == 40
-    assert nota.offset_s > nota.onset_s
+    assert transcricao.notas == ()
+    assert [(a.instante_s, a.peca_gm) for a in transcricao.ataques] == [(1.0, 40)]
 
 
 def test_linha_vazia_e_ignorada() -> None:
-    assert parse_jsonl("\n\n") == []
+    assert parse_jsonl("\n\n") == Transcricao((), ())
 
 
 def test_comando_nunca_usa_instruments(tmp_path: Path) -> None:
@@ -119,7 +131,8 @@ def test_transcreve_audio_real(tmp_path: Path) -> None:
         check=True,
     )
 
-    notas = MuscriptorTranscriber().transcribe(wav, instrument="electric_bass")
+    transcricao = MuscriptorTranscriber().transcribe(wav)
+    notas = [n for n in transcricao.notas if n.instrument == "electric_bass"]
 
     assert notas, "o modelo real não devolveu nenhuma nota de baixo"
     assert all(n.offset_s > n.onset_s for n in notas)
@@ -209,7 +222,7 @@ def test_audio_mais_curto_que_a_janela_nao_quebra() -> None:
 def test_transcreve_stem_de_tres_segundos(tmp_path: Path) -> None:
     transcritor, _ = _falso(tmp_path, corte=3.0, duracao=3.0)
 
-    notas = transcritor.transcribe(_stem(tmp_path, 3.0))
+    notas = transcritor.transcribe(_stem(tmp_path, 3.0)).notas
 
     assert notas
 
@@ -217,7 +230,7 @@ def test_transcreve_stem_de_tres_segundos(tmp_path: Path) -> None:
 def test_buraco_e_preenchido_pela_passada_sem_prelude(tmp_path: Path) -> None:
     transcritor, log = _falso(tmp_path, corte=20.0, duracao=60.0)
 
-    notas = transcritor.transcribe(_stem(tmp_path, 60.0))
+    notas = transcritor.transcribe(_stem(tmp_path, 60.0)).notas
 
     chamadas = log.read_text().splitlines()
     assert len(chamadas) == 2
@@ -238,7 +251,7 @@ def test_buraco_e_preenchido_pela_passada_sem_prelude(tmp_path: Path) -> None:
 def test_sem_buraco_nao_ha_segunda_passada(tmp_path: Path) -> None:
     transcritor, log = _falso(tmp_path, corte=60.0, duracao=60.0)
 
-    notas = transcritor.transcribe(_stem(tmp_path, 60.0))
+    notas = transcritor.transcribe(_stem(tmp_path, 60.0)).notas
 
     assert len(log.read_text().splitlines()) == 1
     assert {n.pitch for n in notas} == {30}
@@ -259,9 +272,10 @@ t0 = float(np.flatnonzero(np.abs(y).max(axis=1) > 1e-4)[0] / sr)
 Path(args[args.index("--log") + 1]).write_text(f"{t0} {args[args.index('transcribe') + 1]}")
 eventos = [(t0, t0 + 0.3), *json.loads(args[args.index("--extras") + 1])]
 linhas = []
-for i, (ini, fim) in enumerate(eventos):
+for i, evento in enumerate(eventos):
+    ini, fim, *rotulo = evento
     linhas.append({"type": "start", "pitch": 40 + i, "start_time": ini, "index": i,
-                   "instrument": "electric_bass"})
+                   "instrument": rotulo[0] if rotulo else "electric_bass"})
     linhas.append({"type": "end", "end_time": fim, "start_event_index": i})
 Path(args[args.index("-o") + 1]).write_text("\\n".join(json.dumps(x) for x in linhas))
 """
@@ -272,7 +286,9 @@ SILENCIO = 0.1
 
 
 def _ouvinte(
-    tmp_path: Path, extras: list[tuple[float, float]], silencio: float = SILENCIO
+    tmp_path: Path,
+    extras: list[tuple[float, float] | tuple[float, float, str]],
+    silencio: float = SILENCIO,
 ) -> MuscriptorTranscriber:
     """O instante do primeiro som ouvido e o arquivo recebido ficam em `ouvido.txt`."""
     import json
@@ -299,7 +315,7 @@ def test_sem_silencio_o_modelo_recebe_o_arquivo_original(tmp_path: Path) -> None
     e com 0 o caminho do baixo é o de antes, sem nem regravar o áudio."""
     stem = _stem(tmp_path, 10.0)
 
-    (nota,) = _ouvinte(tmp_path, [], silencio=0.0).transcribe(stem)
+    (nota,) = _ouvinte(tmp_path, [], silencio=0.0).transcribe(stem).notas
 
     assert MuscriptorTranscriber().silencio_inicial_s == 0.0
     assert _ouvido(tmp_path)[1] == str(stem)
@@ -308,7 +324,7 @@ def test_sem_silencio_o_modelo_recebe_o_arquivo_original(tmp_path: Path) -> None
 
 def test_modelo_recebe_silencio_na_frente_e_o_tempo_volta_ao_original(tmp_path: Path) -> None:
     """ADR-045: o MuScriptor perde ataques de bateria no começo do áudio."""
-    (nota,) = _ouvinte(tmp_path, []).transcribe(_stem(tmp_path, 10.0))
+    (nota,) = _ouvinte(tmp_path, []).transcribe(_stem(tmp_path, 10.0)).notas
 
     assert _ouvido(tmp_path)[0] == pytest.approx(SILENCIO, abs=1e-3)
     # O ouvinte deu a nota onde ouviu o primeiro som; descontado, é 0 no áudio original.
@@ -320,7 +336,7 @@ def test_nota_inteira_dentro_do_silencio_e_descartada(tmp_path: Path) -> None:
     """Som que não existe no áudio original não pode virar nota."""
     extras = [(0.0, SILENCIO / 2)]
 
-    notas = _ouvinte(tmp_path, extras).transcribe(_stem(tmp_path, 10.0))
+    notas = _ouvinte(tmp_path, extras).transcribe(_stem(tmp_path, 10.0)).notas
 
     assert [n.pitch for n in notas] == [40]
 
@@ -328,11 +344,19 @@ def test_nota_inteira_dentro_do_silencio_e_descartada(tmp_path: Path) -> None:
 def test_nota_que_atravessa_o_fim_do_silencio_comeca_em_zero(tmp_path: Path) -> None:
     extras = [(SILENCIO / 2, SILENCIO + 0.5)]
 
-    notas = _ouvinte(tmp_path, extras).transcribe(_stem(tmp_path, 10.0))
+    notas = _ouvinte(tmp_path, extras).transcribe(_stem(tmp_path, 10.0)).notas
 
     atravessa = next(n for n in notas if n.pitch == 41)
     assert atravessa.onset_s == 0.0
     assert atravessa.offset_s == pytest.approx(0.5, abs=1e-3)
+
+
+def test_ataque_de_bateria_que_atravessa_o_silencio_nao_some(tmp_path: Path) -> None:
+    extras = [(SILENCIO - 0.02, SILENCIO + 0.2, "drums")]
+
+    transcricao = _ouvinte(tmp_path, extras).transcribe(_stem(tmp_path, 10.0))
+
+    assert [(a.instante_s, a.peca_gm) for a in transcricao.ataques] == [(0.0, 41)]
 
 
 @pytest.mark.slow

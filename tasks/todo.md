@@ -2,6 +2,15 @@
 
 > Áudio → partitura e tablatura, foco em contrabaixo. Uso pessoal. CPU-only. Decisões em `tasks/decisions.md`.
 
+## Contrato livre do transcritor e metadados MusicXML (2026-09-28)
+
+**Plano (execução não interativa):** ignorar suporte a piano conforme orientação do usuário; registrar MPRIS como aceito conforme confirmação do usuário; generalizar a saída do transcritor para notas e ataques de bateria, remover o seletor de instrumento do contrato e corrigir nomes/título das partes no MusicXML multifaixa.
+
+1. [x] Escrever testes de regressão primeiro para o parsing completo do JSONL, o contrato e a passagem da transcrição estruturada pelo pipeline.
+2. [x] Implementar o retorno `Transcricao` e adaptar filtros/consumidores preservando comportamento de baixo, guitarra e bateria.
+3. [x] Escrever testes primeiro para metadados corretos de baixo/guitarras e título de fonte local no MusicXML composto; corrigir a origem dos metadados.
+4. [x] Marcar MPRIS como aceito e piano como fora da prioridade atual; revisar diff e rodar verificações aplicáveis.
+
 ## WAVs publicados por padrão e perfis adiados (2026-09-28)
 
 **Escopo:** manter somente os perfis já cobertos pelo trabalho e adiar novas famílias sem inventário/validação independente,
@@ -44,7 +53,7 @@ decidem se cada instrumento está correto.
    foi incluída; violino, viola, cello e melodia vocal não foram inferidos.
 8. [x] Execução real do pipeline concluída e resultados por parte registrados na emenda do ADR-048; 543 testes,
    Ruff e mypy passaram no checkpoint do commit. Isso valida a execução, não a exatidão musical sem referência.
-9. [ ] Antes de considerar a entrega MusicXML final, corrigir e testar os nomes vazios de baixo/guitarras nas partes
+9. [x] Corrigir e testar os nomes vazios de baixo/guitarras nas partes
    multifaixa e evitar o título interno `mix` quando a fonte for um WAV já normalizado em cache.
 10. [x] Registrar o veredito do usuário de que GP5 do baixo solo e GP5 multifaixa estão perfeitos no uso observado;
     manter esse resultado separado do aviso ainda não diagnosticado do MusicXML no MuseScore.
@@ -152,48 +161,24 @@ decidem se cada instrumento está correto.
 - [x] README e arquitetura explicam compatibilidade, instalação no Linux, uso e limites de alinhamento.
 - [x] Suíte padrão (535 testes), navegador (13 testes), D-Bus real (1 teste), Ruff e mypy executados.
 
-**Ponto de pausa:** implementação e testes automatizados concluídos; alterações permanecem locais e sem commit. Falta
-validar com um player de música real na sessão Linux da estação antes de considerar a feature aceita em uso cotidiano.
+**Estado:** implementação e testes automatizados concluídos; o usuário confirmou a aceitação de MPRIS em 2026-09-28.
 
-#### Retomar daqui
+#### Aceitação
 
-- [ ] No Linux desktop, abrir um player que anuncie MPRIS (por exemplo, VLC ou Strawberry) e tocar uma faixa que também
-  tenha sido usada para gerar uma partitura. Spotify está fora do escopo.
-- [ ] Iniciar `uv run thoth serve`, abrir a partitura, usar **Usar player externo**, atualizar a lista e conferir que
-  título e artista do player correto aparecem.
-- [ ] Clicar **Seguir player** e conferir na página que `Playing` move o cursor, `Paused` o mantém no lugar e `Stopped`
-  o retorna ao início; confirmar também que o alphaTab não emite áudio no modo externo.
-- [ ] Se houver diferença fixa no início da gravação, ajustar **Deslocamento (segundos)**; observar e registrar deriva
-  durante a faixa, pois o deslocamento não corrige diferenças de andamento.
-- [ ] Registrar player/versão, resultado e qualquer incompatibilidade aqui; depois revisar o diff completo. Não fazer
-  commit ou push sem solicitação explícita.
+- [x] O usuário confirmou que MPRIS está OK (2026-09-28); encerrado sem acrescentar resultado manual não informado.
 
-O projeto está funcional para baixo, guitarra e bateria. A prioridade agora é concluir o suporte ao piano acústico e
-generalizar o contrato do transcritor. Bateria (M2), guitarra (M4), compatibilidade do baixo (M5), contêiner e Fase 5
-estão concluídos. O piano elétrico permanece fora do escopo por decisão registrada no ADR-044.
+O projeto está funcional para baixo, guitarra e bateria. O transcritor agora devolve a transcrição livre, e os nomes das
+partes e o título da fonte são preservados na exportação MusicXML multifaixa. O piano acústico permanece fora da
+prioridade por orientação do usuário (2026-09-28); o piano elétrico segue fora do escopo conforme ADR-044.
 
-### Próximas tarefas, nesta ordem
+### Itens do plano ADR-044
 
-1. **Generalizar o contrato do transcritor (ADR-044, M1).** `Transcricao` já representa notas e ataques de bateria,
-   mas `Transcriber.transcribe()` ainda retorna `list[NoteEvent]` e aceita um filtro opcional de instrumento. Alterar o
-   contrato e o adapter para devolver a transcrição livre completa, separando notas de ataques na fronteira do domínio.
-   Remover o argumento de filtro depois de migrar os consumidores e testes. Critério: nenhuma chamada usa
-   `--instruments` nem filtra dentro do transcritor; teste real do JSONL confirma notas e percussão preservadas.
-2. **Fechar o spike GP5 de piano (ADR-044, M3).** Testar A0, C8, acorde de dez notas e duas vozes com gravação e
-   releitura PyGuitarPro, além de abertura/importação no MuseScore. Confirmar que não surgem cordas ou trastes fictícios.
-   Se o formato não preservar o conteúdo, registrar a limitação em teste e adotar MusicXML como único formato de piano.
-3. **Integrar `piano-acustico` ao pipeline (ADR-044, M3).** Usar o stem `other`, manter notas de piano separadas de
-   contaminação de outras famílias, chamar `ExportadorDePiano` sem atribuidor de braço e expor o instrumento na CLI, API
-   e página. Disponibilizar GP5 somente se o spike o aprovar; MusicXML continua disponível. O piano elétrico deve seguir
-   recusado antes de etapas caras. Cobrir cache de notas por perfil, nomes de saída e preservação byte a byte do fluxo
-   de baixo. Se a página/API mudar, rodar o marcador `navegador`.
-4. **Concluir o M5 para piano.** Atualizar a comparação de compatibilidade do baixo se a nova integração tocar código
-   compartilhado; confirmar que piano não altera as fixtures e os artefatos do baixo. Executar suítes padrão, lint,
-   tipagem, testes reais do MuseScore e o caminho pesado aplicável.
+1. [x] Generalizar o contrato do transcritor (ADR-044, M1), mantendo notas e ataques de bateria separados no domínio.
+2. [x] Corrigir os nomes das partes e o título de origem na exportação MusicXML multifaixa.
+3. [x] ~~Spike e integração do piano acústico (ADR-044, M3)~~ — fora da prioridade por orientação do usuário; não agendado.
 
-O detalhamento de requisitos e medições continua nas seções [M1](#m1--contrato-de-domínio-e-régua-comum-por-tdd),
-[M3](#m3--piano-depois) e [M5](#m5--compatibilidade-e-verificação-de-entrega) abaixo. O caminho do baixo é uma
-restrição permanente: qualquer mudança compartilhada precisa preservar os pisos, descartes e artefatos existentes.
+O caminho do baixo é uma restrição permanente: qualquer mudança compartilhada precisa preservar os pisos, descartes e
+artefatos existentes.
 
 ### Aguardando dados ou decisão — não bloqueia o trabalho acima
 
@@ -476,7 +461,7 @@ avisos de oitava no relatório.
 - [x] Testar primeiro e introduzir `EventoPercussivo` e `Transcricao` (`ParteMusical` espera o primeiro exportador
   novo): nota com altura continua sendo `NoteEvent`; ataque de bateria guarda instante e peça GM, sem fingir altura
   ou sustentação; pronto com testes de igualdade, ordenação e validação de cada modelo.
-- [ ] Generalizar `Transcriber` para devolver a transcrição livre completa e remover o seletor opcional do contrato;
+- [x] Generalizar `Transcriber` para devolver a transcrição livre completa e remover o seletor opcional do contrato;
   pronto quando nenhum caminho usar `--instruments` e notas mais ataques de bateria sobreviverem ao parsing real do
   JSONL.
 - [x] Manter `Separator.separate()` retornando stems nomeados, mas retirar do contrato a suposição de “baixo”; pronto
@@ -545,12 +530,7 @@ avisos de oitava no relatório.
   pronto quando round-trip e MuseScore real preservarem todas as alturas, ataques, durações quantizadas, clave e
   pauta. → `MusicXmlPianoExporter` (emenda do ADR-044): no máximo 4 vozes por pauta, porque o MuseScore descarta a
   5ª; acima disso a duração encolhe (decisão do usuário), altura e ataque não. Beams consertados voz a voz (ADR-038).
-- [ ] Fazer o spike de GP5 antes de prometer o formato: cobrir A0, C8, acorde de dez notas e duas vozes; pronto quando
-  PyGuitarPro e um leitor independente preservarem tudo sem cordas/trastes fictícios visíveis. Se falhar, o teste
-  deve exigir erro “GP5 não suportado para piano” e o MusicXML será o artefato canônico.
-- [ ] Integrar `--instrumento piano-acustico`; pronto com teste ponta a ponta pelo stem `other`, diagnóstico de
-  contaminação por outros instrumentos e ausência de qualquer chamada ao atribuidor de trastes. O `piano-eletrico`
-  continua recusado (decisão do usuário, 2026-09-25: o veredito de fora de escopo vale).
+- [x] ~~Spike de GP5 e integração do piano acústico~~ — fora da prioridade por orientação do usuário (2026-09-28).
 
 #### M4 — guitarra polifônica por último
 

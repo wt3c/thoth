@@ -86,6 +86,8 @@ class MusicXmlExporter:
     """O baixo segue monofônico, em `Bass8vb`; a guitarra empilha acordes em `Treble8vb`."""
     programa_gm: int = 33
     """Programa GM da guitarra, do perfil. O baixo continua como `ElectricBass`."""
+    nome_da_parte: str | None = None
+    """Nome legível da faixa; usado explicitamente na partitura multifaixa."""
 
     def export(self, notes: list[TabNote], out: Path, tuning: tuple[int, ...]) -> Path:
         if not notes:
@@ -136,10 +138,16 @@ class MusicXmlExporter:
             parte.insert(0, layout.StaffLayout(staffLines=len(tuning)))
         else:
             if self.familia == "guitarra":
-                parte.insert(0, instrument.instrumentFromMidiProgram(self.programa_gm))
+                instrumento_musical = instrument.instrumentFromMidiProgram(self.programa_gm)
+                if self.nome_da_parte is not None:
+                    parte.partName = self.nome_da_parte
+                parte.insert(0, instrumento_musical)
                 parte.insert(0, clef.Treble8vbClef())
             else:
-                parte.insert(0, instrument.ElectricBass())
+                instrumento_musical = instrument.ElectricBass()
+                if self.nome_da_parte is not None:
+                    parte.partName = self.nome_da_parte
+                parte.insert(0, instrumento_musical)
                 parte.insert(0, clef.Bass8vbClef())
             parte.insert(0, tempo.MetronomeMark(number=round(self.bpm)))
             if self.armadura is not None:

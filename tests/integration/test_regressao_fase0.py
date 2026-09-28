@@ -68,7 +68,7 @@ def test_fixture_nao_regrediu(
 ) -> None:
     wav, _ = renderizar(nome, tmp_path)
     referencia = notas_do_midi(tmp_path / f"{nome}.mid")
-    todas = MuscriptorTranscriber(model="small").transcribe(wav)
+    todas = MuscriptorTranscriber(model="small").transcribe(wav).notas
     estimativa = [n for n in todas if n.instrument == "electric_bass"]
 
     # Sem isto, um rótulo diferente (ADR-008: o MuScriptor já chamou baixo de

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import shutil
+import xml.etree.ElementTree as ET
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -10,7 +11,7 @@ import guitarpro as gp
 import numpy as np
 import soundfile as sf
 
-from thoth.domain.models import TUNING_BASS_5, AudioAsset, NoteEvent
+from thoth.domain.models import TUNING_BASS_5, AudioAsset, NoteEvent, Transcricao
 from thoth.services.pipeline import transcrever
 
 
@@ -36,22 +37,22 @@ class SeparadorDeTodasAsFamilias:
 
 @dataclass(frozen=True, slots=True)
 class TranscritorPorStem:
-    def transcribe(self, audio: Path, instrument: str | None = None) -> list[NoteEvent]:
+    def transcribe(self, audio: Path) -> Transcricao:
         if audio.stem == "bass":
-            return [
+            return Transcricao.do_muscriptor([
                 NoteEvent(36, 0.0, 0.45, "electric_bass"),
                 NoteEvent(38, 0.5, 0.95, "electric_bass"),
-            ]
+            ])
         if audio.stem == "other":
-            return [
+            return Transcricao.do_muscriptor([
                 NoteEvent(52, 0.0, 0.45, "clean_electric_guitar"),
                 NoteEvent(53, 0.5, 0.95, "distorted_electric_guitar"),
                 NoteEvent(55, 1.0, 1.45, "acoustic_guitar"),
-            ]
-        return [
+            ])
+        return Transcricao.do_muscriptor([
             NoteEvent(36, 0.0, 0.1, "drums"),
             NoteEvent(42, 0.5, 0.6, "drums"),
-        ]
+        ])
 
 
 def test_todos_combina_partes_e_entrega_somente_wavs_de_baixo(tmp_path: Path) -> None:
@@ -73,12 +74,16 @@ def test_todos_combina_partes_e_entrega_somente_wavs_de_baixo(tmp_path: Path) ->
     )
 
     musica = gp.parse(str(resultado.artefatos["gp5"]))
+    xml = ET.parse(resultado.artefatos["musicxml"]).getroot()
     assert [faixa.name for faixa in musica.tracks] == [
         "Baixo",
         "Guitarra limpa",
         "Guitarra distorcida",
         "Guitarra acústica",
         "Bateria",
+    ]
+    assert [parte.text for parte in xml.iter("part-name")] == [
+        "Baixo", "Guitarra limpa", "Guitarra distorcida", "Guitarra acústica", "Bateria"
     ]
     assert len(musica.tracks[0].strings) == 5
     assert resultado.instrumento == "todos"

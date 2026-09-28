@@ -51,7 +51,7 @@ pytestmark = [
 
 
 def _transcrever(wav: Path) -> list[NoteEvent]:
-    todas = MuscriptorTranscriber(model="small").transcribe(wav)
+    todas = MuscriptorTranscriber(model="small").transcribe(wav).notas
     baixo = [n for n in todas if n.instrument == "electric_bass"]
     assert baixo, f"nenhuma nota electric_bass; rótulos: {Counter(n.instrument for n in todas)}"
     return baixo

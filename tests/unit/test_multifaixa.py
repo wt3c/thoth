@@ -40,7 +40,7 @@ def test_gp5_combina_cordas_e_percussao_em_faixas_reais(tmp_path: Path) -> None:
 
 
 def test_musicxml_combina_partes_sem_colidir_ids(tmp_path: Path) -> None:
-    baixo = MusicXmlExporter(bpm=120, titulo="Estudo").export(
+    baixo = MusicXmlExporter(bpm=120, titulo="Estudo", nome_da_parte="Baixo").export(
         _baixo(), tmp_path / "baixo.musicxml", TUNING_BASS_4
     )
     bateria = MusicXmlPercussaoExporter(bpm=120, titulo="Estudo").exportar(
@@ -58,10 +58,25 @@ def test_musicxml_combina_partes_sem_colidir_ids(tmp_path: Path) -> None:
     assert len(ids) == len(set(ids))
     assert len(instrumentos) == len(set(instrumentos))
     nomes = {
-        elemento.text
-        for tag in ("part-name", "instrument-name")
-        for elemento in raiz.iter(tag)
+        elemento.text or ""
+        for elemento in raiz.iter("part-name")
     }
-    assert nomes >= {"Electric Bass", "Bateria"}
+    assert nomes == {"Baixo", "Bateria"}
     # O music21 expande as duas pautas da parte de baixo em objetos separados.
     assert len(converter.parse(str(saida)).parts) == 3
+
+
+def test_musicxml_multifaixa_nomeia_explicitamente_baixo_e_guitarra(tmp_path: Path) -> None:
+    baixo = MusicXmlExporter(bpm=120, titulo="Estudo", nome_da_parte="Baixo").export(
+        _baixo(), tmp_path / "baixo.musicxml", TUNING_BASS_4
+    )
+    guitarra = MusicXmlExporter(
+        bpm=120, titulo="Estudo", familia="guitarra", programa_gm=27,
+        nome_da_parte="Guitarra limpa",
+    ).export(_baixo(), tmp_path / "guitarra.musicxml", TUNING_BASS_4)
+
+    saida = CompositorMusicXml().combinar([baixo, guitarra], tmp_path / "todos.musicxml")
+    raiz = ET.parse(saida).getroot()
+    nomes = [elemento.text for elemento in raiz.iter("part-name")]
+
+    assert nomes == ["Baixo", "Guitarra limpa"]

@@ -71,6 +71,47 @@ def test_duracao_detectada(mp3_de_teste: Path, tmp_path: Path) -> None:
     assert ativo.duration_s == pytest.approx(2.0, abs=0.2)
 
 
+def test_wav_mix_normalizado_no_cache_nao_vira_titulo_da_partitura(
+    mp3_de_teste: Path, tmp_path: Path
+) -> None:
+    """Sem metadados originais, a identidade da fonte é melhor que o nome técnico `mix`."""
+    cache_origem = tmp_path / "cache" / "0123456789abcdef"
+    cache_origem.mkdir(parents=True)
+    mix = cache_origem / "mix.wav"
+    subprocess.run(
+        ["ffmpeg", "-y", "-i", str(mp3_de_teste), "-ar", "44100", "-ac", "2",
+         "-loglevel", "error", str(mix)],
+        check=True,
+    )
+
+    ativo = LocalFileSource().fetch(str(mix), tmp_path / "cache-destino")
+
+    assert ativo.title == ativo.source_id
+    assert ativo.title != "mix"
+
+
+def test_wav_de_cache_youtube_recupera_titulo_do_meta_json(
+    mp3_de_teste: Path, tmp_path: Path
+) -> None:
+    import json
+
+    pasta = tmp_path / "cache" / "yt_abcdefghijk"
+    pasta.mkdir(parents=True)
+    mix = pasta / "mix.wav"
+    subprocess.run(
+        ["ffmpeg", "-y", "-i", str(mp3_de_teste), "-ar", "44100", "-ac", "2",
+         "-loglevel", "error", str(mix)],
+        check=True,
+    )
+    (pasta / "meta.json").write_text(
+        json.dumps({"title": "Título original", "artist": "Artista", "duration_s": 2.0})
+    )
+
+    ativo = LocalFileSource().fetch(str(mix), tmp_path / "cache-destino")
+
+    assert (ativo.title, ativo.artist) == ("Título original", "Artista")
+
+
 def test_arquivo_inexistente_falha_claro(tmp_path: Path) -> None:
     with pytest.raises(FileNotFoundError, match="não encontrado"):
         LocalFileSource().fetch(str(tmp_path / "nao_existe.mp3"), tmp_path / "cache")

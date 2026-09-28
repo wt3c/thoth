@@ -24,7 +24,7 @@ from tests.sintetico import BPM as BPM_FIXTURE
 from tests.sintetico import SOUNDFONT, renderizar
 from tests.sintetico_multi import FIXTURES_MULTI, referencia, renderizar_multi
 from thoth.domain.instrumentos import PERFIS
-from thoth.domain.models import ROTULO_BATERIA, EventoPercussivo, NoteEvent
+from thoth.domain.models import ROTULO_BATERIA, EventoPercussivo, NoteEvent, Transcricao
 from thoth.services.cache_notas import ler
 from thoth.services.evaluation import avaliar_bateria
 from thoth.services.pipeline import transcrever, transcritor_padrao
@@ -54,8 +54,8 @@ class SeparadorFalso:
 class TranscritorFalso:
     notas: tuple[NoteEvent, ...]
 
-    def transcribe(self, audio: Path, instrument: str | None = None) -> list[NoteEvent]:
-        return list(self.notas)
+    def transcribe(self, audio: Path) -> Transcricao:
+        return Transcricao.do_muscriptor(list(self.notas))
 
 
 def _ataque(peca: int, onset: float, rotulo: str = ROTULO_BATERIA) -> NoteEvent:
@@ -249,4 +249,3 @@ def test_caminho_completo_de_bateria_com_demucs_e_muscriptor_reais(tmp_path: Pat
     assert not {"baixo", "sem-baixo"} & set(r.artefatos)
     bytes_de = {k: r.artefatos[k].read_bytes() for k in ("mix", "bateria", "sem-bateria")}
     assert len({*bytes_de.values()}) == 3, "mix, bateria e sem-bateria têm que diferir"
-

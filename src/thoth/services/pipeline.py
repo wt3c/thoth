@@ -58,11 +58,13 @@ from thoth.adapters.separation import DemucsMultifaixaSeparator, DemucsSeparator
 from thoth.adapters.transcription.muscriptor import MuscriptorTranscriber
 from thoth.domain.instrumentos import PERFIS, PerfilInstrumento
 from thoth.domain.models import (
+    ROTULO_BATERIA,
     AcordeImpossivel,
     AudioAsset,
     EventoPercussivo,
     NoteEvent,
     TabNote,
+    Transcricao,
 )
 from thoth.domain.ports import (
     AtribuidorDeAcordes,
@@ -119,6 +121,8 @@ _PARTES_MULTIFAIXA = (
     "bateria",
 )
 _NOMES_DE_FAIXA = {
+    "baixo": "Baixo",
+    "bateria": "Bateria",
     "guitarra-limpa": "Guitarra limpa",
     "guitarra-distorcida": "Guitarra distorcida",
     "guitarra-acustica": "Guitarra acústica",
@@ -188,13 +192,12 @@ class _TranscritorComCache:
     """Evita pagar três vezes pela mesma transcrição do stem `other`."""
 
     base: Transcriber
-    por_audio: dict[Path, list[NoteEvent]] = field(default_factory=dict)
+    por_audio: dict[Path, Transcricao] = field(default_factory=dict)
 
-    def transcribe(self, audio: Path, instrument: str | None = None) -> list[NoteEvent]:
+    def transcribe(self, audio: Path) -> Transcricao:
         if audio not in self.por_audio:
             self.por_audio[audio] = self.base.transcribe(audio)
-        notas = self.por_audio[audio]
-        return [nota for nota in notas if instrument is None or nota.instrument == instrument]
+        return self.por_audio[audio]
 
 
 @dataclass(frozen=True, slots=True)
@@ -247,6 +250,7 @@ def transcrever(
     progresso: Progresso | None = None,
     _copiar_audios: bool = True,
     _gerar_auralizacao: bool = True,
+    _nome_da_parte: str | None = None,
 ) -> Resultado:
     """Caminho ou URL → uma pasta por música em `out_dir`, nomeada pelo título (ADR-037).
 
@@ -334,8 +338,17 @@ def transcrever(
     stem = stems[perfil.stem]
 
     relator.inicia("transcrevendo as notas", "MuScriptor, o outro estágio caro")
-    todas = transcriber.transcribe(stem)
+    transcricao = transcriber.transcribe(stem)
+    todas = list(transcricao.notas)
     rotulos = Counter(n.instrument for n in todas)
+    if transcricao.ataques:
+        rotulos[ROTULO_BATERIA] += len(transcricao.ataques)
+    # Ponte temporária da transcrição tipada ao processador de bateria legado:
+    # a duração de 10 ms é somente representação do cache/auralização, não sustain.
+    todas.extend(
+        NoteEvent(a.peca_gm, a.instante_s, a.instante_s + 0.01, ROTULO_BATERIA)
+        for a in transcricao.ataques
+    )
     # O perfil entra no nome de tudo que não é do baixo: a guitarra da mesma música
     # cai na mesma pasta, e o baixo tem que continuar byte a byte onde estava (M5).
     sufixo = "" if perfil.familia == "baixo" else f".{instrumento}"
@@ -368,12 +381,15 @@ def transcrever(
             ),
             "musicxml": MusicXmlExporter(
                 bpm=parte.bpm, armadura=armadura, titulo=asset.title, familia="guitarra",
-                programa_gm=perfil.programa_gm,
+                programa_gm=perfil.programa_gm, nome_da_parte=_nome_da_parte,
             ),
         }
     exporters = exporters or {
         "gp5": Gp5Exporter(bpm=parte.bpm, armadura=armadura, titulo=asset.title),
-        "musicxml": MusicXmlExporter(bpm=parte.bpm, armadura=armadura, titulo=asset.title),
+        "musicxml": MusicXmlExporter(
+            bpm=parte.bpm, armadura=armadura, titulo=asset.title,
+            nome_da_parte=_nome_da_parte,
+        ),
     }
 
     # Uma pasta por música, e o nome repetido dentro dela (ADR-037): oito músicas
@@ -483,6 +499,7 @@ def _transcrever_todas_as_partes(
         progresso=progresso,
         instrumento="baixo",
         _gerar_auralizacao=gerar_auralizacao,
+        _nome_da_parte=_NOMES_DE_FAIXA["baixo"],
     )
     resultados.append(baixo)
 
@@ -510,6 +527,7 @@ def _transcrever_todas_as_partes(
                     instrumento=instrumento,
                     _copiar_audios=False,
                     _gerar_auralizacao=False,
+                    _nome_da_parte=_NOMES_DE_FAIXA[instrumento],
                 )
             )
         except ValueError as erro:
@@ -714,8 +732,7 @@ def _parte_de_bateria(
     na_grade = deslocar(do_perfil, recuo)
     no_mapa = [n for n in na_grade if n.pitch in MAPA_PERCUSSAO]
     ataques = [EventoPercussivo(n.onset_s, n.pitch) for n in no_mapa]
-    # Pela identidade, não pela igualdade: a repetida no tique pode ser igual à mantida,
-    # e o cache precisa da nota que de fato foi para a partitura.
+    # Pela identidade: o cache guarda a nota da origem correspondente ao ataque mantido.
     nota_de = {id(a): n for a, n in zip(ataques, no_mapa, strict=True)}
     grupos, repetidas = ataques_em_ticks(ataques, andamento_fino)
     # Mais peças que cordas na faixa: ficam as de número GM mais baixo, que no mapa são
@@ -739,7 +756,8 @@ def _parte_de_bateria(
         if lista
     }
     notas_no_audio = sorted(
-        deslocar([nota_de[id(a)] for a in mantidos], -recuo), key=lambda n: (n.onset_s, n.pitch)
+        deslocar([nota_de[id(a)] for a in mantidos], -recuo),
+        key=lambda n: (n.onset_s, n.pitch),
     )
     gravar(notas_no_audio, cache_de_notas)
     return _Parte(

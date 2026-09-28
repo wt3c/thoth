@@ -16,7 +16,7 @@ import pytest
 import soundfile as sf
 
 from tests.sintetico import SOUNDFONT, renderizar
-from thoth.domain.models import TUNING_BASS_5, AudioAsset, NoteEvent
+from thoth.domain.models import TUNING_BASS_5, AudioAsset, NoteEvent, Transcricao
 from thoth.services.cache_notas import ler
 from thoth.services.pipeline import ROTULOS_DE_BAIXO, transcrever
 
@@ -53,8 +53,8 @@ class EtapasVistas:
 class TranscritorFalso:
     notas: tuple[NoteEvent, ...]
 
-    def transcribe(self, audio: Path, instrument: str | None = None) -> list[NoteEvent]:
-        return [n for n in self.notas if instrument is None or n.instrument == instrument]
+    def transcribe(self, audio: Path) -> Transcricao:
+        return Transcricao.do_muscriptor(list(self.notas))
 
 
 def _nota(pitch: int, onset: float, rotulo: str = "electric_bass") -> NoteEvent:
