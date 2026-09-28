@@ -4,9 +4,9 @@
 
 ## Publicação do guia didático (2026-09-28)
 
-1. [ ] Revisar o diff e executar a verificação de entrega antes do commit.
-2. [ ] Criar commit da implementação e publicar `develop` em `origin`.
-3. [ ] Integrar no branch de produção indicado pelo usuário e confirmar o estado remoto.
+1. [x] Revisar o diff e executar a verificação de entrega antes do commit: 561 testes padrão, Ruff e mypy passaram.
+2. [x] Criar o commit `4bceeb5` da implementação e publicar `develop` em `origin`.
+3. [x] Integrar `develop` em `main` pelo merge `710b978` e publicar o branch de produção em `origin`.
 
 ## Teste do guia com _Eyrie_ (2026-09-28)
 
