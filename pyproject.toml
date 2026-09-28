@@ -1,6 +1,6 @@
 [project]
 name = "thoth"
-version = "0.1.0"
+version = "0.2.0"
 description = "Áudio → partitura e tablatura, com foco em contrabaixo elétrico"
 readme = "README.md"
 license = "MIT"
