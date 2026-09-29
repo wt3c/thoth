@@ -2,6 +2,42 @@
 
 > Áudio → partitura e tablatura, foco em contrabaixo. Uso pessoal. CPU-only. Decisões em `tasks/decisions.md`.
 
+## Reprocessamento multifaixa do acervo (2026-09-28)
+
+**Plano (execução não interativa):** reprocessar as músicas reais do acervo com o perfil `todos`, começando por _Thalles Roberto - A Resposta (vídeo oficial)_. Usar os URLs correspondentes aos IDs já registrados em `cache/` para aproveitar a mix e as notas de baixo existentes. Preservar a afinação de cinco ou seis cordas das músicas que a usam. Deixar _Eyrie_ fora do lote por já ter sido concluída, e ignorar a fixture `misto` e a cópia técnica `.aural`.
+
+1. [x] Reprocessar e conferir _A Resposta_: GP5/MusicXML multifaixa com Baixo e Bateria; as três categorias de guitarra não tiveram eventos válidos. Os dois guias de estudo foram regenerados e a afinação de quatro cordas foi preservada.
+2. [x] Reprocessar as outras 12 músicas e comunicar cada conclusão: _Dance of Death_, _Fear Is the Key_, _Fear of the Dark_, _Feel Like Makin' Love_, _Hallowed Be Thy Name_, _And Plague Flowers the Kaleidoscope_, _Equus_, _Everything Changes_, _SOU EU_, _Is It A Crime_, _Smooth Operator_ e _Tive Razão_. Todos os GP5/MusicXML multifaixa e os guias solo/multifaixa foram gerados e conferidos; os perfis sem eventos válidos foram relatados e as afinações de quatro, cinco ou seis cordas foram preservadas.
+3. [x] Conferir cobertura: 13 músicas do acervo reprocessadas, _Eyrie_ excluída por já estar concluída; GP5 e MusicXML com faixas disponíveis, guias solo e multifaixa presentes, sem falhas finais. As faixas incluídas dependem dos eventos válidos encontrados nos stems; o processamento em CPU não garante que cada música tenha eventos em todas as categorias de guitarra.
+
+### Resultado por música (GP5/MusicXML `todos`)
+
+| Música | Afinação do baixo | Faixas presentes |
+|---|---:|---|
+| _A Resposta_ | 4 cordas | Baixo, Bateria |
+| _Dance of Death_ | 4 cordas | Baixo, Guitarra distorcida, Guitarra acústica, Bateria |
+| _Fear Is the Key_ | 4 cordas | Baixo, Guitarra distorcida, Bateria |
+| _Fear of the Dark_ | 4 cordas | Baixo, Guitarra distorcida, Bateria |
+| _Feel Like Makin' Love_ | 4 cordas | Baixo, Guitarra limpa, Bateria |
+| _Hallowed Be Thy Name_ | 4 cordas | Baixo, Guitarra distorcida, Guitarra acústica, Bateria |
+| _And Plague Flowers the Kaleidoscope_ | 6 cordas | Baixo, Guitarra acústica, Bateria |
+| _Equus_ | 5 cordas | Baixo, Guitarra limpa, Guitarra distorcida, Guitarra acústica, Bateria |
+| _Everything Changes_ | 4 cordas | Baixo, Guitarra limpa, Guitarra acústica, Bateria |
+| _SOU EU_ | 4 cordas | Baixo, Guitarra distorcida, Guitarra acústica, Bateria |
+| _Is It A Crime_ | 4 cordas | Baixo, Guitarra limpa, Guitarra distorcida, Bateria |
+| _Smooth Operator_ | 4 cordas | Baixo, Guitarra limpa, Bateria |
+| _Tive Razão_ | 4 cordas | Baixo, Guitarra acústica, Bateria |
+
+_Eyrie_ já tinha sido processada separadamente e não integra as 13 acima.
+
+## Guias de estudo das músicas do acervo, exceto _Eyrie_ (2026-09-28)
+
+**Plano (execução não interativa):** gerar os guias Markdown com `thoth estudar` para os GP5 musicais já presentes em `out/`, começando por _Thalles Roberto - A Resposta (vídeo oficial)_. Incluir as versões solo e multifaixa quando houver baixo em ambas. Excluir _Eyrie_, a fixture sintética `misto` e a cópia técnica `.aural`; arquivos sem faixa de baixo serão relatados.
+
+1. [x] Gerar e conferir os dois guias de _Thalles Roberto - A Resposta (vídeo oficial)_: 431 ataques, primeiro ataque no compasso 23 e tom candidato F# menor (margem 0,28) em ambos.
+2. [x] Gerar e conferir os guias das outras 12 músicas com faixa de baixo, informando a conclusão de cada música.
+3. [x] Conferir a cobertura: 14 GP5 musicais alvo, 14 guias presentes e completos, sem falhas; os dois guias preexistentes de _Eyrie_ ficaram fora do lote. O tom de cada guia é candidato inferido da linha de baixo, sujeito a conferência harmônica.
+
 ## Publicação do guia didático (2026-09-28)
 
 1. [x] Revisar o diff e executar a verificação de entrega antes do commit: 561 testes padrão, Ruff e mypy passaram.

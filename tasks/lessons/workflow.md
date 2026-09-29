@@ -1,5 +1,51 @@
 # Lições — workflow
 
+## Reprocessar o acervo em multifaixa sem perder trabalho concluído
+
+**2026-09-29.** O lote real de 13 músicas (todas menos _Eyrie_, que já tinha a
+multifaixa) confirmou a ordem e os custos do fluxo `--instrumento todos`.
+`DemucsMultifaixaSeparator` executa `htdemucs_ft` sobre a mix completa em CPU;
+uma separação pode levar dezenas de minutos, e stems/áudios longos podem levar
+mais tempo no MuScriptor. Processos simultâneos podem aumentar a vazão total,
+mas consomem vários núcleos e alguns GB de RAM cada. Durante uma separação, os arquivos ficam
+sob `cache/stems/<source_id>/htdemucs_ft/4.1.0-multifaixa.parcial`; quando o
+estágio termina, são publicados sob `4.1.0-multifaixa`. Não tratar a ausência de
+arquivos na pasta final enquanto `.parcial` existe como falha nem iniciar uma
+segunda separação para o mesmo ID.
+
+**Como aplicar:**
+
+- Reaproveitar `cache/yt_<id>/meta.json`, `mix.wav` e `notas.jsonl` quando
+  pertencem à música solicitada. A URL com o ID registrado faz o
+  `YtDlpSource` atingir esse cache; não baixar a mix outra vez.
+- Ler a afinação real da faixa `Baixo` no GP5 solo anterior e passá-la ao
+  pipeline. Não deduzir afinação apenas pelo número de cordas: há afinações
+  diferentes com o mesmo número. Conferir a afinação relendo o GP5 multifaixa.
+- O perfil `todos` separa os stems completos uma vez; guitarra e bateria
+  compartilham os stems. A transcrição e a inclusão de cada perfil são
+  condicionais aos eventos válidos encontrados. Faixa ausente deve ser relatada,
+  não inventada nem criada vazia (ADR-047). GP5/MusicXML são saídas da
+  multifaixa; os stems são intermediários de cache.
+- Se a solicitação cobre apenas tablaturas e os WAVs existentes devem ser
+  mantidos, a rotina interna pode passar `_gerar_auralizacao=False`. Em uma
+  execução sob sandbox, a chamada ao FluidSynth da auralização ficou presa; não
+  repetir essa etapa para produzir GP5/MusicXML. A geração de auralização é uma
+  tarefa separada e deve ser reavaliada quando solicitada.
+- `gerar_guia(caminho)` **retorna o conteúdo Markdown como `str`**; não retorna
+  um caminho nem grava o arquivo. Gravar esse conteúdo explicitamente em
+  `<nome>.estudo.md` ou `<nome>.todos.estudo.md` ao lado do GP5. Um erro nessa
+  etapa pode retornar código diferente de zero depois de GP5 e MusicXML já terem
+  sido gravados: verificar os artefatos antes de repetir o pipeline caro.
+- Ao derivar o caminho do GP5 solo a partir de `nome.todos.gp5`, remover o
+  sufixo completo `.todos.gp5` antes de acrescentar `.gp5`. Não usar
+  `Path.with_suffix()` sobre o título: títulos como `... ft. ...` contêm pontos
+  que não são extensões.
+- Cobertura final: para cada música, abrir o GP5 multifaixa com PyGuitarPro,
+  confirmar `Baixo` e `Bateria`, conferir a afinação, verificar e fazer parse do
+  MusicXML e confirmar a presença dos guias solo e multifaixa. A contagem do lote
+  atual foi 13/13. Verificar as faixas observadas em cada música; não exigir as
+  cinco categorias quando um perfil não teve eventos válidos.
+
 ## Não exigir que o iniciante saiba o tom antes de estudar a tab
 
 **2026-09-28.** O primeiro guia só mostrava graus quando o usuário informava `--tom`. O usuário perguntou se o tom
