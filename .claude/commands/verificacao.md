@@ -3,6 +3,8 @@ description: Roda a verificação de entrega do Thoth — testes, lint e tipos
 allowed-tools: Bash(uv run pytest:*), Bash(uv run ruff:*), Bash(uv run mypy:*)
 ---
 
+# Verificação
+
 Rode os três comandos da verificação, nesta ordem, e **não pare no primeiro que falhar** —
 o relatório precisa dizer o estado dos três:
 

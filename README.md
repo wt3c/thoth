@@ -7,7 +7,7 @@ rodando localmente em CPU.
 
 ## Como funciona
 
-```
+```text
 arquivo de áudio  ou  link do YouTube
    │
    ▼
@@ -60,17 +60,17 @@ da sessão Linux e não acompanha um player do Windows, do WSL ou do host a part
 
 ### O que será instalado
 
-| Componente                      |                   Obrigatório | Finalidade                                                               |
-|---------------------------------|------------------------------:|--------------------------------------------------------------------------|
-| Git                             |                           sim | obter o repositório                                                      |
-| `uv`                            |                           sim | instalar o Python 3.12, as dependências e executar o projeto             |
-| `ffmpeg` e `ffprobe`            |                           sim | normalizar áudio e montar os arquivos de saída                           |
-| `yt-dlp`                        |               só para YouTube | baixar a faixa de áudio de uma URL                                       |
-| `fluidsynth` + `FluidR3_GM.sf2` |                   recomendado | gerar a auralização; sem eles, GP5 e MusicXML continuam sendo exportados |
-| Node.js + npm                   |         só para `thoth serve` | baixar o alphaTab uma vez; Node não participa da execução da aplicação   |
-| `dbus-next`                     | só para sincronização externa | biblioteca Python instalada automaticamente pelo `uv sync`             |
-| Sessão D-Bus + player MPRIS     | só para sincronização externa | ler estado/posição de um player no Linux; instalado à parte             |
-| Docker + Compose                | só na instalação em contêiner | construir e executar a imagem local                                      |
+| Componente | Obrigatório | Finalidade |
+| --- | --- | --- |
+| Git | sim | obter o repositório |
+| `uv` | sim | instalar o Python 3.12, as dependências e executar o projeto |
+| `ffmpeg` e `ffprobe` | sim | normalizar áudio e montar os arquivos de saída |
+| `yt-dlp` | só para YouTube | baixar a faixa de áudio de uma URL |
+| `fluidsynth` + `FluidR3_GM.sf2` | recomendado | gerar a auralização; sem eles, GP5 e MusicXML continuam sendo exportados |
+| Node.js + npm | só para `thoth serve` | baixar o alphaTab uma vez; Node não participa da execução da aplicação |
+| `dbus-next` | só para sincronização externa | biblioteca Python instalada automaticamente pelo `uv sync` |
+| Sessão D-Bus + player MPRIS | só para sincronização externa | ler estado/posição de um player no Linux; instalado à parte |
+| Docker + Compose | só na instalação em contêiner | construir e executar a imagem local |
 
 Demucs e MuScriptor **não** são instalados globalmente. O pipeline chama versões fixadas por `uvx` e guarda os
 ambientes no cache do `uv`. A primeira transcrição também baixa os pesos dos modelos; reserve alguns gigabytes em disco
@@ -331,7 +331,7 @@ somente a auralização: os demais artefatos continuam válidos e a causa é exi
 Principais opções:
 
 | Opção | Padrão | Efeito |
-|---|---|---|
+| --- | --- | --- |
 | `--instrumento` | `baixo` | Escolhe `todos`, `baixo`, `bateria`, `guitarra-acustica`, `guitarra-limpa` ou `guitarra-distorcida`. |
 | `--afinacao` | `4` | Afinação do baixo: `4`, `5`, `6` ou `drop-d`; é recusada para outros instrumentos. |
 | `--digitacao` | `iniciante` | Define o custo de posicionamento no braço: `iniciante` ou `experiente`. |
@@ -347,7 +347,7 @@ margem é pequena.
 Cada música recebe uma pasta `out/<título>/`. Os arquivos específicos dependem do instrumento:
 
 | Instrumento | Partitura | Áudios específicos |
-|---|---|---|
+| --- | --- | --- |
 | baixo | `<título>.gp5`, `<título>.musicxml` | `.baixo.wav`, `.sem-baixo.wav`, `.aural.wav` |
 | guitarra | `<título>.<perfil>.gp5`, `<título>.<perfil>.musicxml` | `.outros.wav`, `.sem-outros.wav`, `.<perfil>.aural.wav` |
 | bateria | `<título>.bateria.gp5`, `<título>.bateria.musicxml` | `.bateria.wav`, `.sem-bateria.wav`, `.bateria.aural.wav` |

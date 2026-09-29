@@ -11,7 +11,7 @@ devolva PCM. Extrair exigiria re-gravação de loopback ou circunvenção de DRM
 **Consequência:** o Spotify permanece útil só para sincronizar o cursor de reprodução (`/me/player/currently-playing`),
 nunca para obter áudio.
 
-### Emenda (2026-09-26)
+## Emenda (2026-09-26)
 
 A consequência acima registrava uma possibilidade antiga, não uma integração aprovada. A proposta de Web API do Spotify
 foi rejeitada no ADR-043. Para acompanhar reprodução externa, o Thoth implementa somente MPRIS local conforme o ADR-046;
@@ -50,9 +50,11 @@ placa ou instalar os wheels não prova que os kernels executaram nela.
 **Decisão mantida:** Thoth continua CPU-only. A possibilidade experimental fica documentada, mas não será instalada,
 configurada nem integrada nesta estação; portanto, não altera os adaptadores, dependências ou comando padrão.
 
-Fontes consultadas em 2026-09-28: [matriz de GPUs do TheRock](https://github.com/ROCm/TheRock/blob/main/SUPPORTED_GPUS.md),
+Fontes consultadas em 2026-09-28: [matriz de GPUs do
+TheRock](https://github.com/ROCm/TheRock/blob/main/SUPPORTED_GPUS.md),
 [instruções dos wheels ROCm/PyTorch](https://github.com/ROCm/TheRock/blob/main/RELEASES.md),
-[compatibilidade da distribuição ROCm estável](https://rocm.docs.amd.com/en/latest/compatibility/compatibility-matrix.html)
+[compatibilidade da distribuição ROCm
+estável](https://rocm.docs.amd.com/en/latest/compatibility/compatibility-matrix.html)
 e [guia AMD de alvos LLVM](https://rocm.docs.amd.com/projects/llvm-project/en/latest/LLVM/llvm/html/AMDGPUUsage.html).
 
 ---
@@ -75,7 +77,7 @@ configurável, (2) GP5 editável via PyGuitarPro, (3) MusicXML via music21, (4) 
 cache/orquestração/UI.
 
 > **Correção de premissa (2026-09-21):** a versão anterior deste ADR afirmava que o MuScriptor já produzia MusicXML, PDF
-> e tablatura, e usava isso para delimitar o escopo do Thoth. Era falso — veio do README, não da CLI. O erro _aumentava_
+> e tablatura, e usava isso para delimitar o escopo do Thoth. Era falso — veio do README, não da CLI. O erro *aumentava*
 > o escopo próprio em vez de reduzi-lo: a Fase 4 (music21 + PyGuitarPro) deixa de ser conveniência e passa a ser caminho
 > crítico, sem a qual não existe partitura alguma.
 
@@ -83,8 +85,8 @@ cache/orquestração/UI.
 viram condicionais, só justificados por evidência medida na Fase 0.
 
 > **Correção (2026-09-21):** o Beat This! **não é condicional** — é dependência obrigatória do MuScriptor
-> (`Requires-Dist: beat-this>=1.1`), usada pelo `--detect-tempo`. A condicional C2 passa a ser apenas o _quantizador
-> próprio_. Ressalva operacional: o checkpoint vem de `cloud.cp.jku.at`, host inalcançável desta estação — ver
+> (`Requires-Dist: beat-this>=1.1`), usada pelo `--detect-tempo`. A condicional C2 passa a ser apenas o *quantizador
+> próprio*. Ressalva operacional: o checkpoint vem de `cloud.cp.jku.at`, host inalcançável desta estação — ver
 > `tasks/fase0-resultados.md`. Limitação conhecida: notas sobrepostas do mesmo instrumento degradam o F1 (60,4 → 51,8) —
 > irrelevante para baixo, que é monofônico.
 
@@ -155,7 +157,7 @@ de treino do ouvinte, é física somada à cadeia de reprodução. Renderizando 
 
 Um quarto da energia do B0 está abaixo de 50 Hz, que caixa e fone comuns não reproduzem. O que sobra audível do B0 são
 seus harmônicos — a começar por 61,7 Hz, que é exatamente a **fundamental do B1**. As duas hipóteses soam quase iguais
-por construção. Submetido o A/B com a linha completa, o veredito foi _"agora as duas ficaram perfeitas"_: a Camada 2
+por construção. Submetido o A/B com a linha completa, o veredito foi *"agora as duas ficaram perfeitas"*: a Camada 2
 funcionou como projetada e disse, corretamente, que não distingue.
 
 **Consequência:** erro de oitava no registro grave é da **Camada 3**, não da 2 — como este ADR já previa ao escrever
@@ -207,8 +209,8 @@ Pro, ou Songsterr Plus) e entra aqui como arquivo local, lido pelo PyGuitarPro.
 
 **Data:** 2026-09-21 · **Status:** aceito
 
-A leitura intuitiva do `--instruments electric_bass` é "transcreva só o baixo". A CLI diz outra coisa: _"every
-instrument not in the list is forbidden from being decoded at all"_. Proibir os outros rótulos **não faz o modelo
+A leitura intuitiva do `--instruments electric_bass` é "transcreva só o baixo". A CLI diz outra coisa: *"every
+instrument not in the list is forbidden from being decoded at all"*. Proibir os outros rótulos **não faz o modelo
 ignorar aquele áudio** — força o áudio deles para dentro do rótulo permitido.
 
 Medido nos dois modelos, em áudio real (30s de `4kd_eR4216g`):
@@ -256,7 +258,7 @@ que o filtro tem um modo de falha próprio, e ele é silencioso.
 
 ### Emenda (2026-09-24) — o modo de falha apareceu numa música inteira
 
-_And Plague Flowers_ (`yt_ArBcOGvMvGU`, 653 s) saía com a transcrição acabando em 511,4 s, embora o stem continue alto
+*And Plague Flowers* (`yt_ArBcOGvMvGU`, 653 s) saía com a transcrição acabando em 511,4 s, embora o stem continue alto
 até ~655 s. A saída bruta do MuScriptor sobre o stem mostra a causa:
 
 | rótulo                  | notas | primeiro ataque | último ataque |
@@ -287,7 +289,7 @@ todos os 16 stems em cache (5 fixtures, 11 músicas), duas opções:
 | stems                                                               | A    | B    |
 |---------------------------------------------------------------------|------|------|
 | 15 (inclusive Sade ×2, SOJA, Seu Jorge — os candidatos a vazamento) | +0   | +0   |
-| _And Plague Flowers_                                                | +879 | +621 |
+| *And Plague Flowers*                                                | +879 | +621 |
 
 Nas outras 15, a única coisa fora de `ROTULOS_DE_BAIXO` é `drums`. Ficou **B**: a diferença de 258 notas são justamente
 as da transição, perto de um ataque de baixo — o que o ADR-010 manda tratar como vazamento — e B deixa o filtro intacto
@@ -300,14 +302,14 @@ O aviso da CLI passa a dizer `readmitidas … como baixo — se ali não há bai
 fecha:** nenhum dos 15 stems disparou o critério, então não há caso negativo — num trecho instrumental sem baixo, com
 guitarra vazando no stem, B transcreve a guitarra. O aviso diz onde ouvir.
 
-**Resultado em _And Plague Flowers_** (`--afinacao 6`): 2402 → 3023 notas, a última em 654,9 s; as descartadas continuam
+**Resultado em *And Plague Flowers*** (`--afinacao 6`): 2402 → 3023 notas, a última em 654,9 s; as descartadas continuam
 195 — o acréscimo é exatamente as 621 readmitidas. Aviso de oitava em 121 das 611 notas depois de 516,5 s (20%), contra
 658 das 2412 antes (27%): o trecho readmitido não é pior que o resto. Contra a tab (ADR-041): 1558 pares, 89,5% na mesma
 oitava contra piso de 75,2%; a janela de 540–600 s, que antes não tinha nota, dá 146 pares, **90%** contra piso de 69%.
 
 ### Emenda (2026-09-25) — o prelude forcing emudece o modelo; segunda passada onde isso acontecer
 
-**Contexto.** Em _Ne Obliviscaris - Eyrie_ (`_RMax1LS3pM`, 711 s) o MuScriptor não devolve nenhuma nota, de nenhum
+**Contexto.** Em *Ne Obliviscaris - Eyrie* (`_RMax1LS3pM`, 711 s) o MuScriptor não devolve nenhuma nota, de nenhum
 rótulo, de 557 a 671 s, com o stem de baixo soando (−28 a −24 dB, 97% da energia harmônica, 150 a 220 ataques a cada 30
 s). O caso anterior desta emenda era rótulo trocado. Este é o modelo em silêncio. Causa, uma variável por vez:
 
@@ -320,12 +322,12 @@ s). O caso anterior desta emenda era rótulo trocado. Este é o modelo em silên
 | trecho de 520 s até o fim, `--no-prelude-forcing` | 299                  |
 
 O MuScriptor corta o áudio em blocos de 5 s e, por padrão, começa cada um forçado pelas notas que o bloco anterior
-deixou abertas (_prelude forcing_). Em _Eyrie_, a partir de um ponto, todo bloco termina logo depois do prompt: 39
+deixou abertas (*prelude forcing*). Em *Eyrie*, a partir de um ponto, todo bloco termina logo depois do prompt: 39
 blocos em 15 s. O mecanismo interno não foi rastreado. A troca da flag sozinha decide. Vazamento do bumbo foi
 descartado: os ataques do stem coincidem com os da banda grave do `no_bass` no nível do acaso.
 
 **Frequência.** Varrendo as 14 músicas em cache atrás de segundos em que o stem soa (a menos de 12 dB da mediana) e não
-há ataque a até 2 s, em trechos de 10 s ou mais: só _Eyrie_ (114 s).
+há ataque a até 2 s, em trechos de 10 s ou mais: só *Eyrie* (114 s).
 
 **Decisão:** segunda passada **só quando há buraco**, do stem inteiro sem o forcing, usada apenas dentro do buraco
 alargado por 2 s de cada lado (a vizinhança que o atrasou). O buraco se mede contra os ataques de **todos** os rótulos,
@@ -336,7 +338,7 @@ porque rótulo trocado é assunto da emenda anterior, não deste caso. Fica no a
 instrumento errado, e o filtro do Thoth depende do rótulo. Desligar exigiria remedir o corpus inteiro para corrigir 1
 música em 14. Fatiar o trecho, em vez de passar o stem inteiro, viola a emenda de 2026-09-22.
 
-**Medido:** no trecho de _Eyrie_ a partir de 520 s, 0 notas no buraco com o forcing e 382 pelo `transcribe`
+**Medido:** no trecho de *Eyrie* a partir de 520 s, 0 notas no buraco com o forcing e 382 pelo `transcribe`
 (`tests/integration/test_prelude_eyrie.py`, `slow`, pula sem o arquivo em `~/thoth-fase0`). Custo: uma passada extra do
 MuScriptor, só nas músicas com buraco. **Risco aberto:** as notas do buraco vêm de uma passada sem forcing. Se vierem
 com rótulo trocado, a readmissão da emenda anterior as pega. Se forem ruins em altura, o veredito contra a tab (ADR-042)
@@ -409,11 +411,11 @@ Medido em 30s de mix real, `htdemucs_ft --two-stems=bass`, `small` livre:
 
 |                                 | mix direta                               | stem                            |
 |---------------------------------|------------------------------------------|---------------------------------|
-| Sade, _Is It A Crime_ (ao vivo) | 67 notas, E1..C3, 1 simultânea           | 62 notas, E1..C3, 1 simultânea  |
-| Seu Jorge, _Tive Razão_         | 63 notas, E1..**F#4**, **4 simultâneas** | 52 notas, E1..F#3, 1 simultânea |
+| Sade, *Is It A Crime* (ao vivo) | 67 notas, E1..C3, 1 simultânea           | 62 notas, E1..C3, 1 simultânea  |
+| Seu Jorge, *Tive Razão*         | 63 notas, E1..**F#4**, **4 simultâneas** | 52 notas, E1..F#3, 1 simultânea |
 
-**Confirmação perceptual (Camada 2, ADR-006).** O Welington ouviu os dois pares: _"a versão jorge_STEM ficou muito
-melhor, na versão MIX tem um teclado no meio"_. O teclado do arranjo aparece **dentro do canal do baixo** na transcrição
+**Confirmação perceptual (Camada 2, ADR-006).** O Welington ouviu os dois pares: *"a versão jorge_STEM ficou muito
+melhor, na versão MIX tem um teclado no meio"*. O teclado do arranjo aparece **dentro do canal do baixo** na transcrição
 da mix.
 
 O detalhe que importa: o MuScriptor **detectou o teclado corretamente** — 341 notas rotuladas `acoustic_piano` no mesmo
@@ -424,7 +426,7 @@ flag resolve isso; só remover o instrumento do áudio antes da transcrição.
 **sempre** — sem heurística de "separar só quando precisar".
 
 O par de controle decidiu isso. No Sade a separação derrubou 67 notas para 62, o que admitia duas leituras opostas: lixo
-removido ou nota real comida. A escuta resolveu — o Welington comparou os dois e eles _"soaram equivalentes"_. Separar
+removido ou nota real comida. A escuta resolveu — o Welington comparou os dois e eles *"soaram equivalentes"*. Separar
 não custa qualidade em mix limpa, então não há motivo para uma heurística de re-execução condicional carregar
 complexidade no pipeline.
 
@@ -441,7 +443,7 @@ O "custo aceito" acima vale para mix esparsa. Em mix densa a separação **paga 
 decoder não gasta passos com instrumentos que vamos descartar. Quanto mais cheio o arranjo, mais barato fica separar
 antes.
 
-A escuta do `neo_STEM` trouxe _"pegou o som da dedilhada"_. A investigação que isso disparou achou um problema diferente
+A escuta do `neo_STEM` trouxe *"pegou o som da dedilhada"*. A investigação que isso disparou achou um problema diferente
 e maior: **a separação erra a oitava**. Em 12 de 165 notas (7%) o stem diz B0 onde a mix diz B1, e as evidências
 disponíveis — continuidade melódica e espectro — apontam para a mix. Detalhe e ressalvas em `fase0-resultados.md`;
 pendente de escuta A/B focada.
@@ -461,13 +463,13 @@ fixture `misto` tem: baixo e piano saem do mesmo MIDI, e o que o piano ocupa é 
 | sem separação                      | 0,938    | 0,682     |
 | com separação                      | 0,938    | **0,968** |
 
-**O onset não se move.** Separar não recupera _quando_ — recupera _qual_. O piano não estava criando ataques falsos;
+**O onset não se move.** Separar não recupera *quando* — recupera *qual*. O piano não estava criando ataques falsos;
 estava sequestrando a altura de notas de baixo que o transcritor já ouvia no tempo certo. Bate exatamente com o que a
 escuta do `jorge` dizia, e explica por que rotular certo não bastava: o rótulo é do evento, a altura vem do espectro
 misturado.
 
 Vale para uma fixture sintética, e só. As outras cinco são baixo solo saído de MIDI limpo — medi-las com Demucs
-responderia _"atrapalha?"_, não _"ajuda?"_. Travado em `tests/integration/test_separacao_fase0.py`, com o número sem
+responderia *"atrapalha?"*, não *"ajuda?"*. Travado em `tests/integration/test_separacao_fase0.py`, com o número sem
 separação como piso: se uma troca de modelo o derrubar, o que se reabre é este ADR, não o piso.
 
 ### Emenda (2026-09-23, o piso era o número errado)
@@ -494,7 +496,7 @@ O objetivo secundário ("idealmente qualquer instrumento") encontra um teto no m
 guitarra neo-soul (Toshiki Soejima): 208 notas na mix, **7–8 simultâneas** — acorde real, não artefato.
 
 Diferente do baixo, aqui não há teste de plausibilidade estrutural: uma linha de baixo com 6 notas juntas é obviamente
-erro; um acorde de neo-soul não é. A verificação teve que ser perceptual, e o veredito foi _"o som ficou misturado"_ — a
+erro; um acorde de neo-soul não é. A verificação teve que ser perceptual, e o veredito foi *"o som ficou misturado"* — a
 manifestação audível da fraqueza já documentada do MuScriptor em notas sobrepostas do mesmo instrumento (onset F1 60,4 →
 51,8).
 
@@ -522,11 +524,11 @@ O posicionamento é um caminho ótimo sobre a frase (Viterbi), com cinco pesos: 
 (ADR-006).
 
 **O achado que motiva este ADR é negativo.** Na primeira versão os dois presets produziam **tablatura idêntica** em
-todas as linhas testadas — o modo iniciante existia só como rótulo. A causa não é calibração ruim: um custo _linear_ por
+todas as linhas testadas — o modo iniciante existia só como rótulo. A causa não é calibração ruim: um custo *linear* por
 traste desloca todas as opções de uma nota na mesma direção, então mudar seu peso quase nunca inverte o argmin. Nenhuma
 reponderação dos quatro termos originais separa os modos.
 
-**Decisão:** o que separa é uma penalidade que só morde _fora_ da zona confortável —
+**Decisão:** o que separa é uma penalidade que só morde *fora* da zona confortável —
 `acima_da_janela * max(0, traste - 5)`, zero em `PADRAO` e alta em `INICIANTE`. Com ela, 170 de 400 linhas aleatórias
 divergem, e na direção certa (o iniciante desce o braço).
 
@@ -560,7 +562,7 @@ se anuncia.
 **Consequências assumidas nesta primeira versão:**
 
 - **GP5 sem ligaduras.** Nota mais longa que a maior figura representável vira a maior figura que couber, e o resto vira
-  pausa. O _ataque_ fica exato, que é o que se lê numa tablatura. O MusicXML não tem esse limite: o `makeNotation` do
+  pausa. O *ataque* fica exato, que é o que se lê numa tablatura. O MusicXML não tem esse limite: o `makeNotation` do
   music21 resolve ligaduras e pausas sozinho a partir dos offsets.
 - **Monofonia.** Notas que caem no mesmo tique são **recusadas** (`ValueError`), não empilhadas — a tablatura é
   monofônica (ADR-012) e empilhar produziria posição impossível de tocar. Falhar alto é melhor que emitir tab que
@@ -641,13 +643,13 @@ sozinha não avisa o que foi jogado fora.
 larguras certas. Só que os três blocos estavam vazios — nenhum `<svg>` no documento.
 
 **Causa raiz.** `player.scrollElement` apontava para `#tab`, o próprio container da partitura. O `scrollElement` é o
-_viewport que rola_, não o conteúdo que é rolado; com ele apontando para o próprio conteúdo, o lazy loading do alphaTab
+*viewport que rola*, não o conteúdo que é rolado; com ele apontando para o próprio conteúdo, o lazy loading do alphaTab
 conclui que nenhuma parte está visível e nunca dispara `partialRenderFinished` — os blocos são posicionados pelo layout
 e ficam sem desenho.
 
 **Decisão.** Remover `scrollElement`. O `#tab` mora num `.painel` sem `overflow`, então quem rola é o documento — que já
 é o padrão do alphaTab. Se um dia o `#tab` for embrulhado num container `overflow:auto`, o certo é `scrollElement`
-apontar para _esse_ embrulho, nunca para o `#tab`.
+apontar para *esse* embrulho, nunca para o `#tab`.
 
 **Descartado:** `useWorkers: false` e `enableLazyLoading: false`. Ambos fazem a página renderizar, e ambos tratam
 sintoma: o primeiro não tem relação nenhuma com a falha (foi diagnóstico errado — ver lição), o segundo desliga um
@@ -730,7 +732,7 @@ Para esse usuário, o ADR-013 exigia a resposta antes de permitir a pergunta —
 **Decisão.** `--bpm` passa a ser opcional. Informado, manda sempre e nada muda. Ausente, o andamento é estimado do
 **mix** (não do stem: o pulso está na bateria, que a separação justamente remove) e o resultado é **anunciado em
 amarelo** no CLI, exposto no JSON do job (`bpm_estimado`, `bpm_confiavel`) e marcado como aviso na página. O que o
-ADR-013 proibia era o palpite _silencioso_; um palpite alto e corrigível não viola o princípio, cumpre.
+ADR-013 proibia era o palpite *silencioso*; um palpite alto e corrigível não viola o princípio, cumpre.
 
 **Dois estimadores, não um.** Medindo as fixtures de andamento conhecido (90 BPM), cada método errou onde o outro
 acertou: `beat_track` leu o `misto` a 45 (metade) e `feature.tempo` leu o `groove16` a 117. O desacordo entre eles vira
@@ -743,7 +745,7 @@ Dobrar ou dividir até cair na faixa corrige o `misto` (45 → 90) sem inventar 
 **Custo aceito:** entra o `librosa` (BSD) como dependência de produção. É a mesma peça prevista para o C2, então não é
 dívida nova.
 
-**Limite conhecido, não resolvido aqui:** um único BPM global não representa música que muda de andamento — o _Equus_ é
+**Limite conhecido, não resolvido aqui:** um único BPM global não representa música que muda de andamento — o *Equus* é
 exatamente esse caso. Seguir a curva de tempo real exigiria mudança de andamento por compasso no exportador, que hoje é
 4/4 fixo. Fica anotado, não escondido.
 
@@ -831,7 +833,7 @@ ms.
 `ajustar(onsets, bpm, faixa)` procura andamento e fase **em conjunto**, minimizando a distância mediana dos onsets
 transcritos à grade. A busca fica restrita a ±3% da estimativa do áudio.
 
-- **Juntos, não em sequência.** Refinar o BPM mantendo a âncora em `t=0` _piora_ quatro das sete (Equus 34 → 57 ms):
+- **Juntos, não em sequência.** Refinar o BPM mantendo a âncora em `t=0` *piora* quatro das sete (Equus 34 → 57 ms):
   grade mais precisa ancorada no lugar errado erra mais que grade grosseira alinhada por acaso. Não existe meia correção
   aqui.
 - **±3% e não busca livre.** A busca irrestrita corria até o teto de 192–200 BPM em seis das sete — artefato de faixa,
@@ -888,7 +890,7 @@ variável não é implementável com um único caso.
 
 ### Emenda (2026-09-23)
 
-A "duração real" que `eventos()` passou a devolver é real no sentido de _não truncada na barra_ — não no sentido de
+A "duração real" que `eventos()` passou a devolver é real no sentido de *não truncada na barra* — não no sentido de
 sustentação medida. O MuScriptor preenche `offset_s` com o onset da nota seguinte (ADR-033, provado contra fixture de
 duração conhecida), então a ligadura que este ADR passou a escrever liga a nota até a próxima, e não até onde ela parou
 de soar. O censo de notas encurtadas e a decisão de decompor no exportador não mudam: ambos foram medidos sobre
@@ -958,7 +960,7 @@ defeito de duração nosso fica invisível**.
 
 Medido no teste novo, com o corte na barra do ADR-022 reativado e três de treze notas encurtadas:
 
-```
+```text
 Scores(onset_f1=1.0, note_f1=1.0, nota_offset_f1=0.923, duracao_ratio=1.0)
 ```
 
@@ -1081,7 +1083,7 @@ limites duplicados em número solto.
 - `transcrever` **valida antes de tudo**: antes do download, antes da separação. Quem usa como biblioteca não passa pela
   CLI, e o erro não pode custar minutos de CPU.
 - A faixa aceita (20–300) é deliberadamente mais larga que a faixa musical de `dobrar_para_faixa` (70–160). A primeira
-  recusa erro de digitação; a segunda desfaz dobro/metade de uma _estimativa_. Confundir as duas recusaria um pedido
+  recusa erro de digitação; a segunda desfaz dobro/metade de uma *estimativa*. Confundir as duas recusaria um pedido
   legítimo de 180 BPM.
 - `AFINACOES = {4: TUNING_BASS_4, 5: TUNING_BASS_5}` na CLI, e `typer.BadParameter` para o que não está no catálogo. A
   porta de entrada do `TUNING_BASS_DROP_D` é outro item (A10/B4) e cabe aqui quando chegar: o dicionário é o lugar.
@@ -1149,11 +1151,11 @@ tratava nem a falha nem a interrupção.
 - **`thoth/arquivos.py`**: `escrita_atomica(destino)` e `diretorio_atomico(destino)`, dois gerenciadores de contexto que
   dão um caminho **vizinho do destino** e promovem com `os.replace` só na saída sem erro. Convenção para toda escrita de
   cache daqui para frente.
-    - Vizinho, e nunca `tempfile`: `/tmp` nesta estação é outro ponto de montagem, e `os.replace` entre montagens
+  - Vizinho, e nunca `tempfile`: `/tmp` nesta estação é outro ponto de montagem, e `os.replace` entre montagens
       levanta
       `Invalid cross-device link`.
-    - A extensão é preservada (`mix.wav` → `mix.parcial.wav`): ffmpeg e yt-dlp escolhem o formato de saída por ela.
-    - `.parcial` fica fora de tudo que qualquer verificação de cache procura, então sobra de execução anterior nunca é
+  - A extensão é preservada (`mix.wav` → `mix.parcial.wav`): ffmpeg e yt-dlp escolhem o formato de saída por ela.
+  - `.parcial` fica fora de tudo que qualquer verificação de cache procura, então sobra de execução anterior nunca é
       confundida com resultado.
 - **`separate` procura em `out_dir / self.model`**, não em `out_dir`. O modelo já está no caminho que o demucs escreve;
   passou a estar no caminho que o Thoth lê. O diretório provisório se chama `<modelo>.parcial` — nunca `<modelo>` —, e o
@@ -1253,7 +1255,7 @@ estudo:
    sai — e é justamente o caso que ele existe para pegar. Medido no teste novo: nota de 0,3 s seguida de um 30,9 Hz
    forte passava calada.
 2. **Lia o stem inteiro na memória.** `_ler_mono` fazia `readframes(getnframes())` e convertia tudo para `float64` antes
-   de olhar qualquer nota. Para os 16 min de _Equus_: ~170 MB de quadros e ~680 MB de `float64`, para analisar meio
+   de olhar qualquer nota. Para os 16 min de *Equus*: ~170 MB de quadros e ~680 MB de `float64`, para analisar meio
    segundo por nota. Medido num WAV de 30 s: pico de 26,5 MB para uma nota.
 
 ### Decisão
@@ -1305,7 +1307,7 @@ fim — o caso do vizinho que motivou este ADR segue coberto pelo teste dele; a 
 invadindo o vizinho. As alternativas, todas com a FFT completada, medidas no Equus e nas três tabs do ADR-042
 (pega/alarme):
 
-| Janela                                         | Equus           | _And Plague Flowers_ | _Fear_: alarme | _Dance_: alarme |
+| Janela                                         | Equus           | *And Plague Flowers* | *Fear*: alarme | *Dance*: alarme |
 |------------------------------------------------|-----------------|----------------------|----------------|-----------------|
 | piso 0,25 s                                    | 5/12 · 1,6%     | 21/66 · 10,3%        | 26,3%          | 7,3%            |
 | **piso 0,3 s**                                 | **8/12 · 3,1%** | **25/66 · 10,9%**    | 27,4%          | 8,1%            |
@@ -1313,7 +1315,7 @@ invadindo o vizinho. As alternativas, todas com a FFT completada, medidas no Equ
 | até a próxima nota de outra altura, piso 0,3 s | 8/12 · 3,1%     | 22/66 · 10,5%        | 28,5%          | 5,3%            |
 | 0,6 s fixos                                    | 12/12 · 7,1%    | 25/66 · 15,9%        | 29,3%          | 4,1%            |
 
-Os 0,6 s fixos pegam tudo no Equus, mas em _And Plague Flowers_ alarmam 50% mais para a mesma detecção. Estender até a
+Os 0,6 s fixos pegam tudo no Equus, mas em *And Plague Flowers* alarmam 50% mais para a mesma detecção. Estender até a
 próxima nota de outra altura não ganha nada que pague a regra a mais.
 
 - A calibração agora é teste: `tests/integration/test_oitava_equus.py` (`slow`) refaz o pareamento da Fase 0 e trava
@@ -1377,20 +1379,20 @@ existe.
 
 | Música                      | notas com par | alarme entre as que concordam | pega "abaixo" | avisos que eram erro |
 |-----------------------------|---------------|-------------------------------|---------------|----------------------|
-| _Fear Is the Key_           | 755           | 38,6%                         | 15 de 18      | 15 de 296 (5%)       |
-| _And Plague Flowers_        | 2137          | 30,6%                         | 24 de 50      | 24 de 644 (4%)       |
-| _Dance of Death_ (1 janela) | 246           | 10,6%                         | sem caso      | 0 de 26              |
+| *Fear Is the Key*           | 755           | 38,6%                         | 15 de 18      | 15 de 296 (5%)       |
+| *And Plague Flowers*        | 2137          | 30,6%                         | 24 de 50      | 24 de 644 (4%)       |
+| *Dance of Death* (1 janela) | 246           | 10,6%                         | sem caso      | 0 de 26              |
 | Equus (calibração)          | 139           | 8,7%                          | 12 de 12      | 12 de 23             |
 
-- **Nenhum limiar separa.** De 0,2 a 1,0, alarme e acerto sobem juntos: em _Fear_, 0,2 ainda alarma 28,7% das
+- **Nenhum limiar separa.** De 0,2 a 1,0, alarme e acerto sobem juntos: em *Fear*, 0,2 ainda alarma 28,7% das
   concordantes e pega 12 de 18. Não é questão de ajuste.
-- **O registro grave não explica.** Em _And Plague Flowers_, 528 dos 614 alarmes em nota concordante estão acima de
-  `pitch` 28; em _Fear_, 142 de 277.
-- **A sugestão acerta pouco**: bate com a tab em 15 dos 18 "abaixo" de _Fear_ e em 21 dos 50 de _And Plague Flowers_.
+- **O registro grave não explica.** Em *And Plague Flowers*, 528 dos 614 alarmes em nota concordante estão acima de
+  `pitch` 28; em *Fear*, 142 de 277.
+- **A sugestão acerta pouco**: bate com a tab em 15 dos 18 "abaixo" de *Fear* e em 21 dos 50 de *And Plague Flowers*.
 - **O erro para cima passa**: das 97 notas em que o Thoth ficou uma oitava acima da tab, 10 foram sinalizadas. O
   discriminador foi feito para o erro para baixo, e não vê o outro.
 
-A tab é de comunidade e _And Plague Flowers_ é um cover: parte do que conta como alarme falso pode ser erro da tab. Não
+A tab é de comunidade e *And Plague Flowers* é um cover: parte do que conta como alarme falso pode ser erro da tab. Não
 o bastante para mudar o quadro — de 30 a 39% de alarme contra 8,7%.
 
 **Decisão:** o limiar fica — a varredura não oferece outro melhor —, mas o aviso **não é lista curta fora do Equus**:
@@ -1400,37 +1402,37 @@ triagem. Um discriminador que separe é pesquisa, aberta no todo.
 ### Emenda (2026-09-25, tarde) — remedido com o módulo corrigido
 
 A emenda acima mediu um módulo quebrado: a janela do ADR-029 com o defeito do pico zero (ver a emenda do ADR-029). Nela,
-70% dos alarmes em nota concordante de _Fear_ e 86% dos de _And Plague Flowers_ eram pico zero, não medição. Remedido
+70% dos alarmes em nota concordante de *Fear* e 86% dos de *And Plague Flowers* eram pico zero, não medição. Remedido
 com o módulo corrigido (FFT completada, janela com piso de 0,3 s), limiar 0,40. A rotulagem foi refeita (tab a ±0,1 s,
 janelas conclusivas, "abaixo" e "acima" só quando toda nota da tab com a mesma classe de altura está do mesmo lado), por
 isso as contagens diferem um pouco da tabela acima:
 
 | Música               | concordam | alarme              | pega "abaixo" | pega "acima" | AUC "abaixo" |
 |----------------------|-----------|---------------------|---------------|--------------|--------------|
-| _Fear Is the Key_    | 731       | 27,4% (antes 37,9%) | 11 de 18      | 4 de 19      | 0,75         |
-| _And Plague Flowers_ | 2224      | 10,9% (antes 27,6%) | 25 de 66      | 1 de 78      | 0,75         |
-| _Dance of Death_     | 246       | 8,1% (antes 10,6%)  | sem caso      | sem caso     | —            |
+| *Fear Is the Key*    | 731       | 27,4% (antes 37,9%) | 11 de 18      | 4 de 19      | 0,75         |
+| *And Plague Flowers* | 2224      | 10,9% (antes 27,6%) | 25 de 66      | 1 de 78      | 0,75         |
+| *Dance of Death*     | 246       | 8,1% (antes 10,6%)  | sem caso      | sem caso     | —            |
 | Equus (calibração)   | 127       | 3,1%                | 8 de 12       | —            | —            |
 
 - **"Nenhum limiar separa" não se sustenta.** A separação é fraca, mas existe (AUC 0,75 nas duas músicas com caso). O
-  limiar troca alarme por detecção: em _And Plague Flowers_, 0,3 alarma 7% e pega 17 de 66; 0,4 alarma 11% e pega 25;
+  limiar troca alarme por detecção: em *And Plague Flowers*, 0,3 alarma 7% e pega 17 de 66; 0,4 alarma 11% e pega 25;
   0,5 alarma 19% e pega 34.
-- **Em _Fear_ o registro grave explica mais da metade**: 113 dos 200 alarmes estão em `pitch <= 28`, onde a fundamental
+- **Em *Fear* o registro grave explica mais da metade**: 113 dos 200 alarmes estão em `pitch <= 28`, onde a fundamental
   irradia pouco (o que a calibração original já previa).
-- **A sugestão acerta**: sai `pitch + 12` em 9 dos 11 "abaixo" pegos em _Fear_ e em 25 dos 25 em _And Plague Flowers_.
+- **A sugestão acerta**: sai `pitch + 12` em 9 dos 11 "abaixo" pegos em *Fear* e em 25 dos 25 em *And Plague Flowers*.
 - **O erro para cima continua invisível**: 5 de 97.
-- **O que se marca continua sendo quase tudo nota certa**: 15 de 215 avisos em _Fear_ e 26 de 268 em _And Plague
-  Flowers_ são erro segundo a tab, porque o erro de oitava é raro (2 a 3% das notas).
+- **O que se marca continua sendo quase tudo nota certa**: 15 de 215 avisos em *Fear* e 26 de 268 em *And Plague
+  Flowers* são erro segundo a tab, porque o erro de oitava é raro (2 a 3% das notas).
 
 **Decisão:** limiar em 0,40, travado no Equus pelo teste da emenda do ADR-029. O aviso continua diagnóstico da nota, não
-triagem: a lista caiu para um décimo das notas em _And Plague Flowers_, mas nove em cada dez avisos ainda são nota
+triagem: a lista caiu para um décimo das notas em *And Plague Flowers*, mas nove em cada dez avisos ainda são nota
 certa.
 
 ### Emenda (2026-09-25, noite) — o "erro para cima" é, segundo o áudio, da tab
 
 As duas emendas acima dizem que o erro para cima passa (5 de 97 avisados). Procurando um discriminador para ele, a
 hipótese era física: se a nota soa em `p - 12`, os ímpares dela caem em 0,5·f0 e 1,5·f0 de `p`, onde uma nota `p` de
-verdade não tem nada. Nenhum candidato separou: AUC de 0,41 a 0,50 em _Fear_ e de 0,57 a 0,65 em _And Plague Flowers_,
+verdade não tem nada. Nenhum candidato separou: AUC de 0,41 a 0,50 em *Fear* e de 0,57 a 0,65 em *And Plague Flowers*,
 comparando notas de mesma altura — a altura sozinha dá 0,88 e 0,70.
 
 O motivo está no áudio. Se a tab estivesse certa, a razão `f0 / 2·f0` **da nota da tab** (a energia em 0,5·f0 de `p`
@@ -1438,21 +1440,21 @@ contra a em f0) seria parecida com a de uma nota concordante tocada naquela altu
 
 | Música               | casos | razão sob "tab certa" | concordantes naquela altura | casos compatíveis com a tab |
 |----------------------|-------|-----------------------|-----------------------------|-----------------------------|
-| _Fear Is the Key_    | 19    | 0,07                  | 0,33                        | 0                           |
-| _And Plague Flowers_ | 76    | 0,17                  | 0,58                        | 4                           |
+| *Fear Is the Key*    | 19    | 0,07                  | 0,33                        | 0                           |
+| *And Plague Flowers* | 76    | 0,17                  | 0,58                        | 4                           |
 
 "Compatível" é a razão da nota ficar acima de 95% das concordantes naquela altura. Nas demais, a fundamental que a tab
 pede falta mais do que em qualquer nota real do mesmo registro, e a fundamental do Thoth é forte (mediana 1,71 em
-_Fear_, contra 0,60 das concordantes).
+*Fear*, contra 0,60 das concordantes).
 
 **Decisão:** não há discriminador a construir para o erro para cima nestes dados — o áudio sustenta a altura do Thoth em
 quase todos os 97 casos, e o que diverge é a tab (escrita uma oitava abaixo do que soa, ou o baixista subiu a oitava).
 Consequência para quem ler o veredito do ADR-042: a contagem "oitava" mistura erro do Thoth com erro da tab, e para cima
 é quase só da tab. O que continua aberto é o erro para baixo (AUC 0,75).
 
-### Emenda (2026-09-25, quarta tab) — _Eyrie_ não amplia a amostra
+### Emenda (2026-09-25, quarta tab) — *Eyrie* não amplia a amostra
 
-Uma quarta tab, _Ne Obliviscaris - Eyrie_ (baixo de 6 cordas, 2529 notas), contra a versão de estúdio no YouTube
+Uma quarta tab, *Ne Obliviscaris - Eyrie* (baixo de 6 cordas, 2529 notas), contra a versão de estúdio no YouTube
 (`_RMax1LS3pM`, 711 s), transcrita com `--afinacao 6`. Rende **2 casos** de erro para baixo e nenhum para cima, de 53
 notas rotuladas: a amostra vai de 84 para 86, o que não muda nada do que está acima.
 
@@ -1494,7 +1496,7 @@ Medido em `cache/*/notas.jsonl` (sete músicas, corpus local — `cache/` é git
 | yt_U-SHfpm5Bxk | 778   | 185 (23,8%)  | f minor (−4)  | 0,783 | C major (0) 0,456      | 0,327  |
 | yt_g81jzIwyDjg | 634   | 33 (5,2%)    | d minor (−1)  | 0,778 | G major (+1) 0,684     | 0,095  |
 
-Três das sete estimam tom bemol — nelas _toda_ nota alterada saía mal escrita, ~476 notas somadas. E uma delas é um
+Três das sete estimam tom bemol — nelas *toda* nota alterada saía mal escrita, ~476 notas somadas. E uma delas é um
 **empate exato**: fá menor 0,590 contra dó maior 0,590. Esse é o caso que decide o desenho.
 
 Errar aqui é pior que não opinar, e de um jeito que o `--bpm` não tem: andamento errado se ouve, armadura errada é
@@ -1556,7 +1558,7 @@ grave — o defeito estava escondido pelo perfil default. Ou seja: **quem usa o 
 diferença.** Quem escolhe "experiente" perde 70% dos saltos inventados.
 
 Os 8 que sobram no experiente são genuínos, e foi por isso que foram lidos um a um: em cinco deles o destino é o traste
-9 do pitch 52, cujas alternativas são 14, 19 e 24 — o 9 _é_ a opção barata; em dois o destino é o traste 1 do pitch 29,
+9 do pitch 52, cujas alternativas são 14, 19 e 24 — o 9 *é* a opção barata; em dois o destino é o traste 1 do pitch 29,
 que é a **única** casa possível. A mão precisa mesmo andar. Estão **precificados, não escondidos**.
 
 ### Decisão
@@ -1593,7 +1595,7 @@ O item B3 propunha inferir candidatos de dinâmica e articulação do stem — R
 falham, por três motivos diferentes.
 
 **1. Articulação: `offset_s` é preenchimento, não medida.** Provado na fonte, não inferido. Uma fixture renderizada com
-notas de 0,45 s separadas por 0,10 s de silêncio — duração _conhecida_ — passou pelo modelo real e voltou com vãos
+notas de 0,45 s separadas por 0,10 s de silêncio — duração *conhecida* — passou pelo modelo real e voltou com vãos
 contíguos: `0,51→1,09`, `1,09→1,65`, `1,65→2,20`. No acervo, a lacuna `offset → próximo onset` é **exatamente zero** em
 83,3% a 99,7% das notas (as lacunas não nulas são pausas entre frases: p99 até 1652 ms). Ou seja, `duration_s` é tempo
 até a próxima nota. Qualquer razão duração/passo mede a convenção do transcritor: ela dá 83% a 99,6% de "legato", o que
@@ -1638,7 +1640,7 @@ Precisão nas duas direções, para não superafirmar o negativo:
 - **Articulação** é impossibilidade provada: o dado não contém a informação.
 - **Dinâmica** não está na saída do modelo e, do áudio, tem espalhamento pequeno e sem rótulo para calibrar. Não é
   "fisicamente impossível" — é inverificável aqui.
-- **Deslize** é _este discriminador_ sem poder, não prova de que deslize seja indetectável. Um rastreador de f0 de
+- **Deslize** é *este discriminador* sem poder, não prova de que deslize seja indetectável. Um rastreador de f0 de
   verdade (pYIN, CREPE) não foi tentado, e seria dependência pesada nova numa estação CPU-only — o que é por si só
   motivo para não persegui-lo agora.
 
@@ -1653,7 +1655,7 @@ foi registrado onde o leitor tropeça:
 - **`NoteEvent.duration_s`** ganhou docstring — era a propriedade sem documentação nenhuma, e é o lugar onde o fato
   pertence.
 - **`services/tonalidade.py`** — o comentário dizia que a ponderação por duração impede a nota de passagem de pesar como
-  "a tônica que fica soando". Sob preenchimento isso prometia mais do que o dado dá; o peso é o do _espaço_ na frase. Os
+  "a tônica que fica soando". Sob preenchimento isso prometia mais do que o dado dá; o peso é o do *espaço* na frase. Os
   números do ADR-031 continuam válidos: foram medidos exatamente nesta condição.
 - **ADR-022** ganhou emenda: a "duração real" é real por não ser truncada na barra, não por ser sustentação medida.
 - **`octave_check` fica melhor do que sabia**: janela que para no `offset_s` é janela que para no próximo onset, que é
@@ -1743,7 +1745,7 @@ genuíno: cinco janelas em 103,0 e depois um platô em ~105, com vizinhas a 0,05
 Nada muda. Semicolcheia reta e andamento constante continuam como estão.
 
 - **Swing e tercina não existem neste acervo.** Não é que o ganho seja pequeno: as grades alternativas explicam os
-  ataques _pior_ que a atual, nas sete, e o controle interno absorve a massa de tercina em seis das sete. Implementar
+  ataques *pior* que a atual, nas sete, e o controle interno absorve a massa de tercina em seis das sete. Implementar
   detecção aqui seria escrever um discriminador que dispara no ruído.
 - **O teto é o jitter de ataque, não a grade.** A fusa custa resolução dobrada e devolve 0,1 a 2,9 ms em quatro músicas.
   Enquanto o ataque do transcritor tiver 10 a 31 ms de dispersão, nenhuma grade mais fina melhora a leitura — o caminho
@@ -2059,7 +2061,7 @@ A conta de 1548 ritmos da Fase 12 veio de um script não versionado que não se 
 Nas nove músicas, reexportadas pelo `thoth transcribe` de verdade (2026-09-24, todas com saída 0): **188 → 0**
 mal-formados. Nas oito comparáveis, **nenhum** dos 2998 pares (compasso, pauta) que o music21 já escrevia válidos mudou
 de beam, e as notas batem exatamente com as de antes; foram refeitos só os 94 compassos quebrados, nas duas pautas. A
-nona, _Equus_, não é comparável: a exportação de 2026-09-23 saiu com 4 cordas em vez das 5 de `tasks/corpus.md` — 2807
+nona, *Equus*, não é comparável: a exportação de 2026-09-23 saiu com 4 cordas em vez das 5 de `tasks/corpus.md` — 2807
 elementos de nota contra 3251 agora, e a diferença (444) é o que cai abaixo do E1 (445 elementos na nova), descartado
 pelo ADR-014 sem ninguém notar. Refeita com `--afinacao 5`: 0 mal-formados.
 
@@ -2148,7 +2150,7 @@ numa camada e custava 800 MB a mais).
 ### Contexto
 
 A Camada 3 pede referência externa. O usuário baixou à mão três `.gp5` da comunidade do Ultimate Guitar (ADR-007,
-emenda) para `samples/`, ignorada pelo git: _Fear Is the Key_, _Dance of Death_, _And Plague Flowers_. O
+emenda) para `samples/`, ignorada pelo git: *Fear Is the Key*, *Dance of Death*, *And Plague Flowers*. O
 `thoth comparar <tab.gp5> <fonte>` lê a tab (`services/tab_referencia.py`) e a compara às notas em cache (`notas.jsonl`)
 da mesma música (`services/comparacao.py`).
 
@@ -2162,11 +2164,11 @@ de propósito casava quase o mesmo número de ataques que a alinhada, e o acerto
 
 | Música            | casados, alinhada | casados, deslocada | mesma altura, alinhada | mesma altura, deslocada |
 |-------------------|-------------------|--------------------|------------------------|-------------------------|
-| _Fear Is the Key_ | 944               | 785–892            | 61,9%                  | 35,8–56,5%              |
-| _Dance of Death_  | 1474              | 1401–1431          | 27,0%                  | 22,5–**40,7%**          |
+| *Fear Is the Key* | 944               | 785–892            | 61,9%                  | 35,8–56,5%              |
+| *Dance of Death*  | 1474              | 1401–1431          | 27,0%                  | 22,5–**40,7%**          |
 
-Em _Dance of Death_ deslocar a tab **melhorava** o acerto: o alinhamento estava errado. Em _And Plague Flowers_ a escala
-parou em 0,900, a borda da grade. Com 0,05 s de tolerância _Dance_ seguiu igual; _Fear_ separou melhor (65,3% contra
+Em *Dance of Death* deslocar a tab **melhorava** o acerto: o alinhamento estava errado. Em *And Plague Flowers* a escala
+parou em 0,900, a borda da grade. Com 0,05 s de tolerância *Dance* seguiu igual; *Fear* separou melhor (65,3% contra
 36,8–52,7%), mas ainda com a tab uma nota ao lado perto do alinhado.
 
 ### Decisão
@@ -2188,19 +2190,19 @@ parou em 0,900, a borda da grade. Com 0,05 s de tolerância _Dance_ seguiu igual
 
 | Música               | pares            | piso | mesma oitava | piso  | acima | abaixo |
 |----------------------|------------------|------|--------------|-------|-------|--------|
-| _Fear Is the Key_    | 704 (49% da tab) | 582  | 88,2%        | 85,2% | 6,1%  | 5,7%   |
-| _Dance of Death_     | 861 (36%)        | 803  | 84,8%        | 84,3% | 0,3%  | 14,9%  |
-| _And Plague Flowers_ | 1266 (35%)       | 876  | 89,6%        | 74,9% | 5,0%  | 5,5%   |
+| *Fear Is the Key*    | 704 (49% da tab) | 582  | 88,2%        | 85,2% | 6,1%  | 5,7%   |
+| *Dance of Death*     | 861 (36%)        | 803  | 84,8%        | 84,3% | 0,3%  | 14,9%  |
+| *And Plague Flowers* | 1266 (35%)       | 876  | 89,6%        | 74,9% | 5,0%  | 5,5%   |
 
-- **Duas oitavas é raro**: nenhum par em _Fear_ e _Dance_, 6 de 1266 em _And Plague Flowers_ (contados em
+- **Duas oitavas é raro**: nenhum par em *Fear* e *Dance*, 6 de 1266 em *And Plague Flowers* (contados em
   "acima"/"abaixo"). O erro de uma oitava fica entre 5% e 15%.
-- **_Dance of Death_ está no piso**: o alinhamento não se confirma, e 84,8% é o que sai de qualquer encaixe. O desvio
+- ***Dance of Death* está no piso**: o alinhamento não se confirma, e 84,8% é o que sai de qualquer encaixe. O desvio
   para baixo (14,9% contra 0,3% acima) aparece também com a tab deslocada (107 a 123 abaixo contra 1 a 4 acima), então é
   do **registro** — trechos em que a tab e o Thoth leem a linha em oitavas diferentes —, não de um par a par. Se o erro
   é do Thoth ou da tab, esta medida não diz.
-- _Fear Is the Key_ fica 3 pontos acima do piso: sinal fraco. A tab mapeada cai em 3,6–322,5 s, dentro da transcrição
+- *Fear Is the Key* fica 3 pontos acima do piso: sinal fraco. A tab mapeada cai em 3,6–322,5 s, dentro da transcrição
   (0,5–319,3 s).
-- **_And Plague Flowers_ não alinhou a música inteira.** A tab mapeada vai de −5,2 s a 663,4 s — começa antes do áudio.
+- ***And Plague Flowers* não alinhou a música inteira.** A tab mapeada vai de −5,2 s a 663,4 s — começa antes do áudio.
   Por janela de 60 s, só 60–300 s alinha: 91% a 100% na mesma oitava contra um piso de 61% a 83%. Fora disso fica no
   piso ou sem par. A margem da linha da tabela vem desse trecho, não da música. Duas ressalvas somam-se: a transcrição
   foi feita com a afinação de 4 cordas (a tab é de 5, com B0) e para em 511 s de 653 s de áudio.
@@ -2210,10 +2212,10 @@ parou em 0,900, a borda da grade. Com 0,05 s de tolerância _Dance_ seguiu igual
 
 ### Limites
 
-- D.S./coda não são seguidos; final alternativo ocupa um compasso. Nenhuma das três usa D.S.; _And Plague Flowers_ tem
+- D.S./coda não são seguidos; final alternativo ocupa um compasso. Nenhuma das três usa D.S.; *And Plague Flowers* tem
   uma repetição aberta sem fecho no compasso 344.
 - Tab de comunidade tem erro próprio e pode ser de outra versão da música.
-- A extensão mapeada da tab não é conferida contra a do áudio: em _And Plague Flowers_ isso teria recusado o encaixe
+- A extensão mapeada da tab não é conferida contra a do áudio: em *And Plague Flowers* isso teria recusado o encaixe
   global. Guarda possível, do mesmo tipo da borda.
 - 36% a 49% da tab entra em par: o veredito vale para as notas em que tab e transcrição concordam no nome, que não são
   uma amostra neutra.
@@ -2221,12 +2223,12 @@ parou em 0,900, a borda da grade. Com 0,05 s de tolerância _Dance_ seguiu igual
 ### Consequência
 
 A pergunta "o Thoth erra a oitava?" tem resposta parcial: quase nunca por duas, de 5% a 15% por uma, e a medida só se
-sustenta onde a fração na mesma oitava fica acima do piso — em _Fear_, por pouco, e no trecho de 60–300 s de _And Plague
-Flowers_. Para "a nota está certa?" a tab de comunidade, alinhada automaticamente, não serve. O próximo passo, se
+sustenta onde a fração na mesma oitava fica acima do piso — em *Fear*, por pouco, e no trecho de 60–300 s de *And Plague
+Flowers*. Para "a nota está certa?" a tab de comunidade, alinhada automaticamente, não serve. O próximo passo, se
 houver, é alinhar a tab ao stem do baixo e não à transcrição (DTW sobre o envelope de ataques), o que devolveria "nota
 errada" à medida.
 
-### Emenda (2026-09-24) — _And Plague Flowers_ refeita com `--afinacao 5`
+### Emenda (2026-09-24) — *And Plague Flowers* refeita com `--afinacao 5`
 
 A transcrição foi refeita com a afinação de 5 cordas, a mesma da tab (B0). Agora há notas abaixo de E1 (122, a mais
 grave B0 = 23), e 2402 notas contra 2280.
@@ -2299,11 +2301,11 @@ deslocada ±0,25 e ±0,5 s, como no ADR-041.
 
 | Música               | certa (DTW) | piso | certa (alinhamento do ADR-041) |
 |----------------------|-------------|------|--------------------------------|
-| _Fear Is the Key_    | 78%         | ≤64% | 62%                            |
-| _And Plague Flowers_ | 79%         | ≤45% | 54%                            |
-| _Dance of Death_     | 60%         | ≤55% | 44%                            |
+| *Fear Is the Key*    | 78%         | ≤64% | 62%                            |
+| *And Plague Flowers* | 79%         | ≤45% | 54%                            |
+| *Dance of Death*     | 60%         | ≤55% | 44%                            |
 
-Em _And Plague Flowers_, de 120 a 300 s — o único trecho que o ADR-041 confirmou —, os dois alinhamentos coincidem
+Em *And Plague Flowers*, de 120 a 300 s — o único trecho que o ADR-041 confirmou —, os dois alinhamentos coincidem
 (distância mediana de 0,08 a 0,27 s); fora dele o do ADR-041 erra de 4 a 14 s e o DTW fica 16 a 43 pontos acima do piso
 em toda janela. É conferência independente do DTW.
 
@@ -2336,17 +2338,17 @@ janelas que passam.
 
 | Música               | janelas conclusivas | notas | certa | oitava | errada |
 |----------------------|---------------------|-------|-------|--------|--------|
-| _Fear Is the Key_    | 5 de 6              | 938   | 80,8% | 5,1%   | 14,1%  |
-| _And Plague Flowers_ | 11 de 11            | 3070  | 79,5% | 5,1%   | 15,4%  |
-| _Dance of Death_     | 1 de 9              | 334   | 76,9% | 0,0%   | 23,1%  |
+| *Fear Is the Key*    | 5 de 6              | 938   | 80,8% | 5,1%   | 14,1%  |
+| *And Plague Flowers* | 11 de 11            | 3070  | 79,5% | 5,1%   | 15,4%  |
+| *Dance of Death*     | 1 de 9              | 334   | 76,9% | 0,0%   | 23,1%  |
 
 Os números por janela reproduzem os do script de medição.
 
 - **Nota errada fica em 14 a 15%** onde a medida vale — o dobro ou o triplo do erro de oitava. Parte disso é da tab de
   comunidade e do cover (ADR-041); a medida não separa.
-- _Dance of Death_ quase inteira sai inconclusiva. Nos 0 s e 480 s o croma diz que a tab está no lugar e certa fica
+- *Dance of Death* quase inteira sai inconclusiva. Nos 0 s e 480 s o croma diz que a tab está no lugar e certa fica
   abaixo do piso: pode ser erro real do Thoth, e esta regra não pode afirmar isso.
-- _Fear Is the Key_ em 180 s: inconclusivo, certa 70% contra piso 73%.
+- *Fear Is the Key* em 180 s: inconclusivo, certa 70% contra piso 73%.
 
 ### Limites
 
@@ -2791,9 +2793,9 @@ sem impossível.
 - **A guitarra fica sem readmissão, monofonização e conferência de oitava.** As três foram medidas no baixo e pressupõem
   uma nota por vez; na guitarra, um acorde é o próprio sinal.
 - **O relatório tem três campos**, vazios no baixo:
-    - `erro_de_rotulo`: outras guitarras que o modelo ouviu;
-    - `contaminacao`: outras famílias presentes no stem;
-    - `acordes_impossiveis`: acordes que não cabem no braço, com onset, alturas e motivo.
+  - `erro_de_rotulo`: outras guitarras que o modelo ouviu;
+  - `contaminacao`: outras famílias presentes no stem;
+  - `acordes_impossiveis`: acordes que não cabem no braço, com onset, alturas e motivo.
 
   Os três rótulos de guitarra nunca se fundem numa parte só.
 
@@ -2814,12 +2816,12 @@ sem impossível.
   há. Hoje nenhum alvo aceito cai nesse caso, porque bateria e piano são recusados na entrada. A guarda existe para
   quando o piano entregar só MusicXML, como está previsto acima.
 - **Verificado com Chromium real (`-m navegador`, 10 testes):**
-    - o formulário manda `instrumento` e manda `afinacao: null` na guitarra;
-    - a afinação fica desabilitada fora do baixo;
-    - um GP5 de guitarra com seis cordas e acorde aparece na tela (contagem de `#tab svg`, com a sessão viva por mais de
+  - o formulário manda `instrumento` e manda `afinacao: null` na guitarra;
+  - a afinação fica desabilitada fora do baixo;
+  - um GP5 de guitarra com seis cordas e acorde aparece na tela (contagem de `#tab svg`, com a sessão viva por mais de
       10 s);
-    - o relato traz as três causas;
-    - job sem GP5 mostra a mensagem e não abre os controles de estudo.
+  - o relato traz as três causas;
+  - job sem GP5 mostra a mensagem e não abre os controles de estudo.
 
 ### Emenda (2026-09-25) — revocação por tamanho de acorde e o teto do ADR-011
 
@@ -2844,7 +2846,7 @@ de 50 ms do `ViterbiAcordes`. Só revocação: uma nota falsa não pertence a ac
 ou 24 de 24. A perda que se repete nas nove medições é uma nota simples (3/4); a causa não foi investigada.
 
 **Isto não contradiz o ADR-011, e também não o derruba.** O teto de lá foi medido em música real: guitarra neo-soul com
-7 a 8 notas simultâneas, _voicings_ densos e notas sustentadas que se sobrepõem aos ataques seguintes. A fixture tem
+7 a 8 notas simultâneas, *voicings* densos e notas sustentadas que se sobrepõem aos ataques seguintes. A fixture tem
 acordes tocados em bloco, uma semínima cada, de no máximo seis notas e sem sobreposição entre eles. Ou seja, mede o que
 o M4 pede (díades e acordes de até seis cordas), mas não o caso que o ADR-011 descreveu. A qualidade em música real
 continua sendo da Camada 3, como já dizia o veredito. Se aparecer lá, o sinal esperado é `acordes_impossiveis` e
@@ -3083,7 +3085,7 @@ caminho do baixo.
 
 ### Medição
 
-`_passada` com a primeira passada (com _prelude_), `small`, `muscriptor@0.3.0`, `htdemucs_ft`. F1 de nota (baixo,
+`_passada` com a primeira passada (com *prelude*), `small`, `muscriptor@0.3.0`, `htdemucs_ft`. F1 de nota (baixo,
 guitarra, piano) e F1 micro (bateria) por segundos de silêncio na frente; entre parênteses, o rótulo que tomou o lugar
 do certo. O 0 s bate com os pisos já commitados (a guitarra acústica no stem deu 0,961 contra 0,981, dentro da folga do
 Demucs), então o modelo repete o resultado e a diferença vem do silêncio.
@@ -3147,19 +3149,24 @@ sofreria a mesma troca de rótulo, e ela dobra o custo de CPU.
 
 A página de estudo já reproduz o áudio MIDI do alphaTab e move seu cursor. Queremos que o cursor também possa acompanhar
 uma reprodução externa, sem obter nem retransmitir o áudio do player. A opção anterior sugeria a Web API do Spotify; a
-referência oficial dessa API proíbe sincronizar conteúdo Spotify com mídia visual. Também exigiria OAuth e tráfego remoto,
+referência oficial dessa API proíbe sincronizar conteúdo Spotify com mídia visual. Também exigiria OAuth e tráfego
+remoto,
 desnecessários para o objetivo local.
 
-O MPRIS 2 é um protocolo local de D-Bus usado por players Linux. Ele publica o estado (`Playing`, `Paused`, `Stopped`), a
+O MPRIS 2 é um protocolo local de D-Bus usado por players Linux. Ele publica o estado (`Playing`, `Paused`, `Stopped`),
+a
 posição em microssegundos e metadados opcionais da faixa. O alphaTab 1.8.4 inclui `EnabledExternalMedia`, que recebe a
 posição da mídia externa em milissegundos e atualiza o cursor sem gerar áudio local.
 
 ### Decisão
 
 - Manter a reprodução atual do Thoth como padrão. O usuário ativa explicitamente o modo externo; a página recria o
-  alphaTab em `EnabledExternalMedia` e instala um handler sem saída de áudio. Há ação explícita para voltar ao modo local.
-- Implementar um leitor MPRIS genérico atrás do `Protocol LeitorDeReproducao`. O adaptador consulta o barramento de sessão
-  do mesmo usuário, fecha a conexão após cada consulta e devolve lista vazia quando está fora do Linux, sem barramento ou
+  alphaTab em `EnabledExternalMedia` e instala um handler sem saída de áudio. Há ação explícita para voltar ao modo
+  local.
+- Implementar um leitor MPRIS genérico atrás do `Protocol LeitorDeReproducao`. O adaptador consulta o barramento de
+  sessão
+  do mesmo usuário, fecha a conexão após cada consulta e devolve lista vazia quando está fora do Linux, sem barramento
+  ou
   sem player. Spotify é filtrado pelo nome do serviço, identidade ou URL e não é uma fonte suportada. Não há controle de
   transporte do player externo nesta versão.
 - A página consulta a API local a cada 300 ms. Ao selecionar um player e iniciar o acompanhamento, `Playing` atualiza a
@@ -3192,7 +3199,7 @@ players; VLC/Strawberry devem ser validados manualmente na estação Linux do us
 
 ### Emenda (2026-09-28) — nomes explícitos das partes e fonte local em cache
 
-O primeiro MusicXML de _Eyrie_ mostrou `<part-name/>` vazio nas partes de cordas. O compositor multifaixa apenas copia
+O primeiro MusicXML de *Eyrie* mostrou `<part-name/>` vazio nas partes de cordas. O compositor multifaixa apenas copia
 as declarações dos arquivos de cada parte; portanto, o nome precisa ser definido pelo exportador antes da composição.
 No modo `todos`, cada arquivo de cordas agora recebe o mesmo nome legível da faixa GP5 (Baixo, Guitarra limpa,
 Guitarra distorcida ou Guitarra acústica). A parte de bateria já declara `Bateria`. O modo de baixo isolado não muda.
@@ -3201,7 +3208,8 @@ Uma referência direta a `cache/<id>/mix.wav` também não contém o título ori
 reaproveita título e artista de `meta.json` quando presente; sem metadados, usa o identificador estável do conteúdo,
 em vez de publicar o nome técnico `mix`. Arquivos locais comuns continuam usando o nome do arquivo.
 
-A porta e o adapter `Transcriber` agora devolvem `Transcricao` completa: notas com altura e ataques de bateria separados,
+A porta e o adapter `Transcriber` agora devolvem `Transcricao` completa: notas com altura e ataques de bateria
+separados,
 sem parâmetro de seleção por instrumento. A escolha dos rótulos continua no pipeline. A rotina legada de grade de
 bateria ainda recebe uma representação interna `NoteEvent`; sua duração técnica de 10 ms serve ao cache/auralização e
 não é apresentada como sustentação musical.
@@ -3248,7 +3256,7 @@ compatível existente e usa uma única separação completa para `other`, `drums
 `<versão>-multifaixa` evita confundir o novo produto com os caches históricos de
 dois stems.
 
-## ADR-048 — _Eyrie_ como laboratório multifaixa real, não como único gate
+## ADR-048 — *Eyrie* como laboratório multifaixa real, não como único gate
 
 **Data:** 2026-09-28 · **Status:** aceito · **Complementa:** ADR-006, ADR-007, ADR-044 e ADR-047
 
@@ -3258,14 +3266,14 @@ O caminho do baixo amadureceu com fixtures determinísticas, corpus real, tablat
 expansão para outras partes precisa repetir esse método sem presumir que um stem do separador equivale a um instrumento
 ou que uma partitura plausível está correta. O acervo local tem duas candidatas extremas de Ne Obliviscaris:
 
-- _Equus_ (`yt_4dJz6U3_Xlk`, 756 s) é um **playthrough de baixo**. É a melhor fronteira do baixo, mas sua mix foi
+- *Equus* (`yt_4dJz6U3_Xlk`, 756 s) é um **playthrough de baixo**. É a melhor fronteira do baixo, mas sua mix foi
   produzida para destacar justamente o instrumento já dominado;
-- _Eyrie_ (`yt__RMax1LS3pM`, 711 s) é a versão de estúdio completa, sem esse viés, com arranjo denso e partes que
+- *Eyrie* (`yt__RMax1LS3pM`, 711 s) é a versão de estúdio completa, sem esse viés, com arranjo denso e partes que
   disputam o mesmo stem. Ela já expôs o maior buraco de cobertura conhecido do MuScriptor, entre 557 e 671 s.
 
 ### Decisão
 
-_Eyrie_ será o laboratório real principal para aprender a extrair as partes da música. “Todos os instrumentos” significa
+*Eyrie* será o laboratório real principal para aprender a extrair as partes da música. “Todos os instrumentos” significa
 cada parte efetivamente confirmada no arranjo, não os quatro nomes de saída do `htdemucs_ft`. O inventário inicial
 esperado inclui baixo, bateria, guitarras, violino e vozes; cello e viola entram como candidatos após consulta aos
 créditos específicos de `Urn`. Piano/teclas continuam hipótese sem confirmação documental para `Eyrie`. Cada parte
@@ -3274,7 +3282,7 @@ precisa ser confirmada no áudio e ter limites temporais mapeados antes de virar
 A validação será por parte e por trecho, em três camadas:
 
 1. fixtures sintéticas com referência exata, para regressão mecânica;
-2. _Eyrie_ como teste de estresse de separação, cobertura, contaminação e polifonia;
+2. *Eyrie* como teste de estresse de separação, cobertura, contaminação e polifonia;
 3. referência humana independente e legitimamente obtida para afirmar acerto musical.
 
 Sem referência da camada 3, é permitido concluir que uma parte está audível e separada; é proibido concluir que suas
@@ -3307,7 +3315,7 @@ redistribuir letra protegida. Vocal limpo, vocal extremo e vozes sobrepostas rec
 O usuário decidiu manter somente os perfis já cobertos e deixar o restante para depois. Não serão adicionados nesta
 etapa perfis de violino, viola ou cello, nem inferida sua transcrição a partir de `other`. Esta decisão não remove nem
 altera perfis, resultados ou medições existentes; apenas congela a expansão enquanto o processo atual é consolidado.
-O levantamento de _Eyrie_ pode permanecer como pesquisa, sem compromisso de suporte. Reabrir a expansão exige uma
+O levantamento de *Eyrie* pode permanecer como pesquisa, sem compromisso de suporte. Reabrir a expansão exige uma
 decisão posterior e validação por TDD com referência adequada.
 
 ### Emenda (2026-09-28) — publicação padrão dos WAVs
@@ -3341,18 +3349,19 @@ preservadas no cache ignorado. A tabela é uma inspeção de distribuição de r
 do MuScriptor, então suas contagens não são comparáveis como F1 nem como totais de parte.
 
 | Entrada | Eventos | Rótulos / contagem | Cobertura dos eventos |
-|---------|--------:|--------------------|-----------------------|
+| --------- | --------: | -------------------- | ----------------------- |
 | baixo (cache do pipeline) | 1.809 | `electric_bass` 1.796; `clean_electric_guitar` 13 | 55,35–659,23 s |
 | `vocals` | 288 | `voice` 286; `drums` 2 | 111,24–593,64 s |
 | `other` | 14.639 | `acoustic_guitar` 12.478; `drums` 1.872; `clean_electric_guitar` 126; `string_ensemble` 100; `program_105` 48; `electric_bass` 9; `soprano_and_alto_sax` 6 | 12,72–700,03 s |
 | `drums` | 2.451 | `drums` 2.451 | 62,78–649,94 s |
 
 `other` exigiu a segunda passada sem prelude forcing: a primeira deixou buracos longos. Os 1.872 ataques `drums` em
-`other` e os 9 `electric_bass` são sinais de contaminação ou troca de rótulo a investigar, não prova de vazamento físico.
+`other` e os 9 `electric_bass` são sinais de contaminação ou troca de rótulo a investigar, não prova de vazamento
+físico.
 As 12.478 notas rotuladas `acoustic_guitar` também precisam de comparação com referência antes de serem chamadas de
 guitarra correta. Nenhuma família ganha status de suporte com esta tabela.
 
-#### Primeira execução multifaixa de _Eyrie_ (2026-09-28) — perfis cobertos
+#### Primeira execução multifaixa de *Eyrie* (2026-09-28) — perfis cobertos
 
 Executado `transcribe --instrumento todos` em CPU sobre a mix já normalizada (`source_id=9771390c94c585ce`); os stems
 Demucs existentes foram reutilizados. A referência foi o caminho local `cache/9771390c94c585ce/mix.wav`, por isso o
@@ -3362,7 +3371,7 @@ título interno das partituras ficou `mix`; os nomes dos arquivos foram organiza
 `sem-baixo`, `vocais`, `sem-vocais`) e a auralização. O cache original foi preservado.
 
 | Parte do perfil existente | Eventos gravados no cache | Intervalo dos eventos | Observação |
-|----------------------------|--------------------------:|-----------------------|------------|
+| ---------------------------- | --------------------------: | ----------------------- | ------------ |
 | baixo | 1.578 | 55,35–659,23 s | 1.565 `electric_bass`; 13 eventos mantiveram o rótulo `clean_electric_guitar` após readmissão/quantização |
 | guitarra acústica | 6.757 | 36,71–680,01 s | `acoustic_guitar` |
 | guitarra limpa | 112 | 12,72–159,31 s | `clean_electric_guitar` |
@@ -3377,7 +3386,7 @@ eventos desse rótulo, após posicionamento/quantização — diferença que mer
 A transcrição de `other` levou 25min27s, a do stem de baixo 7min13s e a da bateria 4min31s; os stems foram lidos do
 cache. O resultado demonstra que o caminho integrado produz artefatos para os perfis cobertos, não que as notas estão
 corretas. A guitarra distorcida sem eventos, os longos silêncios entre eventos e os alertas do baixo são lacunas
-observadas. Não há referência humana independente de _Eyrie_, então fica proibido converter estes números em precisão,
+observadas. Não há referência humana independente de *Eyrie*, então fica proibido converter estes números em precisão,
 revocação ou aprovação musical. Os rótulos `string_ensemble` e `voice` não foram promovidos a perfis instrumentais.
 
 O GP5 combinado foi relido pelo PyGuitarPro com quatro faixas identificadas: `Baixo`, `Guitarra limpa`,
@@ -3389,7 +3398,7 @@ problemas de apresentação/metadados, não evidência sobre a qualidade das not
 
 #### Veredito de uso dos GP5 (2026-09-28)
 
-O usuário confirmou que os GP5 de baixo solo e multifaixa de _Eyrie_ estão perfeitos no uso observado. Mantemos essa
+O usuário confirmou que os GP5 de baixo solo e multifaixa de *Eyrie* estão perfeitos no uso observado. Mantemos essa
 avaliação como evidência prática positiva desses artefatos, junto aos testes estruturais e ao round-trip PyGuitarPro;
 ela não é uma afirmação de acurácia musical independente nem de compatibilidade universal com todo leitor. O aviso
 remanescente foi reportado ao abrir o MusicXML no MuseScore, que ainda abre o arquivo; não é um defeito observado nos
@@ -3401,10 +3410,12 @@ eliminou o aviso reportado; a causa permanece desconhecida e separada do veredit
 
 A página oficial do álbum `Urn` confirma que `Eyrie` é a faixa de 11:51. Os créditos do encarte, conforme transcritos
 pelo [Metal Archives](https://www.metal-archives.com/albums/Ne_Obliviscaris/Urn/662850) e corroborados pelo anúncio
-editorial da [Metal Forces](https://www.metalforcesmagazine.com/site/news-ne-obliviscaris-release-third-studio-album-urn/),
+editorial da [Metal
+Forces](https://www.metalforcesmagazine.com/site/news-ne-obliviscaris-release-third-studio-album-urn/),
 indicam para a gravação: bateria (Dan Presland), duas partes de guitarra (Matt Klavins e Benjamin Baret), baixo (Robin
 Zielhorst), vocais limpos, violino e viola (Tim Charles), vocais extremos (Xenoyr), cello (Tim Hennessy) e violinos
-adicionais (Emma Charles e Natalija May). A [página oficial do álbum no Bandcamp](https://neobliviscarissom.bandcamp.com/album/urn)
+adicionais (Emma Charles e Natalija May). A [página oficial do álbum no
+Bandcamp](https://neobliviscarissom.bandcamp.com/album/urn)
 é a fonte para faixa, duração e lançamento; a identificação instrumental por faixa vem dos créditos do encarte, não da
 página promocional.
 

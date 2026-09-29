@@ -1,15 +1,20 @@
 # Arquitetura do Thoth
 
-Este documento explica como o Thoth foi projetado, como seus componentes se conectam e por que as principais decisões foram tomadas. Ele foi escrito para servir a dois públicos ao mesmo tempo:
+Este documento explica como o Thoth foi projetado, como seus componentes se conectam e por que as principais decisões
+foram tomadas. Ele foi escrito para servir a dois públicos ao mesmo tempo:
 
 - quem está começando no projeto e precisa formar um modelo mental antes de ler o código;
-- quem avalia arquitetura de software e de solução e precisa verificar responsabilidades, limites, qualidade, riscos e evolução.
+- quem avalia arquitetura de software e de solução e precisa verificar responsabilidades, limites, qualidade, riscos e
+  evolução.
 
-O documento descreve o código existente. Quando houver divergência, as fontes canônicas são `src/thoth/cli.py`, `src/thoth/services/pipeline.py` e os registros em `tasks/decisions.md`.
+O documento descreve o código existente. Quando houver divergência, as fontes canônicas são `src/thoth/cli.py`,
+`src/thoth/services/pipeline.py` e os registros em `tasks/decisions.md`.
 
 ## 1. Resumo executivo
 
-O Thoth é uma aplicação local que transforma áudio em partitura e tablatura. Seu foco inicial é o contrabaixo elétrico, com suporte também a bateria e a perfis de guitarra. O processamento é **CPU-only**, não depende de um serviço próprio na nuvem e mantém os dados do usuário na máquina.
+O Thoth é uma aplicação local que transforma áudio em partitura e tablatura. Seu foco inicial é o contrabaixo elétrico,
+com suporte também a bateria e a perfis de guitarra. O processamento é **CPU-only**, não depende de um serviço próprio
+na nuvem e mantém os dados do usuário na máquina.
 
 A solução combina:
 
@@ -21,21 +26,28 @@ A solução combina:
 6. exportação para GP5, MusicXML e áudios auxiliares;
 7. acesso por linha de comando ou por uma interface web local.
 
-A ideia arquitetural mais importante é: **modelos de aprendizado de máquina sugerem eventos; as regras de domínio transformam essas sugestões em uma partitura utilizável e explicam o que foi descartado**.
+A ideia arquitetural mais importante é: **modelos de aprendizado de máquina sugerem eventos; as regras de domínio
+transformam essas sugestões em uma partitura utilizável e explicam o que foi descartado**.
 
 ## 2. Diagramas interativos
 
-Os diagramas são arquivos HTML autossuficientes. Eles permitem trocar tema, inspecionar os elementos e ativar visões focadas. A interface do visualizador usa alguns termos em inglês porque essa é a interface fornecida pela ferramenta de renderização; o conteúdo arquitetural está em português.
+Os diagramas são arquivos HTML autossuficientes. Eles permitem trocar tema, inspecionar os elementos e ativar visões
+focadas. A interface do visualizador usa alguns termos em inglês porque essa é a interface fornecida pela ferramenta de
+renderização; o conteúdo arquitetural está em português.
 
-- [Arquitetura de componentes](diagramas/arquitetura-componentes.html): quem chama quem e quais são os limites da aplicação.
+- [Arquitetura de componentes](diagramas/arquitetura-componentes.html): quem chama quem e quais são os limites da
+  aplicação.
 - [Fluxo do processamento](diagramas/fluxo-processamento.html): como os dados mudam do áudio de entrada até a entrega.
-- [Sequência de execução](diagramas/sequencia-execucao.html): diferença entre uma execução pela CLI e um job iniciado pela página web.
+- [Sequência de execução](diagramas/sequencia-execucao.html): diferença entre uma execução pela CLI e um job iniciado
+  pela página web.
 
 Os JSONs na mesma pasta são as fontes editáveis e versionadas dos diagramas.
 
 ## 3. O problema que a arquitetura resolve
 
-Reconhecer notas em uma gravação não é o mesmo que escrever música. O áudio mistura instrumentos, ruído, reverberação e pequenas imprecisões de tempo. Mesmo quando um modelo reconhece a altura correta, ainda faltam respostas para perguntas como:
+Reconhecer notas em uma gravação não é o mesmo que escrever música. O áudio mistura instrumentos, ruído, reverberação e
+pequenas imprecisões de tempo. Mesmo quando um modelo reconhece a altura correta, ainda faltam respostas para perguntas
+como:
 
 - Em qual corda e em qual traste a nota deve ser tocada?
 - Duas notas próximas representam um acorde ou um erro de tempo?
@@ -56,7 +68,7 @@ Essa divisão evita colocar regras de música dentro da CLI, da API ou de uma bi
 ### 4.1 Atores e sistemas externos
 
 | Elemento | Papel | Tipo de integração |
-|---|---|---|
+| --- | --- | --- |
 | Pessoa usuária | Escolhe fonte, instrumento, afinação, digitação, BPM e tom | CLI ou navegador local |
 | Sistema de arquivos | Guarda cache, resultados, modelos já baixados e arquivos de entrada | Leitura e escrita local |
 | `ffmpeg`/`ffprobe` | Normalizam áudio, medem duração e produzem mixagens | Subprocesso |
@@ -66,7 +78,8 @@ Essa divisão evita colocar regras de música dentro da CLI, da API ou de uma bi
 | FluidSynth + soundfont | Renderizam as notas para a auralização | Subprocesso local |
 | Hugging Face | Fornece os pesos na primeira utilização | Download externo e aceite de licença |
 
-**Stem** é uma faixa de áudio que tenta isolar uma família, como baixo, bateria ou “outros”. Ele não é garantia de isolamento perfeito.
+**Stem** é uma faixa de áudio que tenta isolar uma família, como baixo, bateria ou “outros”. Ele não é garantia de
+isolamento perfeito.
 
 ### 4.2 O que está fora do escopo
 
@@ -85,24 +98,28 @@ Essas ausências são coerentes com o cenário atual: uso pessoal, local e de um
 
 O núcleo segue **ports and adapters**, também chamado de arquitetura hexagonal.
 
-- Um **port** é um contrato que declara uma capacidade necessária sem escolher a tecnologia. Em Python, o projeto usa `Protocol`.
+- Um **port** é um contrato que declara uma capacidade necessária sem escolher a tecnologia. Em Python, o projeto usa
+  `Protocol`.
 - Um **adapter** implementa esse contrato para uma ferramenta ou formato específico.
 - O **domínio** contém os conceitos musicais compartilhados.
 - Os **services** contêm decisões e algoritmos próprios.
 - O **pipeline** compõe tudo na ordem correta.
 
-Exemplo: o pipeline depende do port `Separator`, e não diretamente da implementação do Demucs. Em produção recebe `DemucsSeparator`; em um teste pode receber uma implementação pequena e determinística. Isso é **inversão de dependência**: a regra central conhece a abstração, não a ferramenta concreta.
+Exemplo: o pipeline depende do port `Separator`, e não diretamente da implementação do Demucs. Em produção recebe
+`DemucsSeparator`; em um teste pode receber uma implementação pequena e determinística. Isso é **inversão de
+dependência**: a regra central conhece a abstração, não a ferramenta concreta.
 
 ### 5.1 Direção permitida das dependências
 
 | Camada | Pode conhecer | Não deve conhecer |
-|---|---|---|
+| --- | --- | --- |
 | `domain/` | biblioteca padrão e tipos do domínio | disco, rede, FastAPI, Typer, torch ou modelos de ML |
 | `services/` | domínio e ports | detalhes da interface web ou do terminal |
 | `adapters/` | domínio, ports e bibliotecas externas | regras de apresentação da CLI/API |
 | `api/` e `cli.py` | pipeline e modelos de resposta | algoritmos musicais duplicados |
 
-Há uma composição pragmática em `pipeline.py`: ele importa os adapters padrão para montar a aplicação, mas aceita ports injetados. Assim, o fluxo principal continua testável sem esconder a configuração real.
+Há uma composição pragmática em `pipeline.py`: ele importa os adapters padrão para montar a aplicação, mas aceita ports
+injetados. Assim, o fluxo principal continua testável sem esconder a configuração real.
 
 ## 6. Componentes e responsabilidades
 
@@ -111,7 +128,7 @@ Há uma composição pragmática em `pipeline.py`: ele importa os adapters padr�
 Define o vocabulário estável da aplicação com `dataclass` imutável e com `slots`.
 
 | Modelo | Significado |
-|---|---|
+| --- | --- |
 | `AudioAsset` | Identidade, título, duração e WAV normalizado de uma fonte |
 | `NoteEvent` | Nota reconhecida: altura MIDI, início, fim e rótulo do instrumento |
 | `TabNote` | Nota musical já posicionada em corda e traste |
@@ -119,7 +136,8 @@ Define o vocabulário estável da aplicação com `dataclass` imutável e com `s
 | `AcordeImpossivel` | Grupo de notas que não coube numa digitação válida |
 | `Posicionamento` | Notas posicionadas e acordes que ficaram de fora |
 
-Imutabilidade reduz mudanças acidentais entre etapas. `slots` reduz memória e impede a criação silenciosa de atributos com nomes errados.
+Imutabilidade reduz mudanças acidentais entre etapas. `slots` reduz memória e impede a criação silenciosa de atributos
+com nomes errados.
 
 ### 6.2 `domain/ports.py`
 
@@ -134,7 +152,8 @@ Contém os contratos entre o pipeline e o mundo externo:
 - ports próprios para bateria e piano;
 - `Progresso`: anúncio do início de cada estágio.
 
-Contratos separados para baixo, acordes, bateria e piano impedem combinações semanticamente inválidas. Por exemplo, bateria não tem corda, traste ou afinação.
+Contratos separados para baixo, acordes, bateria e piano impedem combinações semanticamente inválidas. Por exemplo,
+bateria não tem corda, traste ou afinação.
 
 ### 6.3 `domain/instrumentos.py`
 
@@ -146,7 +165,9 @@ Um `PerfilInstrumento` agrupa:
 - programa General MIDI;
 - afinação, quando o instrumento tem braço.
 
-Os perfis implementados incluem baixo, bateria, piano acústico/elétrico e três tipos de guitarra. O pipeline público aceita hoje baixo, bateria e guitarras. O exportador MusicXML de piano já existe, mas a integração completa do piano ao pipeline ainda não foi liberada.
+Os perfis implementados incluem baixo, bateria, piano acústico/elétrico e três tipos de guitarra. O pipeline público
+aceita hoje baixo, bateria e guitarras. O exportador MusicXML de piano já existe, mas a integração completa do piano ao
+pipeline ainda não foi liberada.
 
 ### 6.4 `adapters/ingest/`
 
@@ -170,16 +191,18 @@ O Demucs sempre vem antes da transcrição porque medições mostraram que a mix
 
 ### 6.6 `adapters/transcription/muscriptor.py`
 
-Executa MuScriptor 0.3.0 em um ambiente Python 3.12 isolado pelo `uvx`. O adapter converte JSONL em `NoteEvent` e usa decodificação livre: deixa o modelo reconhecer rótulos e filtra depois.
+Executa MuScriptor 0.3.0 em um ambiente Python 3.12 isolado pelo `uvx`. O adapter converte JSONL em `NoteEvent` e usa
+decodificação livre: deixa o modelo reconhecer rótulos e filtra depois.
 
-Isso é importante porque forçar um instrumento cedo demais esconde erros de classificação. Em trechos energeticamente ativos sem notas, pode ocorrer uma segunda passagem controlada para recuperar buracos da transcrição.
+Isso é importante porque forçar um instrumento cedo demais esconde erros de classificação. Em trechos energeticamente
+ativos sem notas, pode ocorrer uma segunda passagem controlada para recuperar buracos da transcrição.
 
 ### 6.7 `services/`
 
 Esta pasta contém a inteligência própria da solução.
 
 | Serviço | Responsabilidade |
-|---|---|
+| --- | --- |
 | `tempo.py` | estima BPM, mede confiança, ajusta fase e corrige dobra de andamento |
 | `rhythm.py` | alinha eventos à grade, cria ticks, pausas, durações e acordes |
 | `fretboard.py` | escolhe corda/traste com Viterbi para uma linha monofônica |
@@ -195,9 +218,12 @@ Esta pasta contém a inteligência própria da solução.
 | `model_lock.py` | verifica revisão e SHA-256 dos pesos esperados |
 | `nomes.py` | produz nomes de arquivo seguros e estáveis |
 
-**Viterbi** é um algoritmo que encontra a sequência global de menor custo. Em vez de escolher o melhor traste para cada nota isoladamente, ele considera também a transição da mão entre notas. O perfil “iniciante” penaliza mais saltos e regiões difíceis; o “experiente” aceita movimentos mais amplos.
+**Viterbi** é um algoritmo que encontra a sequência global de menor custo. Em vez de escolher o melhor traste para cada
+nota isoladamente, ele considera também a transição da mão entre notas. O perfil “iniciante” penaliza mais saltos e
+regiões difíceis; o “experiente” aceita movimentos mais amplos.
 
-**DTW**, ou Dynamic Time Warping, alinha sequências que evoluem em velocidades ligeiramente diferentes. Aqui ele permite comparar uma tablatura humana com o áudio sem exigir que os dois relógios coincidam perfeitamente.
+**DTW**, ou Dynamic Time Warping, alinha sequências que evoluem em velocidades ligeiramente diferentes. Aqui ele permite
+comparar uma tablatura humana com o áudio sem exigir que os dois relógios coincidam perfeitamente.
 
 ### 6.8 `adapters/export/`
 
@@ -206,7 +232,8 @@ Esta pasta contém a inteligência própria da solução.
 - exportadores próprios representam bateria em faixa de percussão.
 - `MusicXmlPianoExporter` representa vozes polifônicas de piano, ainda fora do pipeline público.
 
-Os adapters tratam detalhes específicos de cada formato. Por exemplo, GP5 exige que cada beat com nota tenha estado `normal`; MusicXML precisa de ajustes explícitos para afinação, digitação e beams.
+Os adapters tratam detalhes específicos de cada formato. Por exemplo, GP5 exige que cada beat com nota tenha estado
+`normal`; MusicXML precisa de ajustes explícitos para afinação, digitação e beams.
 
 ### 6.9 `cli.py`
 
@@ -221,23 +248,26 @@ A CLI não implementa regras musicais. Isso permite reutilizar o mesmo comportam
 
 ### 6.10 `api/app.py` e `web/`
 
-A API FastAPI envolve o pipeline em jobs locais. A página estática usa alphaTab vendorizado para mostrar e reproduzir a partitura sem depender de CDN. Como opção Linux, um adapter MPRIS lê a posição de um player externo e a página a entrega ao modo `EnabledExternalMedia` do alphaTab.
+A API FastAPI envolve o pipeline em jobs locais. A página estática usa alphaTab vendorizado para mostrar e reproduzir a
+partitura sem depender de CDN. Como opção Linux, um adapter MPRIS lê a posição de um player externo e a página a entrega
+ao modo `EnabledExternalMedia` do alphaTab.
 
 Estados de um job:
 
 | Estado | Significado |
-|---|---|
+| --- | --- |
 | `na fila` | pedido aceito e aguardando a trava |
 | `rodando` | pipeline em execução |
 | `pronto` | resultado e artefatos disponíveis |
 | `erro` | exceção capturada e registrada no próprio job |
 
-Uma `threading.Lock` garante somente um pipeline por processo. O histórico fica em memória, limitado a 50 jobs concluídos. Reiniciar o servidor apaga o histórico, mas não apaga cache nem artefatos.
+Uma `threading.Lock` garante somente um pipeline por processo. O histórico fica em memória, limitado a 50 jobs
+concluídos. Reiniciar o servidor apaga o histórico, mas não apaga cache nem artefatos.
 
 Endpoints:
 
 | Método e caminho | Função |
-|---|---|
+| --- | --- |
 | `POST /jobs` | valida o pedido, cria o job e responde `202` |
 | `GET /jobs` | lista o histórico em memória |
 | `GET /jobs/{id}` | informa estado, diagnósticos e formatos disponíveis |
@@ -247,15 +277,24 @@ Endpoints:
 
 #### Sincronização com player externo (ADR-046)
 
-O caminho opcional é `player MPRIS → adapters/playback/mpris.py → GET /playback/players → web/index.html → alphaTab`. O contrato `LeitorDeReproducao` isola D-Bus do FastAPI e permite testes com dados controlados. A leitura é local, somente informativa: não envia comandos ao player e não captura áudio.
+O caminho opcional é `player MPRIS → adapters/playback/mpris.py → GET /playback/players → web/index.html → alphaTab`. O
+contrato `LeitorDeReproducao` isola D-Bus do FastAPI e permite testes com dados controlados. A leitura é local, somente
+informativa: não envia comandos ao player e não captura áudio.
 
-A página mantém a reprodução alphaTab existente como padrão. Ao entrar no modo externo, destrói e recria a API do alphaTab com `EnabledExternalMedia` e um handler sem áudio. O usuário seleciona o player e inicia o acompanhamento; a página aplica a posição em milissegundos. Um deslocamento manual compensa somente uma diferença fixa no início. Ao voltar ao modo local, a página recria o alphaTab com sintetizador e soundfont usuais.
+A página mantém a reprodução alphaTab existente como padrão. Ao entrar no modo externo, destrói e recria a API do
+alphaTab com `EnabledExternalMedia` e um handler sem áudio. O usuário seleciona o player e inicia o acompanhamento; a
+página aplica a posição em milissegundos. Um deslocamento manual compensa somente uma diferença fixa no início. Ao
+voltar ao modo local, a página recria o alphaTab com sintetizador e soundfont usuais.
 
-MPRIS é próprio do desktop Linux: o Thoth e o player precisam compartilhar a mesma sessão D-Bus. Esse acesso não é encaminhado do Docker nem do Windows/WSL. O adaptador exclui Spotify. Título e artista facilitam a escolha, mas não provam que a versão da gravação corresponde à transcrição; a checagem continua manual. Veja o fluxo atualizado no [ADR-046](../tasks/decisions.md#adr-046--acompanhar-player-local-via-mpris-sem-sincronização-spotifyweb-api).
+MPRIS é próprio do desktop Linux: o Thoth e o player precisam compartilhar a mesma sessão D-Bus. Esse acesso não é
+encaminhado do Docker nem do Windows/WSL. O adaptador exclui Spotify. Título e artista facilitam a escolha, mas não
+provam que a versão da gravação corresponde à transcrição; a checagem continua manual. Veja o fluxo atualizado no
+[ADR-046](../tasks/decisions.md#adr-046--acompanhar-player-local-via-mpris-sem-sincronização-spotifyweb-api).
 
 ## 7. Pipeline em detalhes
 
-`services/pipeline.py` é o único lugar que conhece a ordem completa. Essa centralização evita fluxos ligeiramente diferentes entre CLI, API e testes.
+`services/pipeline.py` é o único lugar que conhece a ordem completa. Essa centralização evita fluxos ligeiramente
+diferentes entre CLI, API e testes.
 
 ### 7.1 Validação antecipada
 
@@ -269,11 +308,13 @@ Falhar cedo aqui reduz custo e torna o erro atribuível à entrada.
 
 ### 7.2 Obtenção e normalização
 
-A fonte produz um `AudioAsset`. O conteúdo normalizado vai para `cache/`, separado da pasta final. Arquivo local e YouTube convergem para o mesmo contrato a partir deste ponto.
+A fonte produz um `AudioAsset`. O conteúdo normalizado vai para `cache/`, separado da pasta final. Arquivo local e
+YouTube convergem para o mesmo contrato a partir deste ponto.
 
 ### 7.3 Andamento
 
-Quando o usuário não informa BPM, `librosa` estima o andamento usando a mix, pois a bateria fornece pulsação mais clara. Depois, os inícios das notas refinam BPM e fase da grade. O resultado registra se o valor foi estimado e se é confiável.
+Quando o usuário não informa BPM, `librosa` estima o andamento usando a mix, pois a bateria fornece pulsação mais clara.
+Depois, os inícios das notas refinam BPM e fase da grade. O resultado registra se o valor foi estimado e se é confiável.
 
 ### 7.4 Separação
 
@@ -283,11 +324,13 @@ O Demucs recebe a mix e produz o stem do perfil:
 - `drums` para bateria;
 - `other` para guitarra.
 
-O stem `other` não significa “guitarra”: ele pode conter piano e outros instrumentos. Por isso os rótulos do transcritor continuam necessários.
+O stem `other` não significa “guitarra”: ele pode conter piano e outros instrumentos. Por isso os rótulos do transcritor
+continuam necessários.
 
 ### 7.5 Transcrição
 
-O MuScriptor processa o stem inteiro. Não há divisão arbitrária em trechos, pois o contexto ajuda o modelo a decidir o instrumento. Cada evento carrega altura MIDI, início, duração e rótulo.
+O MuScriptor processa o stem inteiro. Não há divisão arbitrária em trechos, pois o contexto ajuda o modelo a decidir o
+instrumento. Cada evento carrega altura MIDI, início, duração e rótulo.
 
 ### 7.6 Caminho do baixo
 
@@ -319,7 +362,8 @@ Não usa monofonização nem recuperação de baixo, pois ambas pressupõem uma 
 4. relata peça desconhecida, repetição impossível no mesmo tique ou excesso de peças;
 5. exporta sem tom, cordas ou trastes.
 
-Um silêncio inicial de 100 ms é aplicado somente à bateria porque a medição mostrou melhora importante para esse perfil e mudança indesejada nos demais.
+Um silêncio inicial de 100 ms é aplicado somente à bateria porque a medição mostrou melhora importante para esse perfil
+e mudança indesejada nos demais.
 
 ### 7.9 Exportação e entrega
 
@@ -331,7 +375,8 @@ Depois do caminho específico do instrumento, o trecho comum:
 - tenta produzir a auralização;
 - devolve um `Resultado` com artefatos, contagens, descartes e avisos.
 
-A auralização é um auxílio de auditoria: um canal toca o original e o outro, as notas sintetizadas. A falha de FluidSynth ou do soundfont é registrada, mas não invalida uma partitura já produzida.
+A auralização é um auxílio de auditoria: um canal toca o original e o outro, as notas sintetizadas. A falha de
+FluidSynth ou do soundfont é registrada, mas não invalida uma partitura já produzida.
 
 ### 7.10 Partitura multifaixa
 
@@ -354,21 +399,25 @@ multifaixa estão registrados no ADR-047.
 ### 8.1 Separação entre `cache/` e `out/`
 
 | Diretório | Finalidade | Pode ser apagado? |
-|---|---|---|
+| --- | --- | --- |
 | `cache/` | resultados intermediários identificados pela fonte | sim; o custo é reprocessar |
 | `out/` | pasta portável por música, com entregáveis nomeados pelo título | sim, se os resultados não forem mais necessários |
 
-O repositório ignora áudio, cache, resultados e pesos. Isso reduz risco de publicar material protegido ou arquivos pessoais.
+O repositório ignora áudio, cache, resultados e pesos. Isso reduz risco de publicar material protegido ou arquivos
+pessoais.
 
 ### 8.2 Escrita atômica
 
-Arquivos críticos são gravados ao lado do destino com sufixo `.parcial` e publicados com `os.replace`. Diretórios de stems são montados em área temporária e promovidos apenas no fim.
+Arquivos críticos são gravados ao lado do destino com sufixo `.parcial` e publicados com `os.replace`. Diretórios de
+stems são montados em área temporária e promovidos apenas no fim.
 
-“Atômico” significa que outros leitores veem o estado antigo ou o novo, nunca metade de um arquivo. Isso protege contra processo interrompido e cache parcialmente escrito.
+“Atômico” significa que outros leitores veem o estado antigo ou o novo, nunca metade de um arquivo. Isso protege contra
+processo interrompido e cache parcialmente escrito.
 
 ### 8.3 Reprodutibilidade dos modelos
 
-`models.lock.toml` registra repositório, revisão e SHA-256 esperados. Os pesos não entram na imagem nem no Git por tamanho e licença. O primeiro uso os baixa; os serviços de lock verificam sua identidade.
+`models.lock.toml` registra repositório, revisão e SHA-256 esperados. Os pesos não entram na imagem nem no Git por
+tamanho e licença. O primeiro uso os baixa; os serviços de lock verificam sua identidade.
 
 ## 9. Tratamento de erros e observabilidade
 
@@ -378,7 +427,8 @@ O projeto distingue três classes de problema:
 2. **falha técnica**: subprocesso falha e a mensagem conserva o final do `stderr`;
 3. **incerteza musical**: dado suspeito é descartado ou marcado, sem perder o restante.
 
-O terceiro caso é deliberado. Uma única nota impossível não deve desperdiçar uma transcrição longa. Para impedir falhas silenciosas, `Resultado` carrega:
+O terceiro caso é deliberado. Uma única nota impossível não deve desperdiçar uma transcrição longa. Para impedir falhas
+silenciosas, `Resultado` carrega:
 
 - distribuição bruta de rótulos;
 - notas descartadas e fora do braço;
@@ -390,7 +440,8 @@ O terceiro caso é deliberado. Uma única nota impossível não deve desperdiça
 - confiança do andamento;
 - falha isolada da auralização.
 
-Hoje não há logs estruturados, métricas operacionais persistentes ou tracing. Para execução pessoal isso é aceitável; para uma futura operação multiusuário, seria uma lacuna arquitetural.
+Hoje não há logs estruturados, métricas operacionais persistentes ou tracing. Para execução pessoal isso é aceitável;
+para uma futura operação multiusuário, seria uma lacuna arquitetural.
 
 ## 10. Qualidades arquiteturais
 
@@ -404,7 +455,8 @@ Hoje não há logs estruturados, métricas operacionais persistentes ou tracing.
 
 ### 10.2 Testabilidade
 
-Os ports permitem substituir fontes, separadores, transcritores e exportadores. Ao mesmo tempo, integrações críticas possuem testes reais marcados para que mocks não escondam contratos incorretos.
+Os ports permitem substituir fontes, separadores, transcritores e exportadores. Ao mesmo tempo, integrações críticas
+possuem testes reais marcados para que mocks não escondam contratos incorretos.
 
 ### 10.3 Desempenho
 
@@ -433,7 +485,8 @@ Os modelos são os principais consumidores de tempo. As decisões de desempenho 
 - nomes de saída sanitizados;
 - interface web destinada a `localhost`.
 
-A API não possui autenticação. Ela não deve ser exposta em uma interface pública sem adicionar controle de acesso, limites de upload, isolamento de processos e validação operacional.
+A API não possui autenticação. Ela não deve ser exposta em uma interface pública sem adicionar controle de acesso,
+limites de upload, isolamento de processos e validação operacional.
 
 ### 10.6 Confiabilidade
 
@@ -448,14 +501,15 @@ A API não possui autenticação. Ela não deve ser exposta em uma interface pú
 ### 11.1 Pirâmide prática
 
 | Nível | O que comprova | Exemplos |
-|---|---|---|
+| --- | --- | --- |
 | Unidade | algoritmo e regra isolada | ritmo, tonalidade, nomes, Viterbi |
 | Integração local | contrato com binário ou formato real | ffmpeg, FluidSynth, round-trip GP5/MusicXML |
 | Pesado | modelo real em CPU | Demucs e MuScriptor |
 | Rede | contrato externo atual | canário do YouTube com `yt-dlp` |
 | Navegador | página realmente renderizada | Chromium via CDP |
 
-A suíte padrão exclui `slow`, `network` e `navegador`. Portanto, uma suíte padrão verde não prova modelos, rede ou navegador. Cada afirmação sobre essas camadas precisa da seleção correspondente.
+A suíte padrão exclui `slow`, `network` e `navegador`. Portanto, uma suíte padrão verde não prova modelos, rede ou
+navegador. Cada afirmação sobre essas camadas precisa da seleção correspondente.
 
 Comandos de qualidade:
 
@@ -478,11 +532,13 @@ uv run pytest -m navegador
 
 ### 12.1 Execução nativa
 
-É o modo principal. O `uv` instala a aplicação e resolve as bibliotecas Python; ferramentas de áudio ficam no sistema. A instalação completa para Linux e Windows está no [README](../README.md#instalação).
+É o modo principal. O `uv` instala a aplicação e resolve as bibliotecas Python; ferramentas de áudio ficam no sistema. A
+instalação completa para Linux e Windows está no [README](../README.md#instalação).
 
 ### 12.2 Contêiner
 
-O `Containerfile` cria uma execução somente em CPU e não incorpora pesos. Volumes preservam `cache/` e `out/`. Isso melhora reprodutibilidade, mas não transforma o sistema numa plataforma multiusuário.
+O `Containerfile` cria uma execução somente em CPU e não incorpora pesos. Volumes preservam `cache/` e `out/`. Isso
+melhora reprodutibilidade, mas não transforma o sistema numa plataforma multiusuário.
 
 ### 12.3 Operação web
 
@@ -493,14 +549,16 @@ O `Containerfile` cria uma execução somente em CPU e não incorpora pesos. Vol
 - os diretórios são locais;
 - não existe fila durável.
 
-Usar múltiplos workers violaria essas suposições. Para o cenário atual, execute um processo e exponha apenas em `localhost`.
+Usar múltiplos workers violaria essas suposições. Para o cenário atual, execute um processo e exponha apenas em
+`localhost`.
 
 ## 13. Decisões arquiteturais centrais
 
-Os detalhes e medições completas estão em `tasks/decisions.md`. Abaixo está o mapa de decisões que mais definem a solução.
+Os detalhes e medições completas estão em `tasks/decisions.md`. Abaixo está o mapa de decisões que mais definem a
+solução.
 
 | Tema | Decisão | Consequência |
-|---|---|---|
+| --- | --- | --- |
 | Hardware | CPU-only | execução mais lenta, porém compatível e previsível |
 | Runtime | Python 3.12 | atende simultaneamente projeto e MuScriptor |
 | Transcrição | MuScriptor `small`, decodificação livre | melhor equilíbrio medido e erros de rótulo visíveis |
@@ -518,7 +576,7 @@ Os detalhes e medições completas estão em `tasks/decisions.md`. Abaixo está 
 ## 14. Riscos e limites conhecidos
 
 | Risco ou limite | Impacto | Controle atual | Evolução provável |
-|---|---|---|---|
+| --- | --- | --- | --- |
 | Modelos podem errar altura e rótulo | partitura incorreta | diagnósticos, comparação e descarte explícito | melhorar dados e critérios medidos |
 | CPU pode levar minutos por música | espera longa | progresso, cache e job em background | fila/processo dedicado se virar multiusuário |
 | Jobs não sobrevivem a reinício | histórico web perdido | artefatos permanecem no disco | persistência durável somente se necessária |
@@ -596,7 +654,7 @@ Ao depurar, descubra primeiro a camada do problema:
 ## 17. Glossário
 
 | Termo | Explicação simples |
-|---|---|
+| --- | --- |
 | Adapter | tradução entre o núcleo e uma tecnologia concreta |
 | Auralização | áudio de conferência com a transcrição sintetizada |
 | BPM | batidas por minuto, medida de andamento |

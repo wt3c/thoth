@@ -76,7 +76,8 @@ Mesma família do `Beat.status`: `gp.Note(...)` sem `type` é `NoteType.rest`. O
 nota como pausa. O exportador de cordas sempre passou o `type` e nunca viu isso; o de percussão nasceu sem ele. O
 **MuseScore importou as peças mesmo assim** — o leitor independente não pegou; quem pegou foi o round-trip afirmando
 `note.type`. Todo `gp.Note` leva `type` explícito, e o teste afirma o tipo relido, não só o `value`.
-# Partes e pautas no MusicXML multifaixa
+
+## Partes e pautas no MusicXML multifaixa
 
 Um baixo exportado pelo Thoth ocupa uma única `<part>` com duas pautas. No
 round-trip, porém, o music21 expande cada pauta como um objeto `Part`: baixo mais
