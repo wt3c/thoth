@@ -62,6 +62,16 @@ _FIGURAS = sorted(
 )
 
 
+def _texto_gp5(texto: str) -> str:
+    """O GP5 guarda texto em cp1252, a codificação que o PyGuitarPro usa ao gravar.
+
+    Título de vídeo em japonês não cabe e derrubava a exportação no fim do
+    pipeline. O que não cabe vira `?`; acentos cabem e passam intactos. O título
+    original continua no nome do arquivo (ADR-017).
+    """
+    return texto.encode("cp1252", errors="replace").decode("cp1252")
+
+
 def _decompor(ticks: int) -> list[tuple[int, bool]]:
     """Maior figura que cabe, repetidamente. Nunca devolve lista vazia para `ticks > 0`."""
     figuras = []
@@ -114,7 +124,7 @@ class Gp5Exporter:
         # O GP5 só guarda andamento inteiro no cabeçalho, mas a quantização usa o
         # fracionário: as posições ficam certas e só a reprodução corre ~0,5%
         # fora. O inverso — quantizar no inteiro — desloca as notas (ADR-021).
-        song = gp.Song(title=self.titulo, tempo=round(self.bpm))
+        song = gp.Song(title=_texto_gp5(self.titulo), tempo=round(self.bpm))
         song.tracks.clear()
         track = gp.Track(song, number=1, name=self.faixa)
         # O GP numera as cordas da mais aguda para a mais grave; nós, o contrário.
@@ -229,7 +239,7 @@ class Gp5PercussaoExporter:
                     f"({grupo[0].instante_s:.2f}s): a faixa tem {CORDAS_PERCUSSAO} cordas"
                 )
 
-        song = gp.Song(title=self.titulo, tempo=round(self.bpm))
+        song = gp.Song(title=_texto_gp5(self.titulo), tempo=round(self.bpm))
         song.tracks.clear()
         track = gp.Track(song, number=1, name=self.faixa, isPercussionTrack=True)
         track.strings = [gp.GuitarString(i + 1, 0) for i in range(CORDAS_PERCUSSAO)]

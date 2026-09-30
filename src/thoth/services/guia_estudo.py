@@ -226,7 +226,8 @@ def gerar_guia(caminho: Path, *, faixa: int | None = None, tom: str | None = Non
     titulo_interno = " ".join(song.title.split())
     titulo = (
         caminho.stem.removesuffix(".todos")
-        if titulo_interno.casefold() in {"", "mix", "thoth"}
+        # Só `?`: o título não coube no cp1252 do GP5 e o nome do arquivo tem o original.
+        if titulo_interno.strip("? ").casefold() in {"", "mix", "thoth"}
         else titulo_interno
     )
     linhas = [

@@ -266,3 +266,10 @@ def test_o_titulo_da_musica_vai_no_arquivo(tmp_path: Path) -> None:
     song = _exportar(_tabs([36, 38]), tmp_path, titulo="Smooth Operator")
 
     assert song.title == "Smooth Operator"
+
+
+def test_titulo_fora_do_cp1252_nao_derruba_a_exportacao(tmp_path: Path) -> None:
+    """O GP5 guarda texto em cp1252: o que não cabe vira `?`, o resto sobrevive."""
+    song = _exportar(_tabs([36, 38]), tmp_path, titulo="ゲスの極み乙女 — Falcão")
+
+    assert song.title == "??????? — Falcão"

@@ -105,3 +105,15 @@ aviso específico do MuseScore não foi reproduzido nesta estação. Uma ediçã
 manual dos nomes das partes no arquivo gerado não comprovou que eles fossem a
 causa do aviso. Não alterar o GP5 para contornar um aviso que ocorreu no
 MusicXML.
+
+## O GP5 guarda texto em cp1252 (2026-09-30)
+
+`uv run thoth transcribe` de um vídeo com título em japonês rodou os estágios caros inteiros e morreu no último, no
+`gp.write`: `UnicodeEncodeError` do cp1252 ao gravar `song.title`. Os títulos anteriores do acervo tinham só acento
+latino, que cabe no cp1252 — por isso nunca apareceu.
+
+**Correção:** `_texto_gp5()` em `adapters/export/gp5.py` troca por `?` o que não cabe, nos dois exportadores GP5. O
+título original continua no nome do arquivo (ADR-017), e o guia de estudo cai nele quando o título lido do GP5 é só `?`.
+
+**Regra:** todo texto que entra num campo do GP5 vindo de fora (título, nome de faixa) passa por `_texto_gp5`. MusicXML
+é UTF-8 e não precisa.

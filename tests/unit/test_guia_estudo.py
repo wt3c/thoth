@@ -161,6 +161,18 @@ def test_guia_de_gp5_antigo_prefere_nome_do_arquivo_a_titulo_mix(tmp_path: Path)
     assert guia.startswith("# Guia de estudo — Eyrie\n")
 
 
+def test_guia_prefere_nome_do_arquivo_quando_o_titulo_nao_coube_no_gp5(tmp_path: Path) -> None:
+    """Título todo fora do cp1252 volta do GP5 só com `?`; o nome do arquivo guarda o original."""
+    eventos = [NoteEvent(28, 0.0, 0.5, "electric_bass")]
+    tab = Gp5Exporter(bpm=120, titulo="私以外私じゃないの").export(
+        [TabNote(eventos[0], 0, 0)], tmp_path / "私以外私じゃないの.gp5", TUNING_BASS_4
+    )
+
+    guia = gerar_guia(tab)
+
+    assert guia.startswith("# Guia de estudo — 私以外私じゃないの\n")
+
+
 def test_guia_explica_quando_o_baixo_entra_depois_do_primeiro_compasso(
     tmp_path: Path,
 ) -> None:

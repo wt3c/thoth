@@ -146,3 +146,11 @@ def test_o_musescore_le_pauta_de_percussao_com_as_pecas(tmp_path: Path) -> None:
     figuras = ["eighth"] * (len(grupos) - 1) + ["16th"]
     print(f"\nMUSESCORE bateria: {len(lidos)} figuras, ref={len(grupos)} grupos")
     assert lidos == [*zip(figuras, grupos, strict=True), ("16th", frozenset())]
+
+
+def test_titulo_fora_do_cp1252_nao_derruba_a_exportacao(tmp_path: Path) -> None:
+    arquivo = Gp5PercussaoExporter(bpm=BPM, titulo="私以外私じゃないの").exportar(
+        [EventoPercussivo(0.0, 36)], tmp_path / "b.gp5"
+    )
+
+    assert gp.parse(str(arquivo)).title == "?????????"
