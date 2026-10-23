@@ -13,6 +13,9 @@ Os parâmetros saíram da medição do ADR-042, e cada um corrigiu uma falha vis
   pareciam com qualquer coisa, e o DTW ficou no piso de acaso.
 - **`norm=None` e normalização L2 à mão, distância euclidiana** — pelo mesmo motivo.
 - **banda de Sakoe-Chiba de 10%**: o caminho não salta para outra repetição do riff.
+- **ajuste fino pelos ataques do stem**: o DTW anda em quadros de ~93 ms e deixava a tab
+  18 a 50 ms atrasada; o desvio mediano até os ataques detectados no próprio stem é
+  descontado da música inteira (emenda de 2026-09-30 ao ADR-042). Continua sem olhar a transcrição.
 """
 
 from __future__ import annotations
@@ -32,6 +35,12 @@ BANDA = 0.1
 PERCENTIL_DO_SILENCIO = 15
 #: A nota da tab decai no croma dela, como a corda decai no áudio.
 DECAIMENTO = (1.0, 0.4)
+#: Resolução da detecção de ataques do ajuste fino: ~6 ms, bem abaixo do quadro do DTW.
+HOP_DO_ATAQUE = 128
+#: Só entram no desvio as notas com ataque detectado até aqui: a de quem o DTW errou por
+#: uma nota inteira puxaria a mediana para a vizinha.
+ALCANCE_DO_AJUSTE_S = 0.1
+VOLTAS_DO_AJUSTE = 10
 
 
 def _croma_do_audio(y: np.ndarray) -> np.ndarray:
@@ -56,6 +65,34 @@ def _croma_da_tab(referencia: Sequence[NoteEvent]) -> np.ndarray:
     return croma
 
 
+def _desvio_ate_os_ataques(ataques: np.ndarray, y: np.ndarray) -> float:
+    """Mediana, com sinal, de cada nota alinhada até o ataque do stem mais próximo.
+
+    Um número para a música inteira: medido nas cinco tabs humanas, desvio por trecho
+    ou por nota não ganhou do global em nenhuma e perdeu em algumas. A janela de
+    `ALCANCE_DO_AJUSTE_S` é recentrada até parar: em volta do ponto de partida ela corta a
+    cauda do lado para onde o DTW errou e a mediana sai encolhida (+45 ms viravam +28
+    numa volta, +3 em cinco).
+    """
+    detectados = librosa.onset.onset_detect(y=y, sr=SR, hop_length=HOP_DO_ATAQUE, units="time")
+    if len(detectados) < 2:
+        return 0.0
+    desvio = 0.0
+    for _ in range(VOLTAS_DO_AJUSTE):
+        movidos = ataques + desvio
+        i = np.clip(np.searchsorted(detectados, movidos), 1, len(detectados) - 1)
+        antes, depois = detectados[i - 1] - movidos, detectados[i] - movidos
+        residuo = np.where(np.abs(antes) <= np.abs(depois), antes, depois)
+        perto = residuo[np.abs(residuo) <= ALCANCE_DO_AJUSTE_S]
+        if not len(perto):
+            break
+        passo = float(np.median(perto))
+        desvio += passo
+        if abs(passo) < 0.001:
+            break
+    return desvio
+
+
 def alinhar_ao_stem(referencia: Sequence[NoteEvent], stem: Path) -> list[NoteEvent]:
     """Cada nota da tab no instante do stem em que o DTW a põe — altura intocada."""
     if not referencia:
@@ -76,6 +113,7 @@ def alinhar_ao_stem(referencia: Sequence[NoteEvent], stem: Path) -> list[NoteEve
     ataques = np.interp(
         [n.onset_s for n in referencia], quadros_tab * HOP / SR, quadros_audio * HOP / SR
     )
+    ataques = ataques + _desvio_ate_os_ataques(ataques, y)
     return [
         NoteEvent(n.pitch, float(t), float(t) + (n.offset_s - n.onset_s), n.instrument)
         for n, t in zip(referencia, ataques, strict=True)

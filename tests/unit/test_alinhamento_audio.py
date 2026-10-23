@@ -72,3 +72,26 @@ def test_trecho_mais_lento_no_meio_e_acompanhado(tmp_path: Path) -> None:
     erros = np.abs([a.onset_s - t.onset_s for a, t in zip(alinhada, tocada, strict=True)])
     print(f"erro mediano {np.median(erros):.3f} s")
     assert np.median(erros) < HOP_S
+
+
+def test_ataque_alinhado_nao_fica_atrasado_em_relacao_ao_stem(tmp_path: Path) -> None:
+    """O DTW anda em quadros de ~93 ms e põe a nota tarde (ADR-042, emenda de 2026-09-30).
+
+    Nas cinco músicas com tab humana, a tab alinhada chegava até 50 ms depois dos
+    ataques detectados no stem; com a tolerância de 100 ms do veredito, a nota certa
+    tocada uma semicolcheia rápida antes caía fora e a vizinha virava "errada". O
+    critério é o erro **com sinal**: o módulo abaixo de um quadro não pega um atraso
+    constante de meio quadro.
+    """
+    ref = _tab()
+    tocada = [
+        NoteEvent(n.pitch, n.onset_s * 0.95 + 1.5, n.offset_s * 0.95 + 1.5, n.instrument)
+        for n in ref
+    ]
+    stem = _stem(tmp_path / "bass.wav", tocada, tocada[-1].offset_s + 2.0)
+
+    alinhada = alinhar_ao_stem(ref, stem)
+
+    erros = np.array([a.onset_s - t.onset_s for a, t in zip(alinhada, tocada, strict=True)])
+    print(f"erro mediano com sinal {np.median(erros) * 1000:+.0f} ms")
+    assert abs(np.median(erros)) < 0.015
