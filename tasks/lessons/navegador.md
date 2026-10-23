@@ -23,3 +23,12 @@ O servidor pode responder 200 para cada arquivo e a página ainda assim não ren
 neste projeto: vendorização incompleta do alphaTab (ADR-015) e `scrollElement` errado (ADR-016). A asserção tem de ser
 sobre o resultado visível — contar `#tab svg` —, não sobre eventos do alphaTab nem sobre a existência do container:
 ambos dão sinal de sucesso com o bug ativo.
+
+## Espera por estado intermediário vira corrida quando o job ganha uma thread
+
+Os testes esperavam `status !== 'na fila'` e afirmavam `pronto`. Enquanto o job rodava na mesma thread que o
+atendia, o primeiro estado observável depois da fila já era o final. Com a thread trabalhadora do ADR-027 (2026-10-22)
+apareceu `rodando` no meio, e o teste passou a ler o estado intermediário.
+
+**Regra:** espere pelo conjunto de estados **terminais** (`['pronto', 'erro'].includes(status)`), nunca pela saída
+de um estado anterior. A condição de parada não pode depender de quantos estados existem entre o início e o fim.

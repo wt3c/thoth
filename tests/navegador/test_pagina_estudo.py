@@ -252,7 +252,7 @@ def test_o_formulario_manda_afinacao_e_digitacao_por_nome(servidor: str) -> None
              document.getElementById('enviar').click();
              for (let i = 0; i < 100; i++) {
                const jobs = await (await fetch('/jobs')).json();
-               if (jobs.length && jobs[0].status !== 'na fila') return jobs[0];
+               if (jobs.length && ['pronto', 'erro'].includes(jobs[0].status)) return jobs[0];
                await new Promise(r => setTimeout(r, 100));
              }
              return {status: 'nenhum job criado'};
@@ -333,7 +333,7 @@ def test_o_formulario_de_guitarra_manda_o_instrumento_e_nao_a_afinacao(servidor:
              document.getElementById('enviar').click();
              for (let i = 0; i < 100; i++) {
                const jobs = await (await fetch('/jobs')).json();
-               if (jobs.length && jobs[0].status !== 'na fila') {
+               if (jobs.length && ['pronto', 'erro'].includes(jobs[0].status)) {
                  return {status: jobs[0].status, desabilitada};
                }
                await new Promise(r => setTimeout(r, 100));
@@ -583,7 +583,7 @@ def test_o_formulario_sem_afinacao_manda_o_instrumento(
              document.getElementById('enviar').click();
              for (let i = 0; i < 100; i++) {
                const jobs = await (await fetch('/jobs')).json();
-               if (jobs.length && jobs[0].status !== 'na fila') {
+               if (jobs.length && ['pronto', 'erro'].includes(jobs[0].status)) {
                  return {status: jobs[0].status, desabilitada};
                }
                await new Promise(r => setTimeout(r, 100));

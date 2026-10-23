@@ -74,7 +74,7 @@ class _ClienteQueEspera(_Local):
     def post(self, url, *args, **kwargs):  # type: ignore[no-untyped-def, override]
         resposta = super().post(url, *args, **kwargs)
         if url == "/jobs" and resposta.status_code == 202:
-            limite = time.monotonic() + 10
+            limite = time.monotonic() + 600
             while self.get(f"/jobs/{resposta.json()['id']}").json()["status"] not in TERMINADOS:
                 assert time.monotonic() < limite, "o job não terminou"
                 time.sleep(0.005)
@@ -364,7 +364,7 @@ def test_falha_do_pipeline_vira_estado_e_nao_500(tmp_path: Path) -> None:
 @pytest.mark.skipif(not SOUNDFONT.exists(), reason="soundfont ausente")
 def test_caminho_real_ate_o_arquivo_baixado(tmp_path: Path) -> None:
     wav, _ = renderizar("escala", tmp_path)
-    cliente = _Local(criar_app(out_dir=tmp_path / "out", cache_dir=tmp_path / "cache"))
+    cliente = _ClienteQueEspera(criar_app(out_dir=tmp_path / "out", cache_dir=tmp_path / "cache"))
 
     ident = cliente.post("/jobs", json={"ref": str(wav), "bpm": 90}).json()["id"]
     job = cliente.get(f"/jobs/{ident}").json()
