@@ -109,3 +109,10 @@ deixando para ele a "passada perceptual" de ouvido.
 - Verificação manual só o que dispensa ouvido treinado: "sai som?", "o cursor anda?". "Soa certo?" não é pergunta para
   ele.
 - Explicar termo musical na primeira vez que aparece (oitava, classe de altura, tab).
+
+## `codex exec` sem terminal espera o stdin para sempre
+
+Disparado pela ferramenta Bash, o `codex exec` imprime `Reading additional input from stdin...` e fica parado: o
+stdin não é TTY e nunca fecha. Em 2026-10-23 uma consulta ficou mais de 20 min assim sem nem começar, e o `| tail`
+escondia a linha. **Regra:** sempre `< /dev/null` e saída em arquivo, não em pipe — o progresso fica legível enquanto
+roda.

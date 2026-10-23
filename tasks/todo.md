@@ -41,9 +41,10 @@ existente.
 
 ### Aberto
 
-- [ ] `test_mede_perfil[piano-acustico-mix]` e `[piano-eletrico-mix]` falham ("mão esquerda regrediu", 1 < 3)
-  desde a corrida `slow` do `6283965`, antes deste lote. Não é o fluidsynth: com 2.6.0 falha igual (2026-10-23).
-  Causa ainda não investigada.
+- [x] `test_mede_perfil[piano-acustico-mix]` e `[piano-eletrico-mix]` falhavam ("mão esquerda regrediu", 1 < 3)
+  desde o `1c91fcf`. Não era o modelo nem o fluidsynth (2.6.0 falha igual): o piso foi medido quando o transcritor
+  devolvia `drums` como nota, e a `Transcricao` passou a pô-los em `ataques`, fora de "qualquer rótulo". Com os
+  ataques de volta, 3/8 exatos nos dois pianos. Causa confirmada pelo Codex (`gpt-6.1-sol`, leitura).
 
 ### Fora, por ora
 

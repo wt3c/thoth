@@ -224,7 +224,15 @@ def test_mede_perfil(perfil: str, condicao: str, tmp_path: Path) -> None:
     assert bruto.notas or bruto.ataques, f"MuScriptor não devolveu nada para {perfil} {condicao}"
     assert f1 >= piso, f"{perfil} {condicao} regrediu: {f1} < {piso} medido no ADR-044"
     if PERFIS[perfil].familia == "piano":
-        _confere_partes_do_piano(perfil, condicao, ref.notas, list(bruto.notas))
+        # O piso foi medido quando o transcritor devolvia tudo como nota, `drums` incluso;
+        # desde a `Transcricao` esse rótulo vai para `ataques` e sumia de "qualquer rótulo".
+        # A peça GM do ataque é o número cru do modelo, não altura: preserva a métrica
+        # medida, não quer dizer nota de piano recuperada.
+        como_notas = [
+            NoteEvent(a.peca_gm, a.instante_s, a.instante_s + 0.01, a.rotulo)
+            for a in bruto.ataques
+        ]
+        _confere_partes_do_piano(perfil, condicao, ref.notas, [*bruto.notas, *como_notas])
     if (perfil, condicao) in MEDIDO_SEIS_NOTAS:
         seis = por_acorde[6][0]
         piso_seis = MEDIDO_SEIS_NOTAS[(perfil, condicao)] - (condicao == "mix-stem")
