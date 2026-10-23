@@ -1766,6 +1766,72 @@ Nada muda. Semicolcheia reta e andamento constante continuam como estão.
   série medida é um platô seguido de outro.
 - Nenhum código mudou, então a verificação de entrega da tarefa anterior continua valendo.
 
+### Emenda (2026-09-30) — segundo caso, agora com referência humana
+
+*Você* (Catedral, `yt_veGD1Gzpa_o`) é o segundo caso de andamento variável, e o primeiro medido contra uma tab humana
+(`samples/catedral-voce_build.gp5`), que traz mapa de andamento: abre em 106 bpm, acelera em degraus até 124 e fecha
+em 87. Ponderada pela duração, a tab dá **116,2 bpm**; os dois estimadores do mix concordam em 117, e o `ajustar` leva a
+**119,86**. 74% dos compassos da tab estão entre 115 e 125: o Thoth escreve o andamento do corpo da música, não o da
+introdução. O resíduo mediano fica em 23,7 ms, contra 11,6 ms de *Watashi Igai Watashi Ja Nai No*, que é metronômica
+(136 na tab e no Thoth).
+
+Não é erro do estimador, é o limite da grade única. Diferente de `yt_8m6wrCCRvm8`, a série aqui não é um platô seguido
+de outro, e sim uma aceleração em vários degraus, de modo que "mapa com duas seções" não basta para este caso. Nenhum
+código mudou; a reabertura continua sendo decisão de produto, agora com dois casos e uma referência para medir.
+
+### Emenda (2026-09-30, depois) — andamento por janela medido contra tabs humanas
+
+Primeira etapa do mapa de andamento: medir antes de construir, sem código de produto. O andamento de cada janela de
+20 s sai do `ajustar` com o global como âncora (±10%), sobre as notas em cache.
+
+**O que a tab humana diz.** O BPM escrito na tab nem sempre é o da gravação: em *And Plague Flowers* a tab marca 110 e
+o áudio anda a ~105. Por isso o gabarito é o BPM marcado corrigido pela inclinação local do alinhamento tab → stem
+(ADR-042) — quanto o áudio estica a tab naquele trecho. Erro em BPM contra esse gabarito, nas cinco músicas com tab:
+
+| música                           | erro mediano: por janela | global | janelas com erro ≥ 2 BPM: por janela | global |
+| -------------------------------- | ------------------------ | ------ | ------------------------------------ | ------ |
+| *Watashi Igai Watashi Ja Nai No* | 0,3                      | 0,3    | 3/10                                 | 3/10   |
+| *Você*                           | 0,3                      | 2,7    | 2/12                                 | 6/12   |
+| *Dance of Death*                 | 3,9                      | 6,4    | 15/25                                | 22/25  |
+| *Fear Is the Key*                | 1,2                      | 2,0    | 6/16                                 | 9/16   |
+| *And Plague Flowers*             | 0,2                      | 0,2    | 5/32                                 | 12/32  |
+
+Em *Você* a série por janela segue a da tab — 111,6 · 110,6 · 113,8 · 116,4 · 115,8 · 122,1 · 120,2 · 118,7 · 119,8 ·
+120,7 · 120,9 · 121,4 contra 107 a 124 — e em nenhuma das cinco o mapa erra mais que o número único. Onde ele falha é
+onde o global também falha: a introdução de *Dance of Death* (a tab vai de 75 a 170 bpm, o Thoth fica em 117–141) e o
+trecho lento de *Fear Is the Key* (80 na tab, 98 no Thoth entre 200 e 230 s).
+
+**A razão do ADR-034 não separa.** Repetida nas quinze músicas do cache, ela deixa *Você* em 3,3 (janela de 60 s) e
+11,2 (20 s), enquanto músicas planas passam disso: *Smooth Operator* 33,5 a 20 s, *Feel Like Makin' Love* 21,4 a 60 s,
+*And Plague Flowers* 77 a 79. O limiar tirado de n=1 caiu no primeiro caso novo, como o próprio ADR previa.
+
+**Mas talvez não precise separar.** Resíduo da grade, ponderado por nota, com o andamento único e com um por janela:
+
+| música                           | global  | por janela | ganho |
+| -------------------------------- | ------- | ---------- | ----- |
+| *Smooth Operator*                | 17,3 ms | 11,3 ms    | 35%   |
+| *Watashi Igai Watashi Ja Nai No* | 12,5 ms | 7,6 ms     | 39%   |
+| *Feel Like Makin' Love*          | 33,1 ms | 16,9 ms    | 49%   |
+| *Tive Razão*                     | 22,3 ms | 10,1 ms    | 55%   |
+| *Fear Is the Key*                | 31,3 ms | 13,4 ms    | 57%   |
+| *Você*                           | 24,6 ms | 7,3 ms     | 70%   |
+| *And Plague Flowers*             | 19,6 ms | 5,9 ms     | 70%   |
+| *Hallowed Be Thy Name*           | 30,8 ms | 8,3 ms     | 73%   |
+
+(As outras sete ficam entre 50% e 67%.) As duas músicas de andamento mais estável dão o menor ganho, 35–39%, e isso é
+o piso do método: cada janela ajusta BPM **e fase** livres, e dois parâmetros a mais sobre 40–80 notas sempre baixam o
+resíduo. Acima do piso, o ganho aparece em quase todo o acervo, não só nas duas de andamento variável. A leitura é
+que gravação humana deriva um pouco em toda parte, e o andamento único descola em todas, não só em *Você*.
+
+### Decisão da emenda
+
+Nada muda no código ainda. O mapa por janela acompanha a tab humana onde ela é confiável e nunca erra mais que o
+número único; o aviso por discriminador fica descartado de vez, porque não separa e talvez não precise. O número acima
+é um **teto otimista**: fase livre por janela não é um mapa tocável, porque a grade precisa ser contínua de uma janela
+para a outra (o compasso não pode pular). Antes de construir exportadores e pipeline, a medida seguinte é o resíduo de um
+mapa **contínuo** — fase herdada da janela anterior, mudança de andamento só quando ela paga — e quantas mudanças
+ele escreve nas músicas planas.
+
 ---
 
 ## ADR-035 — a tablatura mora dentro do MusicXML, em duas pautas
@@ -2357,6 +2423,49 @@ Os números por janela reproduzem os do script de medição.
   tab a cobrir o áudio de ponta a ponta.
 - Custo: matrizes de ~7000 × 7000 quadros em float64, perto de 800 MB por música de 10 min. Serve para uso pessoal.
 - Três tabs, todas de comunidade. A margem de 10 pontos saiu de três pares de música errada.
+
+### Emenda (2026-09-30) — o DTW deixava a tab atrasada; ajuste fino pelos ataques do stem
+
+Em *Watashi Igai Watashi Ja Nai No* (`yt_Ae6gQmhaMn4`, 136 bpm) o veredito deu 15,6% de nota errada, contra 4,3% em
+*Você*. Em 78 das 103 erradas o Thoth tinha tocado a altura da nota **vizinha** da tab, e em 48 a altura certa estava
+a 100–150 ms, logo além de `TOLERANCIA_S`. A primeira leitura foi culpar a tolerância em passagem rápida. A medição
+seguinte mostrou outra causa.
+
+**O desvio tem sinal.** Até a mesma altura no Thoth, o resíduo mediano é −42 ms em *Gesu* e −57 ms em *Você*, e quase
+todo resíduo acima de 100 ms é negativo, trecho a trecho. Para saber quem está fora, os dois foram medidos contra os
+ataques detectados no próprio stem (`librosa.onset.onset_detect`), que não dependem de nenhum deles:
+
+| música               | detector − Thoth | detector − tab do DTW |
+|----------------------|------------------|-----------------------|
+| *Gesu*               | +11 ms           | −22 ms                |
+| *Você*               | +11 ms           | −37 ms                |
+| *Dance of Death*     | +9 ms            | +5 ms                 |
+| *Fear Is the Key*    | +5 ms            | −18 ms                |
+| *And Plague Flowers* | +21 ms           | −23 ms                |
+
+O Thoth bate com o detector (o pico do detector vem um pouco depois do ataque). Quem chega tarde é a tab alinhada: o
+DTW anda em quadros de ~93 ms. No sintético do teste, com o atraso medido pelo erro com sinal, a tab chegava +45 ms
+depois.
+
+**Decisão.** `alinhar_ao_stem` passa a descontar, da música inteira, a mediana do desvio de cada nota alinhada até o
+ataque do stem mais próximo, dentro de ±100 ms. A janela é recentrada até parar, porque em volta do ponto de partida
+ela corta a cauda do erro e encolhe a mediana (no sintético, +45 → +28 ms numa volta, +3 em cinco). Só usa o áudio:
+a transcrição continua livre para ser julgada.
+
+Medido contra alternativas, nas cinco tabs: desvio por trecho de 10 s e "puxar cada nota para o ataque mais próximo"
+não ganharam do global em nenhuma e perderam em algumas. A detecção com `backtrack` empatou na soma.
+
+| música               | certa antes | certa depois | errada antes | errada depois | piso antes → depois |
+|----------------------|-------------|--------------|--------------|---------------|---------------------|
+| *Gesu*               | 82,0%       | 88,9%        | 15,6%        | 9,1%          | 0,49 → 0,41         |
+| *Você*               | 95,6%       | 96,2%        | 4,3%         | 3,7%          | 0,40 → 0,38         |
+| *Dance of Death*     | 59,6%       | 58,9%        | 30,8%        | 31,8%         | 0,74 → 0,74         |
+| *Fear Is the Key*    | 78,0%       | 81,8%        | 13,8%        | 11,9%         | 0,82 → 0,82         |
+| *And Plague Flowers* | 79,4%       | 86,9%        | 15,6%        | 9,7%          | 0,82 → 0,81         |
+
+Nenhum piso subiu, e nenhuma janela deixou de ser conclusiva. *Dance of Death*, onde o desvio já era pequeno, oscila
+dentro do ruído. Casar par a par, a ideia anterior, fica sem objeto: com o atraso descontado, as erradas de *Gesu* que
+eram a nota vizinha caem para perto da estimativa feita à mão (~8%).
 
 ---
 
@@ -3470,6 +3579,55 @@ com a margem de grafia e graus condicionais. A margem do ADR-031 compara a melho
 calibrada para provar tônica ou modo. Quando é curta, os nomes cromáticos da leitura permanecem com sustenidos por
 cautela. `--tom` informado continua prevalecendo e é identificado como dado do usuário, sem margem. Nenhuma função
 de acorde é afirmada só pela linha do baixo.
+
+---
+
+## ADR-050 — digitação experiente calibrada contra seis tabs humanas
+
+**Data:** 2026-09-30 · **Status:** aceito · **Complementa:** ADR-006, ADR-012 e ADR-028
+
+### Contexto
+
+Comparadas com tabs humanas, as transcrições de *Você* e *Watashi Igai Watashi Ja Nai No* acertam a nota (95,6% e
+82,0%), mas a corda e a casa coincidem em só 74% e 43%: o Thoth desce para o grave e usa corda solta onde o baixista
+fica numa posição do braço. Parte disso é de propósito: o default é `iniciante` (ADR-006). O perfil `experiente`,
+porém, nunca tinha sido medido contra baixista nenhum.
+
+### Medição
+
+As alturas de cada tab de baixo de `samples/` (seis: *Você*, *Gesu*, *Dance of Death*, *Fear Is the Key*, *And Plague
+Flowers the Kaleidoscope*, *Eyrie*; 11.576 notas, 4, 5 e 6 cordas) passam pelo Viterbi, e mede-se a fração de notas na
+mesma corda do humano. Assim o erro de transcrição não entra na conta.
+
+| perfil                                | Gesu  | Dance | Fear  | Plague | Eyrie | Você  | média     |
+|---------------------------------------|-------|-------|-------|--------|-------|-------|-----------|
+| `iniciante`                           | 0,414 | 0,211 | 0,414 | 0,540  | 0,745 | 0,738 | 0,510     |
+| `experiente` antigo (0,3/1,0/0,6/0,4) | 0,441 | 0,211 | 0,414 | 0,575  | 0,745 | 0,738 | 0,521     |
+| `experiente` novo (0,002/0/1,0/0,4)   | 0,582 | 0,387 | 0,633 | 0,677  | 0,745 | 0,738 | **0,627** |
+
+- **Robusto, não sorte de calibração.** Numa grade de 400 combinações, 307 superam o perfil antigo em **todas** as seis
+  tabs. Ajuste fino de pesos, ao contrário, não generaliza: na validação deixando uma tab de fora, o melhor peso das
+  outras cinco melhora duas, piora três e empata uma. Por isso a escolha é a forma simples, não o ótimo da grade.
+- **O que aproxima do humano é tirar o custo por traste.** Ele puxa a linha para o grave. Preferir traste alto
+  explicitamente (peso negativo) piora.
+- **Empate.** Sem custo de emissão, a mesma forma tocada em alturas diferentes custa igual e o desempate cai na ordem
+  das cordas. Com `traste_alto=0` a média muda com a ordem (0,618 contra 0,631). O residual de 0,002 resolve os empates
+  para o grave e dá **o mesmo resultado nas duas ordens**. Nunca vence uma diferença real de transição (a menor é
+  0,4).
+
+### Decisão
+
+`PADRAO = Custos(traste_alto=0.002, corda_solta=0.0, deslocamento=1.0, troca_corda=0.4, acima_da_janela=0.0)`. O
+default continua `iniciante` (ADR-006): esta decisão não muda a tab de quem usa o Thoth sem `--digitacao experiente`.
+
+### Consequências
+
+- Teste novo com frase real de *Gesu* (`[50, 46, 41, 36]` → trastes 7, 8, 8, 8 cruzando as cordas), escolhida por dar
+  o mesmo resultado nas duas ordens de corda. Os testes do contraste iniciante/experiente e do ADR-032 mantêm a
+  propriedade e mudam só a posição esperada.
+- Teto medido: mesmo o melhor perfil concorda em ~63%. O resto é escolha de estilo de cada baixista, que custo de
+  posição não captura. As tabs ficam fora do repositório (ADR-005); a medição é reproduzível com os arquivos em
+  `samples/`.
 
 ## ADR-051 — abrir arquivo pela página: áudio sobe, partitura abre no navegador
 

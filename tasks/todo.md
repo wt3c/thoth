@@ -17,6 +17,28 @@ abrem na tela. Um WAV escolhido toca sincronizado com a pauta (ADR-051).
    ruff e mypy limpos. O alphaTab encaixa a posição no início do tempo ao pausar e repassava isso como `seekTo`,
    puxando o WAV para trás; a pausa vinda do áudio agora ignora esse eco (teste cobre).
 
+## Tabs humanas como referência: digitação, andamento e nota errada (2026-09-30)
+
+Comparação de _Você_ (Catedral) e _Watashi Igai Watashi Ja Nai No_ (Gesu) com tabs humanas de `samples/`: nota certa
+95,6% e 82,0%; corda/casa iguais em 74% e 43%; andamento de _Você_ 120 contra 106 da tab humana.
+
+1. [x] Digitação: medir os perfis contra as 6 tabs de baixo de `samples/` (alturas humanas → Viterbi → corda humana);
+   recalibrar só o `experiente` (o default `iniciante` é do ADR-006), com teste de frase real e ADR.
+   **Resultado:** concordância de corda média 0,521 → 0,627, sem piorar nenhuma tab (ADR-050).
+2. [x] Andamento de _Você_: achar a causa do 120 contra 106 antes de propor correção.
+   **Resultado:** não é erro. A tab humana acelera de 106 a 124 (média 116,2); o Thoth escreve um BPM só (119,86).
+   Limite já conhecido do ADR-034, registrado como emenda; nenhum código mudou.
+3. [x] Nota errada em _Gesu_: localizar onde se concentram os 15,6% (registro, trecho, tipo de erro).
+   **Resultado:** 78 de 103 erradas são a altura da nota vizinha. A causa é o DTW, que deixava a tab 18 a 50 ms
+   atrasada. Ajuste fino pelos ataques do stem (emenda ao ADR-042): errada de _Gesu_ 15,6% → 9,1%, melhora em
+   quatro de cinco tabs, nenhum piso subiu.
+4. [x] Verificação de entrega e registro dos resultados.
+5. [x] Mapa de andamento por trecho, etapa 1 (medir): por janela de 20 s acompanha a tab humana de _Você_ (erro
+   mediano 0,3 contra 2,7 BPM do global) e nunca erra mais que o global nas cinco tabs; a razão do ADR-034 não
+   separa; resíduo da grade cai 35–73% no acervo inteiro, com fase livre (teto otimista). Emenda ao ADR-034.
+6. [ ] Mapa de andamento, etapa 1b: resíduo de um mapa contínuo (fase herdada, mudança só quando paga) e quantas
+   mudanças ele escreve nas músicas planas. Só depois decidir exportadores e pipeline.
+
 ## Conformidade Markdown do repositório (2026-09-29)
 
 1. [x] Aplicar correções automáticas seguras com `.markdownlint-cli2.jsonc`.
