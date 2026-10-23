@@ -488,6 +488,22 @@ são coisas diferentes de investigar. O teste imprime a margem contra o piso.
 
 ---
 
+### Emenda (2026-10-23) — `--shifts 0` mantém o piso do baixo sintético
+
+Medição na worktree `medir/demucs-shifts0`, com o mesmo estímulo canônico `misto`,
+MuScriptor `small` pregado e sem reaproveitar cache da configuração anterior:
+
+| `misto` separado | onset F1 / piso | nota F1 / piso | referência / estimativa |
+|---|---:|---:|---:|
+| default (`shifts 1`) | 0,938 / 0,938 | 0,968 / 0,968 | 16 / 15 |
+| `shifts 0` | 0,938 / 0,938 | 0,968 / 0,968 | 16 / 15 |
+
+Os seis casos diretos de `test_regressao_fase0` também reproduziram seus pisos.
+O resultado sustenta desligar o deslocamento aleatório no separador de um stem,
+sem afrouxar os pisos nem mudar a ordem do pipeline. A evidência continua sendo
+sintética; as 15 músicas do acervo não foram reprocessadas nesta medição.
+Determinismo, tempos e isolamento do cache estão na emenda de 2026-10-23 do ADR-026.
+
 ## ADR-011 — Baixo-primeiro é limite medido, não preferência
 
 **Data:** 2026-09-22 · **Status:** aceito
@@ -1180,6 +1196,38 @@ tratava nem a falha nem a interrupção.
 - **`comparar` lê o stem pelo escopo do separador** (`DemucsSeparator().escopo`), não por `stems/<id>` cru. Stem de
   outra versão do demucs não é este (emenda acima); antes, o comparador o aceitava e media contra áudio de outro
   modelo. Sem stem no escopo atual, a mensagem é a mesma de quando não há stem.
+
+### Emenda (2026-10-23) — o deslocamento aleatório também identifica o cache
+
+Medição em worktree descartável, com a fixture sintética canônica `misto` (13,137 s),
+`demucs@4.1.0`, `htdemucs_ft`, CPU e `--two-stems bass`, em processos independentes:
+
+| configuração | WAVs byte a byte | diferença máxima | SNR entre rodadas |
+|---|---|---:|---:|
+| default (`--shifts 1` implícito) | diferentes | 0,047760 | 29,945 dB |
+| `--shifts 0` | idênticos | 0 | infinito |
+
+O novo `DemucsSeparator` usa `--shifts 0`. Comando e escopo leem a mesma constante;
+o baixo passa a `<modelo>/<versão>-shifts0`, e os demais stems a
+`<modelo>/<versão>-shifts0-<stem>`. Os diretórios antigos são preservados, mas nunca
+reutilizados nem promovidos para o novo escopo. O comparador usa esse mesmo escopo.
+O cache existente das 15 músicas precisaria ser refeito na adoção.
+
+Os quatro processos levaram, respectivamente, 60,31/35,21 s de relógio e
+240,13/235,49 s de CPU no default, 35,48/35,18 s de relógio e 234,82/232,09 s de CPU
+com `shifts 0`. CPU é usuário + sistema, incluindo os subprocessos; a primeira
+rodada inclui preparação do ambiente. Não se conclui ganho relevante de velocidade.
+
+O determinismo foi observado neste estímulo e nesta máquina, não demonstrado para
+qualquer plataforma. Esta mudança cobre o separador de um stem; a separação
+multifaixa do ADR-047 mantém sua configuração e cache próprios. As rodadas reais
+antes e depois passaram: 48 testes em cada, com um skip de MPRIS por ausência da
+sessão D-Bus descartável. As 115 métricas de piso/teto coincidiram, sem alterar
+pisos nem folgas. Relógio/CPU da suíte: 1.091,65/7.423,01 s antes e
+974,40/6.745,85 s depois. Recomendação: adotar no separador de um stem, aceitando
+refazer o cache das 15 músicas; não reclassificar as folgas nesta mudança.
+**Adotado em 2026-10-23.** As folgas do `mix-stem` (ADR-044) ficam até haver rodadas
+repetidas com `shifts 0` mostrando que deixaram de ser necessárias.
 
 ## ADR-027 — Um job por vez, e histórico com teto
 
@@ -2872,6 +2920,27 @@ sem impossível.
   A `FOLGA_DEMUCS = 0,03` do F1 já absorvia as duas notas; a dos acordes, não.
 - A folga dos acordes de seis notas no `mix-stem` passa a duas notas (`FOLGA_DEMUCS_SEIS_NOTAS = 2`). `isolada` e `mix`
   continuam exatos. O Demucs determinístico continua sendo a saída que tira as folgas, com a mesma ressalva do baixo.
+
+### Emenda (2026-10-23) — medição com o deslocamento aleatório desligado
+
+Na worktree de medição de `--shifts 0`, os 18 casos de `test_mede_perfil`
+reproduziram os valores da rodada imediatamente anterior, com o default aleatório.
+As partes do piano e os acordes de seis notas também mantiveram as contagens.
+
+| perfil `mix-stem` | F1 antes | F1 depois | piso existente | seis notas antes / depois / piso |
+|---|---:|---:|---:|---:|
+| bateria | 0,901 | 0,901 | 0,871 | não se aplica |
+| guitarra acústica | 0,981 | 0,981 | 0,951 | 23 / 23 / 21 |
+| guitarra distorcida | 0,981 | 0,981 | 0,951 | 24 / 24 / 22 |
+| guitarra limpa | 0,990 | 0,990 | 0,960 | 24 / 24 / 22 |
+| piano acústico | 0,879 | 0,879 | 0,849 | não se aplica |
+| piano elétrico | 0,000 | 0,000 | 0,000 | não se aplica |
+
+O baixo separado manteve nota F1 0,968 e onset F1 0,938 (emenda do ADR-010).
+O teste de determinismo comparou dois processos por configuração sobre o `misto`:
+WAVs diferentes no default e byte a byte idênticos com `shifts 0` (ADR-026).
+As folgas históricas de F1, seis notas e partes do piano ficam intactas: esta
+mudança mede a configuração contra os pisos existentes, não redefine os pisos.
 
 ### Emenda (2026-09-25) — GP5 com acordes de guitarra
 

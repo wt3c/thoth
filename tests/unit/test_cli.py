@@ -295,7 +295,7 @@ def test_comparar_com_stem_relata_nota_errada_por_janela(tmp_path: Path) -> None
     tab, origem, cache = _tab_e_cache(tmp_path, {0: 12, 5: -12, 9: 7})
     fonte = next(p for p in cache.iterdir() if p.is_dir() and p.name != "stems")
     notas = ler(fonte / "notas.jsonl")
-    pasta = cache / "stems" / fonte.name / "htdemucs_ft" / "4.1.0"
+    pasta = cache / "stems" / fonte.name / "htdemucs_ft" / "4.1.0-shifts0"
     pasta.mkdir(parents=True)
     _stem(pasta / "bass.wav", notas, notas[-1].offset_s + 2.0)
 
@@ -310,15 +310,18 @@ def test_comparar_com_stem_relata_nota_errada_por_janela(tmp_path: Path) -> None
     assert "limite inferior" in saida
 
 
-def test_comparar_ignora_stem_de_outra_versao_do_demucs(tmp_path: Path) -> None:
-    """O stem é o do separador do pipeline (ADR-026): o de outra versão não mede nada."""
+@pytest.mark.parametrize("configuracao", ["4.0.0-shifts0", "4.1.0"])
+def test_comparar_ignora_stem_de_outra_configuracao_do_demucs(
+    tmp_path: Path, configuracao: str
+) -> None:
+    """O comparador usa o mesmo modelo, versão e configuração do pipeline (ADR-026)."""
     from tests.unit.test_alinhamento_audio import _stem
     from thoth.services.cache_notas import ler
 
     tab, origem, cache = _tab_e_cache(tmp_path, {})
     fonte = next(p for p in cache.iterdir() if p.is_dir() and p.name != "stems")
     notas = ler(fonte / "notas.jsonl")
-    pasta = cache / "stems" / fonte.name / "htdemucs_ft" / "4.0.0"
+    pasta = cache / "stems" / fonte.name / "htdemucs_ft" / configuracao
     pasta.mkdir(parents=True)
     _stem(pasta / "bass.wav", notas, notas[-1].offset_s + 2.0)
 

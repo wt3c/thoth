@@ -290,7 +290,8 @@ principal, gutural, harmonias e dobragens, além de conter vazamento. Ele não t
 uma faixa vocal à partitura.
 
 Na primeira execução, a separação leva alguns múltiplos da duração do áudio; as seguintes reutilizam o cache identificado
-por modelo e versão. `--out` troca a pasta de entrega e `--cache`, a dos arquivos intermediários.
+por modelo, versão e configuração (`--shifts 0`, sem deslocamento aleatório). Stems do cache anterior precisam ser
+refeitos. `--out` troca a pasta de entrega e `--cache`, a dos arquivos intermediários.
 
 ### `transcribe` — executar o pipeline completo
 

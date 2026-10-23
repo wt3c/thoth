@@ -189,6 +189,7 @@ def test_caminho_completo_com_demucs_e_muscriptor_reais(tmp_path: Path) -> None:
 
     resultado = transcrever(str(wav), tmp_path / "out", bpm=90, cache_dir=tmp_path / "cache")
 
+    print(f"\nPIPELINE baixo: notas={resultado.notas} piso exclusivo=10")
     assert resultado.notas > 10  # a escala tem 15 notas
     assert all(c.exists() for c in resultado.artefatos.values())
     # Com o Demucs real os três stems são arquivos distintos, e não o próprio mix

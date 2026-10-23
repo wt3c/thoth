@@ -9,8 +9,10 @@ arrasta torch. O `--with "numpy<2"` não é preferência — o demucs declara ma
 dependências e quebra com `ModuleNotFoundError: numpy` sem ele. A versão vai pregada
 (`demucs@4.1.0`), como a do transcritor: sem ela o `uvx` pega a mais nova do dia e os
 stems — e o cache e as medições do ADR-010 feitos sobre eles — mudam sem aviso.
-Pelo mesmo motivo a versão entra na chave do cache, ao lado do modelo (emenda do
-ADR-026): trocar o pin não reaproveita calado o stem da versão anterior.
+Pelo mesmo motivo a versão e a configuração entram na chave do cache, ao lado do
+modelo (ADR-026). O separador de um stem desliga os deslocamentos aleatórios com
+`--shifts 0`: a medição de 2026-10-23 reproduziu o WAV byte a byte. O escopo novo
+não reaproveita stems produzidos com o deslocamento aleatório padrão.
 """
 
 from __future__ import annotations
@@ -26,6 +28,9 @@ from thoth.processos import rodar
 #: O que o `htdemucs` sabe separar. Piano e guitarra saem em `other` (ADR-044).
 STEMS_DO_HTDEMUCS = frozenset({"bass", "drums", "other", "vocals"})
 
+#: Comando e cache leem a mesma configuração; nunca aceitar stem do default antigo.
+_DESLOCAMENTOS = 0
+
 
 def localizar_stems(out_dir: Path, stem: str = "bass") -> dict[str, Path]:
     """Acha os stems por varredura sob `out_dir`, não reconstruindo o caminho.
@@ -34,8 +39,8 @@ def localizar_stems(out_dir: Path, stem: str = "bass") -> dict[str, Path]:
     arquivo aqui é `mix` — o `source_id` já está em `out_dir`. Procurar o arquivo é
     mais barato e mais honesto do que remontar essa convenção.
 
-    **Quem chama decide o escopo.** `separate` passa `<out>/<modelo>/<versão>`,
-    porque stem de outro modelo ou de outra versão não é cache deste (ADR-026): a
+    **Quem chama decide o escopo.** `separate` passa o modelo, a versão e a
+    configuração, porque stem de outro separador não é cache deste (ADR-026): a
     diferença entre dois separadores é exatamente o que o ADR-010 mede. Quem lê o
     cache fora do pipeline (o `comparar`) usa `DemucsSeparator().escopo` pelo mesmo
     motivo.
@@ -71,11 +76,13 @@ class DemucsSeparator:
         """Onde fica o cache deste stem. Irmãos, nunca aninhados: `diretorio_atomico`
         apaga o destino inteiro antes de promover, e levaria o stem vizinho junto.
 
-        O baixo fica em `<modelo>/<versão>`, o caminho de antes do ADR-044, para não
-        invalidar os stems já em cache; os outros ganham o nome do stem ao lado.
+        O baixo fica em `<modelo>/<versão>-shifts0`; os outros ganham o nome do
+        stem ao lado. O cache anterior, com deslocamento aleatório, é preservado,
+        mas não reutilizado (emenda de 2026-10-23 do ADR-026).
         """
         base = out_dir / self.model
-        return base / (self.versao if self.stem == "bass" else f"{self.versao}-{self.stem}")
+        configuracao = f"{self.versao}-shifts{_DESLOCAMENTOS}"
+        return base / (configuracao if self.stem == "bass" else f"{configuracao}-{self.stem}")
 
     def _comando(self, audio: Path, out_dir: Path) -> list[str]:
         programa = self.binary or ("uvx", "--with", "numpy<2", f"demucs@{self.versao}")
@@ -85,14 +92,15 @@ class DemucsSeparator:
             "-d", self.device,
             "--two-stems", self.stem,
             "-o", str(out_dir),
+            "--shifts", str(_DESLOCAMENTOS),
             str(audio),
         ]
 
     def separate(self, audio: Path, out_dir: Path) -> dict[str, Path]:
         """Separa, ou devolve o que já está separado — a conta é de ~88s por 30s."""
         out_dir.mkdir(parents=True, exist_ok=True)
-        # O cache pertence ao modelo *e* à versão que o produziram: sem a versão, um
-        # stem de outro demucs passaria por este (emenda do ADR-026).
+        # O cache pertence ao modelo, à versão e à configuração que o produziram
+        # (ADR-026): o default aleatório anterior não é este separador.
         meu = self.escopo(out_dir)
         try:
             return localizar_stems(meu, self.stem)
