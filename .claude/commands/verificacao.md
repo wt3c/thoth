@@ -5,6 +5,8 @@ allowed-tools: Bash(uv run pytest:*), Bash(uv run ruff:*), Bash(uv run mypy:*)
 
 # Verificação
 
+Cópia para o Codex em `.agents/skills/verificacao/SKILL.md`; as duas mudam juntas.
+
 Rode os três comandos da verificação, nesta ordem, e **não pare no primeiro que falhar** —
 o relatório precisa dizer o estado dos três:
 
