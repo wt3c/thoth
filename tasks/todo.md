@@ -30,6 +30,24 @@ número impresso ao lado do piso.
    (bass 99,9%, bateria 100%, vocais 78,1%). Por parte continua pendente. Emenda de 2026-10-23 ao ADR-048.
 5. [x] Verificação de entrega e registro de cada resultado aqui e no ADR da área.
    pytest padrão 709 passaram; ruff limpo; mypy sem erros (46 arquivos); Demucs real em develop: 4 passaram.
+6. [x] Conferir as trocas de ~10 bpm do mapa contra a tab humana de *Dance of Death*.
+   **Resultado:** as três trocas escritas são reais (mediana de 2 bpm da gravação entre 220 e 460 s). O que falta é o
+   trecho lento (83 a 90 bpm) e os de 150, fora da faixa de ±10% (116 a 142). Emenda ao ADR-034.
+
+## Mapa de andamento, etapa 2 (aprovada em 2026-10-23)
+
+1. [x] Medir a largura da faixa (só medição): ±10% atual, faixa larga (±40%) e ±10% com metade/dobro como candidatos,
+   nas 21 fontes, com o controle fora da amostra da etapa 1b. Critério: nenhuma música pior que o andamento único,
+   nenhuma troca nas planas e o trecho lento de *Dance of Death* alcançado. Se nenhuma opção cumprir, fica ±10%.
+   **Resultado:** nenhuma cumpriu (±40% alcança o trecho lento piorando 4 músicas; ±40% sem troca piora 9). Fica
+   ±10% com custo em ms e λ = 2000. Emenda ao ADR-034.
+2. [ ] `services/tempo`: `mapa_de_andamento(onsets, bpm, λ)` → trechos `(início, bpm)`, trocas puxadas para a barra de
+   compasso mais próxima. TDD, com estímulo sintético de andamento conhecido.
+3. [ ] `rhythm` quantiza cada trecho no próprio andamento; música plana sai idêntica à de hoje (teste de regressão).
+4. [ ] Exportadores: andamento por compasso no GP5 (`mixTableChange`) e no MusicXML (`<sound tempo>` + metrônomo).
+   Round-trip afirmando estrutura (em que compasso troca, para qual BPM).
+5. [ ] Auralização e cursor da página de estudo seguindo o mapa (`-m navegador`).
+6. [ ] ADR novo, verificação de entrega e seleções `slow` e `navegador`.
 
 ## Eficiência: revisão conjunta Claude + Codex (2026-10-23)
 

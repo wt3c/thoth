@@ -1976,6 +1976,60 @@ troca nas planas e melhora 12 das 21 fontes do acervo. A etapa 2 é produto e n�
 no compasso, `rhythm` quantizando pelo mapa, marcação de andamento no GP5 e no MusicXML, auralização e cursor da página
 seguindo o mapa. Antes dela, conferir as trocas de ~10 bpm contra a tab humana de *Dance of Death*.
 
+#### Conferência em *Dance of Death* (2026-10-23)
+
+O gabarito é o da etapa 1: tab humana (`samples/`, ver 4 by Mirko88) alinhada ao stem pelo `alinhar_ao_stem`, e o
+andamento da gravação em cada janela é a inclinação batidas da tab × segundos do áudio. O ADR-042 não confirma o
+alinhamento desta música nota a nota, mas a inclinação concorda com o BPM marcado na tab onde ele é constante
+(83–90 contra 80–85; 131–137 contra 130), e é a inclinação que importa aqui.
+
+| trecho     | mapa (λ = 2000) | gravação, pela tab | marcado na tab |
+| ---------- | --------------- | ------------------ | -------------- |
+| 0–100 s    | 141,0           | 144 a 155          | 150            |
+| 100–180 s  | 141,0           | 83 a 90            | 80–85          |
+| 180–220 s  | 141,0           | 115 a 120          | 120            |
+| 220–300 s  | 124,1           | 123 a 131          | 120–125        |
+| 300–420 s  | 134,0           | 131 a 137          | 130            |
+| 420–460 s  | 127,1           | 126 a 129          | 125–132        |
+| 460–500 s  | 127,1           | 138 a 148          | 150            |
+
+**As três trocas que o mapa escreve são reais.** Nas janelas de 220 s a 460 s ele fica a 2 bpm, na mediana, da
+gravação. O erro está nas trocas que ele **não** escreve. A busca vai de ±10% em torno do global de 129 bpm, ou seja,
+de 116 a 142, e deixa de fora três trechos: o lento (83 a 90 bpm), a abertura (144 a 155) e a volta a 150 no fim. O
+mapa encosta no teto, 141, e não tem como ir além.
+
+**Consequência para a etapa 2.** O ±10% foi herdado do `ajustar` (ADR-034) e serve a um número só. Um mapa precisa de
+faixa mais larga, ou de grade que admita a metade e o dobro, e qualquer das duas abre a porta para a confusão de
+oitava rítmica que o ±10% fecha. A largura da faixa entra na etapa 2 como medição própria, nas 21 fontes e com o mesmo
+controle fora da amostra, antes de qualquer exportador.
+
+#### Largura da faixa, medida (2026-10-23)
+
+Três faixas: ±10%; ±40%; e ±10% em torno da metade, do global e do dobro ("oitavas"). O custo passa a ser a fração da
+semicolcheia (0 a 0,5) em vez de ms, porque o ms premia a grade mais fina e uma faixa larga escolheria sempre o
+andamento mais rápido. O critério foi fixado antes da rodada: fora da amostra, contra o andamento único de ±10%, nenhuma
+música pior (mais de 2%), nenhuma troca nas planas, e o trecho lento de *Dance of Death* alcançado.
+
+| faixa / λ (fração·nota) | músicas piores | trocas nas planas | *Dance*: 0–100 s / 100–180 s / 460–500 s |
+| ----------------------- | -------------- | ----------------- | ---------------------------------------- |
+| ±10% / 5                | 0              | 0 e 2             | 141 / 135 / 130                          |
+| ±10% / 10               | 1              | 0 e 0             | 116 / 116 / 127                          |
+| ±40% / 10               | 4              | 0 e 2             | 112 / **83** / 111                       |
+| ±40% / 20               | 4              | 0 e 0             | 126 / 126 / 135                          |
+| ±40% / andamento único  | 9              | 0 e 0             | 126 / 126 / 126                          |
+| oitavas / 10            | 1              | 0 e 2             | 232 / 174 / 128                          |
+| oitavas / 20            | 2              | 0 e 0             | 126 / 126 / 124                          |
+| gabarito (tab alinhada) |                |                   | 144–155 / 83–90 / 138–148                |
+
+**Nenhuma faixa larga cumpre o critério.** A única que chega ao trecho lento (±40%, λ = 10) piora 4 músicas. A linha
+mais reveladora é a do andamento único com ±40%: sem troca nenhuma, ela piora 9 das 21 fontes fora da amostra. Mais
+candidatos são mais chances de achar, no ajuste, uma grade que não generaliza. As oitavas escrevem 232 e 174 em
+*Dance of Death*, o tipo de confusão que o ±10% evita.
+
+**Decisão:** a etapa 2 segue com ±10% e o custo em ms com λ = 2000, o candidato da etapa 1b (nenhuma piora, nenhuma
+troca nas planas). Trecho a mais de 10% do global continua sendo escrito no andamento mais próximo da faixa; esse é o
+limite conhecido do mapa, e *Dance of Death* é o caso que o mede.
+
 ---
 
 ## ADR-035 — a tablatura mora dentro do MusicXML, em duas pautas
