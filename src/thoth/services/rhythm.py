@@ -17,7 +17,7 @@ que o ADR-021 corrige — 0,46% de erro vira segundos de deriva no fim da músic
 from __future__ import annotations
 
 from collections.abc import Sequence
-from dataclasses import replace
+from dataclasses import dataclass, replace
 from itertools import pairwise
 
 from thoth.domain.models import EventoPercussivo, NoteEvent, TabNote
@@ -68,6 +68,77 @@ def a_partir_do_zero(notes: Sequence[NoteEvent]) -> list[NoteEvent]:
         replace(n, onset_s=0.0, offset_s=n.offset_s - n.onset_s) if n.onset_s < 0 else n
         for n in notes
     ]
+
+
+@dataclass(frozen=True, slots=True)
+class MapaDeAndamento:
+    """Instante do áudio → instante da partitura, quando o andamento muda no meio.
+
+    Generaliza o `recuo`: sem troca, a partitura é o áudio recuado, como sempre foi.
+    Com troca, a grade inteira continua no andamento do primeiro trecho (`bpm`), e o
+    tempo de cada trecho seguinte é esticado ou encolhido para caber nela — a semínima
+    tocada a 100 BPM sai semínima numa grade de 120. Quem toca a partitura não ouve a
+    deformação: cada troca vira uma marca de andamento no tique em que acontece, e o
+    exportador a escreve (ADR-053).
+    """
+
+    bpm: float
+    recuo: float = 0.0
+    #: `(instante no áudio, bpm)` de cada troca, em ordem.
+    trocas: tuple[tuple[float, float], ...] = ()
+
+    def _trechos(self) -> list[tuple[float, float, float]]:
+        """`(início no áudio, início na partitura, escala)` de cada trecho com troca."""
+        trechos = []
+        audio, partitura, escala = 0.0, -self.recuo, 1.0
+        for instante, bpm in self.trocas:
+            partitura += (instante - audio) * escala
+            audio, escala = instante, bpm / self.bpm
+            trechos.append((audio, partitura, escala))
+        return trechos
+
+    def para_partitura(self, segundos: float) -> float:
+        for audio, partitura, escala in reversed(self._trechos()):
+            if segundos >= audio:
+                return partitura + (segundos - audio) * escala
+        return segundos - self.recuo
+
+    def para_audio(self, segundos: float) -> float:
+        for audio, partitura, escala in reversed(self._trechos()):
+            if segundos >= partitura:
+                return audio + (segundos - partitura) / escala
+        return segundos + self.recuo
+
+    def na_partitura(self, notes: Sequence[NoteEvent]) -> list[NoteEvent]:
+        if not self.trocas:
+            return deslocar(notes, self.recuo)
+        return [
+            replace(
+                n, onset_s=self.para_partitura(n.onset_s), offset_s=self.para_partitura(n.offset_s)
+            )
+            for n in notes
+        ]
+
+    def no_audio(self, notes: Sequence[NoteEvent]) -> list[NoteEvent]:
+        if not self.trocas:
+            return deslocar(notes, -self.recuo)
+        return [
+            replace(n, onset_s=self.para_audio(n.onset_s), offset_s=self.para_audio(n.offset_s))
+            for n in notes
+        ]
+
+    def marcas(self) -> list[tuple[int, float]]:
+        """`(tique, bpm)` de cada troca, para o exportador escrever.
+
+        A partitura escreve BPM inteiro: troca que o arredondamento apaga não vira
+        marca, e a grade a segue do mesmo jeito.
+        """
+        marcas, escrito = [], round(self.bpm)
+        for instante, bpm in self.trocas:
+            if round(bpm) != escrito:
+                marcas.append((para_ticks(self.para_partitura(instante), self.bpm), bpm))
+                escrito = round(bpm)
+        return marcas
 
 
 def para_ticks(segundos: float, bpm: float) -> int:

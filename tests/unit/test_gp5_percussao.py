@@ -154,3 +154,18 @@ def test_titulo_fora_do_cp1252_nao_derruba_a_exportacao(tmp_path: Path) -> None:
     )
 
     assert gp.parse(str(arquivo)).title == "?????????"
+
+
+def test_marca_de_andamento_tambem_na_bateria(tmp_path: Path) -> None:
+    ataques = [EventoPercussivo(i * 0.5, 36) for i in range(16)]
+    arquivo = Gp5PercussaoExporter(bpm=BPM, marcas=((COMPASSO, 100.0),)).exportar(
+        ataques, tmp_path / "b.gp5"
+    )
+    song = gp.parse(str(arquivo))
+
+    trocas = [
+        (numero, medida.voices[0].beats[0].effect.mixTableChange.tempo.value)
+        for numero, medida in enumerate(song.tracks[0].measures)
+        if medida.voices[0].beats[0].effect.mixTableChange is not None
+    ]
+    assert trocas == [(1, 100)]

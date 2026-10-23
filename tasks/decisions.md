@@ -3973,3 +3973,81 @@ recuo. Ele depende do BPM e do instrumento escolhido, e não da transcrição em
 - `cache/transcricoes/` pode ser apagado a qualquer momento; o pior caso é transcrever de novo.
 - Se os pesos mudarem upstream sem o lock mudar, o cache serve o resultado antigo. É o mesmo risco que o lock já torna
   visível (o teste dele falha), e a correção é a mesma: atualizar o lock, o que também invalida o cache.
+
+## ADR-053 — andamento estimado que muda vira mapa, com a troca na barra
+
+**Data:** 2026-10-23 · **Status:** aceito · **Complementa:** ADR-019, ADR-021, ADR-034
+
+### Contexto
+
+A grade do ADR-021 é um andamento só para a música inteira. A emenda de 2026-10-23 do ADR-034 mediu que, nas músicas
+que mudam de andamento, isso custa a distância das notas à grade, e escolheu a busca por programação dinâmica: janelas
+de 20 s, ±10% em passos de 0,05 BPM, custo em ms e λ = 2000. A faixa larga (±40%) alcança o trecho lento de *Dance of
+Death*, mas piora outras quatro músicas. Faltava levar o resultado da busca para a partitura.
+
+### Decisão
+
+- **`MapaDeAndamento` (`services/rhythm`)** guarda o primeiro andamento, o recuo e as trocas `(instante no áudio,
+  bpm)`. A grade continua no primeiro andamento; cada trecho seguinte é escalado por `bpm_i / bpm`. Com isso,
+  quantização, monofonização e exportadores seguem trabalhando em tique, sem saber do mapa.
+- **`mapa_de_andamento` (`services/tempo`)** puxa cada troca da fronteira da janela para a **barra de compasso**. Ela
+  escolhe, entre as barras até a troca bruta seguinte, a que deixa as notas mais perto da grade.
+  - A programação dinâmica só troca na fronteira da janela. Quando a troca real cai no meio, ela compensa com o
+    primeiro trecho enviesado. No caso sintético de 20 compassos a 90 e 20 a 84, o primeiro trecho saiu a 90,2, a grade
+    chegou defasada aos 53 s e a troca foi parar um compasso antes. Por isso:
+    - o primeiro trecho é **reajustado com `ajustar`** só nas notas antes da primeira troca, e as barras são escolhidas
+      de novo;
+    - o andamento depois de cada troca é **refinado junto com a barra** (±0,1 BPM, passo 0,005). Sem isso, a troca
+      continuava um compasso antes.
+- **`marcas()`** converte as trocas em `(tique, bpm)` e descarta a troca cujo BPM arredondado repete o último escrito
+  (84,24 seguido de 83,99, por exemplo). O arquivo só guarda inteiro, e uma marca que não muda o número é ruído na
+  partitura.
+- **O mapa só vale para andamento estimado e só quando há troca.** Com `--bpm` informado (ADR-019) ou sem troca, roda o
+  caminho antigo (`ajustar` + `recuo_de_fase`), e a saída é idêntica à de antes. No caso sem troca, o primeiro trecho
+  da programação dinâmica às vezes fica mais perto da grade que o `ajustar`. Isso foi observado e não adotado: mudaria
+  a saída de músicas planas sem uma medição dedicada.
+- **O cache de notas fica na hora do áudio.** O pipeline passa a usar `mapa.na_partitura` e `mapa.no_audio` onde antes
+  usava `deslocar(x, ±recuo)`. A bateria (`para_audio`) e o multifaixa (que herda o mapa do baixo) seguem a mesma
+  regra.
+- **Exportadores recebem `marcas`.**
+  - GP5: `MixTableChange(tempo=…, hideTempo=False)` no primeiro beat do compasso da troca, que sempre existe, porque
+    pausa também é beat.
+  - MusicXML: `MetronomeMark` no tique da troca, só na pauta de notação (o music21 escreve o `<sound tempo>` junto).
+  - Troca depois da última nota não tem compasso onde cair e é ignorada.
+- **A página não sabe do mapa.** O alphaTab segue a automação de andamento do GP5, e o player externo continua
+  mandando segundos (ADR-046). A auralização trabalha na hora do áudio e não muda.
+
+### Medição (fora da amostra, 21 fontes)
+
+O mapa foi ajustado na parte de treino de cada música. A coluna é a distância média, em ms, das notas da parte de teste
+à grade. "Produção" é o que o pipeline faz: o mapa quando há troca, o andamento único quando não há.
+
+| música | único | produção | variação | trocas |
+|---|---:|---:|---:|---:|
+| And Plague Flowers | 20,3 | 11,1 | −45,2% | 6 |
+| Hallowed Be Thy Name | 31,2 | 21,2 | −32,0% | 4 |
+| `9771390c94c585ce` | 31,0 | 23,9 | −23,0% | 2 |
+| Você | 25,6 | 21,6 | −15,4% | 2 |
+| SOJA — Everything Changes | 15,9 | 13,5 | −15,3% | 1 |
+| `ddc20133ee4470da` | 26,4 | 22,7 | −14,2% | 4 |
+| Seu Jorge — Tive Razão | 26,2 | 22,5 | −13,9% | 1 |
+| Fear Is the Key | 35,4 | 30,5 | −13,8% | 2 |
+| Fear of the Dark | 31,8 | 27,8 | −12,6% | 6 |
+| Dance of Death | 28,5 | 25,1 | −12,1% | 3 |
+| Equus | 13,8 | 13,5 | −2,2% | 2 |
+| Feel Like Makin' Love | 36,2 | 36,3 | +0,2% | 2 |
+| as outras 9, inclusive as planas *Gesu* e *Smooth Operator* | — | — | 0,0% | 0 |
+
+Os três critérios valem: nenhuma música piora mais que 2% (a pior é *Feel Like*, +0,2%); as duas planas não ganham
+troca; e a troca na barra não perde para a troca bruta na mediana. Em *Dance of Death*, as trocas caem em 220,8 s
+(→124,1), 294,3 s (→134,0) e 428,6 s (→127,0). A tab humana marca 123–131 entre 220 e 300 s, 131–137 perto de 300 s e
+126–129 entre 420 e 460 s. O trecho lento continua fora da faixa de ±10%, como a emenda do ADR-034 previa.
+
+### Consequências
+
+- Uma música que muda de andamento sai com marcas de BPM na partitura, e o cursor da página acompanha. Isso é conferido
+  em `-m navegador` (`test_o_cursor_segue_a_troca_de_andamento_do_gp5`).
+- Conversões antigas de músicas com troca só ganham as marcas se forem refeitas. O cache de transcrição (ADR-052) torna
+  isso barato.
+- Mudança de andamento acima de ±10% entre janelas continua sem troca. Ampliar a faixa exige uma medição que não piore
+  as músicas planas.

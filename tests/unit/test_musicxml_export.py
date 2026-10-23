@@ -21,6 +21,7 @@ from music21 import articulations, clef, converter, key, note, tempo
 from thoth.adapters.export.musicxml import MusicXmlExporter
 from thoth.domain.models import TUNING_BASS_4, TUNING_BASS_5, NoteEvent, TabNote
 from thoth.services.fretboard import ViterbiFretAssigner
+from thoth.services.rhythm import COMPASSO
 
 BPM = 90
 SEMINIMA = 60.0 / BPM
@@ -523,3 +524,18 @@ def test_nenhum_ritmo_contiguo_de_um_compasso_quebra_a_gramatica(tmp_path: Path)
     print(f"{len(ritmos)} ritmos, {len(quebrados)} quebrados")
     assert len(ritmos) == 32767
     assert quebrados == []
+
+
+# --- Marcas de andamento (ADR-053) ---------------------------------------------
+
+
+def test_marca_de_andamento_vira_metronomo_no_compasso_da_troca(tmp_path: Path) -> None:
+    pauta = converter.parse(
+        str(_arquivo(_tabs([36, 38, 40, 41] * 3), tmp_path, marcas=((2 * COMPASSO, 80.4),)))
+    ).parts[0]
+
+    marcas = [
+        (m.getContextByClass("Measure").number, m.number)
+        for m in pauta.recurse().getElementsByClass(tempo.MetronomeMark)
+    ]
+    assert marcas == [(1, BPM), (3, 80)]

@@ -41,13 +41,15 @@ número impresso ao lado do piso.
    nenhuma troca nas planas e o trecho lento de *Dance of Death* alcançado. Se nenhuma opção cumprir, fica ±10%.
    **Resultado:** nenhuma cumpriu (±40% alcança o trecho lento piorando 4 músicas; ±40% sem troca piora 9). Fica
    ±10% com custo em ms e λ = 2000. Emenda ao ADR-034.
-2. [ ] `services/tempo`: `mapa_de_andamento(onsets, bpm, λ)` → trechos `(início, bpm)`, trocas puxadas para a barra de
-   compasso mais próxima. TDD, com estímulo sintético de andamento conhecido.
-3. [ ] `rhythm` quantiza cada trecho no próprio andamento; música plana sai idêntica à de hoje (teste de regressão).
-4. [ ] Exportadores: andamento por compasso no GP5 (`mixTableChange`) e no MusicXML (`<sound tempo>` + metrônomo).
+2. [x] `services/tempo`: `mapa_de_andamento(onsets, bpm, λ)` → trechos `(início, bpm)`, trocas puxadas para a barra de
+   compasso mais próxima. TDD, com estímulo sintético de andamento conhecido. O primeiro trecho é reajustado e o BPM
+   depois da troca é refinado junto com a barra: sem isso, a troca saía um compasso antes (ADR-053).
+3. [x] `rhythm` quantiza cada trecho no próprio andamento; música plana sai idêntica à de hoje (teste de regressão).
+   Fora da amostra: nenhuma música pior que +0,2%, planas sem troca, *And Plague Flowers* −45%.
+4. [x] Exportadores: andamento por compasso no GP5 (`mixTableChange`) e no MusicXML (`<sound tempo>` + metrônomo).
    Round-trip afirmando estrutura (em que compasso troca, para qual BPM).
-5. [ ] Auralização e cursor da página de estudo seguindo o mapa (`-m navegador`).
-6. [ ] ADR novo, verificação de entrega e seleções `slow` e `navegador`.
+5. [x] Auralização e cursor da página de estudo seguindo o mapa (`-m navegador`).
+6. [x] ADR novo (ADR-053), verificação de entrega e seleções `slow` e `navegador`.
 
 ## Eficiência: revisão conjunta Claude + Codex (2026-10-23)
 

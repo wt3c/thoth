@@ -7,9 +7,10 @@ chega aqui já passou pelo refino conjunto de andamento e fase (ADR-021).
 
 Limitações assumidas desta primeira versão, todas visíveis na leitura:
 
-- compasso fixo 4/4, grade de semicolcheia e um único andamento para a música
-  inteira — o campo de BPM do arquivo é inteiro, então ele sai arredondado
-  enquanto a quantização usa o fracionário (ADR-021);
+- compasso fixo 4/4 e grade de semicolcheia. O campo de BPM do arquivo é inteiro,
+  então ele sai arredondado enquanto a quantização usa o fracionário (ADR-021);
+  a troca de andamento no meio da música chega pronta em `marcas` e sai como
+  automação no primeiro beat do compasso dela (ADR-053);
 - linha monofônica (ADR-012): notas simultâneas são recusadas, não empilhadas —
   salvo com `acordes=True` (guitarra, ADR-044), em que notas do mesmo tique viram
   um beat com uma nota por corda. Acorde não recebe nome no beat.
@@ -115,6 +116,21 @@ def _por_compasso[T: tuple[Any, ...]](eventos: list[T]) -> dict[int, list[T]]:
     return por_compasso
 
 
+def _marcar_andamentos(track: gp.Track, marcas: tuple[tuple[int, float], ...]) -> None:
+    """Cada troca no primeiro beat do compasso dela, que nunca falta: pausa também é beat.
+
+    A troca chega na barra (ADR-053). Troca depois da última nota não tem compasso
+    onde cair, e não muda nada do que se ouve.
+    """
+    for tique, bpm in marcas:
+        numero = tique // COMPASSO
+        if numero < len(track.measures):
+            beat = track.measures[numero].voices[0].beats[0]
+            beat.effect.mixTableChange = gp.MixTableChange(
+                tempo=gp.MixTableItem(value=round(bpm)), hideTempo=False
+            )
+
+
 @dataclass(frozen=True, slots=True)
 class Gp5Exporter:
     """Implementa o `Exporter`. Round-trip verificado contra o próprio PyGuitarPro."""
@@ -129,6 +145,8 @@ class Gp5Exporter:
     acordes: bool = False
     """Empilha notas do mesmo tique num beat (guitarra). Desligado, o baixo segue
     recusando simultaneidade: lá ela é defeito da transcrição, não música."""
+    marcas: tuple[tuple[int, float], ...] = ()
+    """`(tique, bpm)` de cada troca de andamento, na barra (ADR-053)."""
 
     def export(self, notes: list[TabNote], out: Path, tuning: tuple[int, ...]) -> Path:
         if not notes:
@@ -187,6 +205,7 @@ class Gp5Exporter:
             medida.voices = [voz, *(gp.Voice(medida) for _ in range(3))]
             track.measures.append(medida)
 
+        _marcar_andamentos(track, self.marcas)
         out.parent.mkdir(parents=True, exist_ok=True)
         gp.write(song, str(out))
         return out
@@ -239,6 +258,7 @@ class Gp5PercussaoExporter:
     bpm: float = 120
     titulo: str = "Thoth"
     faixa: str = "Bateria"
+    marcas: tuple[tuple[int, float], ...] = ()
 
     def exportar(self, ataques: list[EventoPercussivo], out: Path) -> Path:
         if not ataques:
@@ -284,6 +304,7 @@ class Gp5PercussaoExporter:
             medida.voices = [voz, *(gp.Voice(medida) for _ in range(3))]
             track.measures.append(medida)
 
+        _marcar_andamentos(track, self.marcas)
         out.parent.mkdir(parents=True, exist_ok=True)
         gp.write(song, str(out))
         return out

@@ -11,14 +11,16 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from pathlib import Path
 
+import guitarpro as gp
 import numpy as np
 import pytest
 import soundfile as sf
 
-from tests.sintetico import SOUNDFONT, renderizar
+from tests.sintetico import SOUNDFONT, execucao_em_andamentos, renderizar
 from thoth.domain.models import TUNING_BASS_5, AudioAsset, NoteEvent, Transcricao
 from thoth.services.cache_notas import ler
 from thoth.services.pipeline import ROTULOS_DE_BAIXO, ParteVazia, transcrever
+from thoth.services.rhythm import COMPASSO
 
 
 @dataclass(frozen=True, slots=True)
@@ -248,6 +250,42 @@ def test_andamento_estimado_e_desdobrado_quando_as_notas_colidem(tmp_path: Path)
     assert resultado.bpm >= 180
     # O que motivou o ADR-024: nenhuma nota perdida para colisão na grade.
     assert resultado.notas == 16
+
+
+def _em_dois_andamentos() -> tuple[NoteEvent, ...]:
+    """20 compassos a 90 e 20 a 84: 107 s, a troca na barra do compasso 20."""
+    return tuple(
+        NoteEvent(pitch=33 + i % 5, onset_s=t, offset_s=t + 0.1, instrument="electric_bass")
+        for i, t in enumerate(execucao_em_andamentos([(20, 90), (20, 84)]))
+    )
+
+
+@requer_soundfont
+def test_andamento_estimado_que_muda_vira_mapa_e_o_cache_fica_no_audio(tmp_path: Path) -> None:
+    """ADR-053: a partitura troca de andamento na barra; o cache não sai da hora do áudio."""
+    notas = _em_dois_andamentos()
+
+    resultado = _rodar(tmp_path, notas, bpm=None)
+
+    ((tique, bpm),) = resultado.mapa.marcas()
+    assert bpm == pytest.approx(84, abs=0.3)
+    gravadas = ler(tmp_path / "cache" / resultado.asset.source_id / "notas.jsonl")
+    assert [n.onset_s for n in gravadas] == pytest.approx([n.onset_s for n in notas])
+    musica = gp.parse(str(resultado.artefatos["gp5"]))
+    trocas = [
+        (m.number - 1, m.voices[0].beats[0].effect.mixTableChange.tempo.value)
+        for m in musica.tracks[0].measures
+        if m.voices[0].beats[0].effect.mixTableChange
+    ]
+    assert trocas == [(tique // COMPASSO, round(bpm))]
+
+
+@requer_soundfont
+def test_bpm_informado_nao_ganha_mapa(tmp_path: Path) -> None:
+    """O número que você deu manda (ADR-019): nada de trocar por cima dele."""
+    resultado = _rodar(tmp_path, _em_dois_andamentos(), bpm=90)
+
+    assert resultado.mapa.trocas == ()
 
 
 # --- BPM fora de faixa não chega à grade (ADR-025) ---------------------------

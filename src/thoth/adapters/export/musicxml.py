@@ -71,6 +71,19 @@ from thoth.services.rhythm import (
 Posicionadas = list[tuple[int, int, tuple[TabNote, ...]]]
 
 
+def _marcar_andamentos(
+    pauta: stream.Part, marcas: tuple[tuple[int, float], ...], fim: int
+) -> None:
+    """Um metrônomo na barra de cada troca (ADR-053); depois da última nota, nenhum.
+
+    Na pauta da notação só: o music21 escreve a `<sound tempo>` junto, e uma
+    marca por parte é o que a tablatura, irmã dela, já herda.
+    """
+    for tique, bpm in marcas:
+        if tique < fim:
+            pauta.insert(tique / PPQ, tempo.MetronomeMark(number=round(bpm)))
+
+
 @dataclass(frozen=True, slots=True)
 class MusicXmlExporter:
     """Implementa o `Exporter`. Round-trip verificado contra o próprio music21."""
@@ -88,6 +101,8 @@ class MusicXmlExporter:
     """Programa GM da guitarra, do perfil. O baixo continua como `ElectricBass`."""
     nome_da_parte: str | None = None
     """Nome legível da faixa; usado explicitamente na partitura multifaixa."""
+    marcas: tuple[tuple[int, float], ...] = ()
+    """`(tique, bpm)` de cada troca de andamento, na barra (ADR-053)."""
 
     def export(self, notes: list[TabNote], out: Path, tuning: tuple[int, ...]) -> Path:
         if not notes:
@@ -152,6 +167,8 @@ class MusicXmlExporter:
                 parte.insert(0, instrumento_musical)
                 parte.insert(0, clef.Bass8vbClef())
             parte.insert(0, tempo.MetronomeMark(number=round(self.bpm)))
+            fim = max((i + d for i, d, _ in posicionadas), default=0)
+            _marcar_andamentos(parte, self.marcas, fim)
             if self.armadura is not None:
                 parte.insert(0, key.KeySignature(self.armadura))
 
@@ -408,6 +425,7 @@ class MusicXmlPercussaoExporter:
     bpm: float = 120
     titulo: str = "Thoth"
     parte: str = "Bateria"
+    marcas: tuple[tuple[int, float], ...] = ()
 
     def exportar(self, ataques: list[EventoPercussivo], out: Path) -> Path:
         if not ataques:
@@ -423,6 +441,7 @@ class MusicXmlPercussaoExporter:
         pauta.insert(0, clef.PercussionClef())
         pauta.insert(0, meter.TimeSignature("4/4"))
         pauta.insert(0, tempo.MetronomeMark(number=round(self.bpm)))
+        _marcar_andamentos(pauta, self.marcas, max((i + d for i, d, _ in grupos), default=0))
         for inicio, duracao, pecas in grupos:
             # Corta na barra: ligadura seria sustentação, e a bateria não a tem medida.
             figura = min(duracao, COMPASSO - inicio % COMPASSO) / PPQ

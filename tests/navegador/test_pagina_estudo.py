@@ -44,6 +44,7 @@ from thoth.services.acordes import ViterbiAcordes
 from thoth.services.fretboard import PADRAO
 from thoth.services.octave_check import OctaveWarning
 from thoth.services.pipeline import Resultado
+from thoth.services.rhythm import COMPASSO
 from thoth.services.tonalidade import tom_de_texto
 
 pytestmark = [
@@ -737,3 +738,49 @@ def test_wav_escolhido_toca_e_o_cursor_acompanha(servidor: str) -> None:
     # O alphaTab encaixa a posição no início do tempo ao pausar; com o WAV mandando,
     # isso puxaria o áudio para trás.
     assert pausado["tempo"] >= tocando_2["tempo"], f"pausar voltou o áudio: {pausado}"
+
+
+
+#: Posição da barra que o alphaTab destaca: muda de compasso, muda o `transform`.
+BARRA = """(() => { const c = document.querySelector('.at-cursor-bar');
+  return c ? c.style.transform : null; })()"""
+
+
+def test_o_cursor_segue_a_troca_de_andamento_do_gp5(servidor: str, tmp_path: Path) -> None:
+    """ADR-053: a página não sabe do mapa; quem sabe é o GP5, e o alphaTab o segue.
+
+    Compasso 0 a 120 BPM (2 s), compasso 1 a 60 BPM (4 s). Aos 2,5 s e aos 4,5 s o
+    cursor está no compasso 1, e só aos 6,5 s chega ao 2. Sem a automação, 4,5 s
+    já seria o compasso 2.
+    """
+    seminima = 60 / 120
+    notas = [
+        TabNote(NoteEvent(33, i * seminima, (i + 1) * seminima, "electric_bass"), 1, 0)
+        for i in range(12)
+    ]
+    gp5 = Gp5Exporter(bpm=120, marcas=((COMPASSO, 60.0),)).export(
+        notas, tmp_path / "out" / "andamento.gp5", TUNING_BASS_4
+    )
+    TROCAS["artefatos"] = {"gp5": gp5}
+    ident = httpx.post(f"{servidor}/jobs", json={"ref": "x.wav"}, timeout=10).json()["id"]
+
+    _, _, _, _, aos_2_5, _, aos_4_5, _, aos_6_5 = sessao(
+        f"{servidor}/?job={ident}",
+        [
+            (12, BARRA),
+            (0, "document.getElementById('ativarExterno').click()"),
+            (0.2, "document.getElementById('seguirPlayer').click()"),
+            (1.2, _player("Paused", 2.5)),
+            (1, BARRA),
+            (0, _player("Paused", 4.5)),
+            (1, BARRA),
+            (0, _player("Paused", 6.5)),
+            (1, BARRA),
+        ],
+        script_inicial=OUVIDO,
+    )
+    print(f"2,5 s {aos_2_5} · 4,5 s {aos_4_5} · 6,5 s {aos_6_5}")
+
+    assert aos_2_5 is not None, "a página não tem cursor de compasso"
+    assert aos_4_5 == aos_2_5, f"4,5 s saiu do compasso a 60 BPM: {aos_2_5} → {aos_4_5}"
+    assert aos_6_5 != aos_4_5, f"6,5 s não chegou ao compasso seguinte: {aos_6_5}"

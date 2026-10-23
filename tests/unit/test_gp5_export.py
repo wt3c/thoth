@@ -21,6 +21,7 @@ from thoth.domain.models import (
     TabNote,
 )
 from thoth.services.fretboard import ViterbiFretAssigner
+from thoth.services.rhythm import COMPASSO
 
 BPM = 90
 SEMINIMA = 60.0 / BPM
@@ -273,3 +274,30 @@ def test_titulo_fora_do_cp1252_nao_derruba_a_exportacao(tmp_path: Path) -> None:
     song = _exportar(_tabs([36, 38]), tmp_path, titulo="ゲスの極み乙女 — Falcão")
 
     assert song.title == "??????? — Falcão"
+
+
+# --- Marcas de andamento (ADR-053) ---------------------------------------------
+
+
+def _andamentos(song: gp.Song) -> list[tuple[int, int]]:
+    """`(compasso, bpm)` de cada troca escrita, lida do primeiro beat do compasso."""
+    return [
+        (numero, beat.effect.mixTableChange.tempo.value)
+        for numero, medida in enumerate(song.tracks[0].measures)
+        for beat in medida.voices[0].beats[:1]
+        if beat.effect.mixTableChange is not None and beat.effect.mixTableChange.tempo
+    ]
+
+
+def test_marca_de_andamento_vai_no_primeiro_beat_do_compasso(tmp_path: Path) -> None:
+    """O andamento do arquivo segue o do começo; a troca é automação no compasso dela."""
+    song = _exportar(_tabs([36, 38, 40, 41] * 3), tmp_path, bpm=BPM, marcas=((COMPASSO, 80.4),))
+
+    assert song.tempo == BPM
+    assert _andamentos(song) == [(1, 80)]
+
+
+def test_sem_marca_nenhum_compasso_troca_de_andamento(tmp_path: Path) -> None:
+    song = _exportar(_tabs([36, 38, 40, 41] * 3), tmp_path, bpm=BPM)
+
+    assert _andamentos(song) == []
