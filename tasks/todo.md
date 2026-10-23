@@ -2,6 +2,35 @@
 
 > Áudio → partitura e tablatura, foco em contrabaixo. Uso pessoal. CPU-only. Decisões em `tasks/decisions.md`.
 
+## Backlog aberto, com Codex e subagentes (2026-10-23)
+
+Pedido do usuário: "pode fazer tudo", usando o Codex e os agentes, depois de alinhar a configuração dos dois
+harnesses ao `CLAUDE.md` global. Escrita sequencial no repositório; medições em paralelo, com script em scratchpad e
+número impresso ao lado do piso.
+
+0. [x] Configuração: `AGENTS.md` com o mapa de módulos atual e a consulta entre agentes; skill `verificacao` para o
+   Codex em `.agents/skills/`, espelho do `/verificacao`.
+1. [x] Mapa de andamento, etapa 1b (Claude): resíduo do mapa **contínuo** (fase herdada, troca de andamento só quando
+   paga) nas 15 músicas do cache, e quantas trocas ele escreve nas planas. Emenda ao ADR-034; sem código de produto.
+   **Resultado:** com λ pequeno o mapa sobreajusta (fora da amostra, pior que o andamento único em 3 músicas). Com
+   λ = 2000 ms·nota, nenhuma piora, zero trocas nas planas e ganho de até 41% fora da amostra em 12 das 21 fontes.
+   A etapa 2 (produto) depende de decisão.
+2. [x] Demucs `--shifts 0` (Codex, worktree): o stem do baixo fica idêntico entre duas rodadas? Os pisos do baixo e
+   o F1 se mantêm? Adotar só se a medição sustentar; senão, registrar por quê.
+   **Resultado:** WAV byte a byte idêntico no `misto` (antes: pico 0,048, SNR 29,9 dB); 115 métricas de piso iguais
+   antes e depois, 48 testes pesados passaram nas duas rodadas. **Adotado**: escopo do cache `4.1.0-shifts0`, stems
+   antigos ficam no disco sem reuso. Emendas aos ADR-010, 026 e 044.
+3. [x] Discriminador de oitava para baixo (subagente): as tabs de *Você* e *Gesu* (2026-09-30) são posteriores à
+   última medição do ADR-030. Remedir o AUC com as seis tabs; candidato novo só se a amostra ampliada o permitir.
+   **Resultado:** as duas somam 5 casos "abaixo"; AUC agregado 0,748 (44 casos, 26 numa música só). Nenhum candidato
+   testado, veredito igual. Emenda de 2026-10-23 ao ADR-030.
+4. [x] *Eyrie*, entrada e saída de cada stem (subagente): energia por stem no tempo, como audibilidade — não é
+   veredito musical (ADR-048). Referência humana por parte continua inexistente; o item 6 de lá depende dela.
+   **Resultado:** intervalos por stem estáveis entre 20 e 50 dB abaixo do pico; eventos do pipeline dentro da presença
+   (bass 99,9%, bateria 100%, vocais 78,1%). Por parte continua pendente. Emenda de 2026-10-23 ao ADR-048.
+5. [x] Verificação de entrega e registro de cada resultado aqui e no ADR da área.
+   pytest padrão 709 passaram; ruff limpo; mypy sem erros (46 arquivos); Demucs real em develop: 4 passaram.
+
 ## Eficiência: revisão conjunta Claude + Codex (2026-10-23)
 
 Revisão somente leitura: Claude (`fable`) e Codex (`gpt-6.1-sol`, `high`). Os achados principais foram conferidos na
@@ -128,8 +157,9 @@ Comparação de _Você_ (Catedral) e _Watashi Igai Watashi Ja Nai No_ (Gesu) com
 5. [x] Mapa de andamento por trecho, etapa 1 (medir): por janela de 20 s acompanha a tab humana de _Você_ (erro
    mediano 0,3 contra 2,7 BPM do global) e nunca erra mais que o global nas cinco tabs; a razão do ADR-034 não
    separa; resíduo da grade cai 35–73% no acervo inteiro, com fase livre (teto otimista). Emenda ao ADR-034.
-6. [ ] Mapa de andamento, etapa 1b: resíduo de um mapa contínuo (fase herdada, mudança só quando paga) e quantas
+6. [x] Mapa de andamento, etapa 1b: resíduo de um mapa contínuo (fase herdada, mudança só quando paga) e quantas
    mudanças ele escreve nas músicas planas. Só depois decidir exportadores e pipeline.
+   **Resultado (2026-10-23):** candidato λ = 2000 ms·nota; ver a emenda do ADR-034 e o item 1 do backlog do topo.
 
 ## Conformidade Markdown do repositório (2026-09-29)
 
@@ -273,7 +303,7 @@ decidem se cada instrumento está correto.
    - [x] Consultar créditos do encarte de `Urn`: baixo, bateria, duas guitarras, violino, viola, cello e vozes são
      candidatos confirmados para `Eyrie`; não há crédito de piano/teclado ou coro confirmado para esta faixa.
    - [ ] Mapear timestamps de entrada/saída no áudio local; os créditos não substituem escuta nem anotação de
-     referência.
+     referência. Por stem, feito em 2026-10-23 (emenda ao ADR-048); por parte, depende de anotação humana.
 4. [ ] Obter referência humana independente por parte quando existir e registrar cobertura temporal, afinação e
    confiabilidade. Sem referência, limitar o veredito a separação/audibilidade e marcar a transcrição como
    inconclusiva.
@@ -559,7 +589,8 @@ sintético é métrica de regressão, não de qualidade real.
 - [ ] Discriminador do erro **para baixo** que separe melhor que o `f0 / 2·f0` (AUC 0,75, segunda emenda do ADR-030).
   Candidatos já medidos e descartados: ímpares/pares, `3f0/(2f0+4f0)`, meios-harmônicos. Com 84 casos em duas
   músicas, diferença pequena entre candidatos não se distingue de acaso: esperar mais tabs. _Eyrie_ acrescentou só 2
-  (quarta emenda do ADR-030): linha repetitiva demais para as janelas serem conclusivas
+  (quarta emenda do ADR-030): linha repetitiva demais para as janelas serem conclusivas. _Você_ e _Gesu_, mais 5
+  (emenda de 2026-10-23): falta tab de música com **mais erro de oitava**, não só mais tabs
 - [x] MuScriptor silencioso no fim de _Eyrie_ (`_RMax1LS3pM`): o _prelude forcing_ trava o modelo em vazio de 557 a 671
   s. Segunda passada sem ele, só quando há buraco, só dentro do buraco (emenda do ADR-008). 0 → 382 notas no trecho,
   travado em `tests/integration/test_prelude_eyrie.py`

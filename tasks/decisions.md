@@ -1538,6 +1538,32 @@ Três motivos, todos medidos:
 **Decisão:** nada muda no aviso de oitava. O discriminador do erro para baixo continua esperando tabs de músicas com
 linha menos repetitiva, para que as janelas sejam conclusivas.
 
+### Emenda (2026-10-23) — *Você* e *Gesu* também não ampliam a amostra
+
+As duas tabs que entraram em 2026-09-30 (*Você*, `yt_veGD1Gzpa_o`, e *Watashi Igai Watashi Ja Nai No*,
+`yt_Ae6gQmhaMn4`) foram medidas com o código existente: `alinhar_ao_stem`, `veredito_de_nota` e
+`verificar_oitavas(limiar=1e300)` sobre o `bass.wav`. O rótulo segue o texto das emendas acima, porque o script de
+2026-09-25 não está no repositório.
+
+Antes da amostra nova, a medição antiga foi refeita. O AUC e o alarme batem com as emendas acima (±0,03), mas a
+contagem de casos não: em *And Plague Flowers*, os casos "abaixo" caíram de 66 para 26. O `notas.jsonl` foi regenerado
+em 2026-09-28 (`1c91fcf`, transcritor corrigido). O dado mais provável da diferença é esse, mas não está provado.
+
+| música               | concordam | casos "abaixo" | AUC "abaixo" (IC 95%, bootstrap) |
+| -------------------- | --------- | -------------- | -------------------------------- |
+| *Fear Is the Key*    | 773       | 13             | 0,72 (0,55–0,87)                 |
+| *And Plague Flowers* | 2588      | 26             | 0,76 (0,65–0,85)                 |
+| *Dance of Death*     | 0         | 0              | — (nenhuma janela conclusiva)    |
+| *Você*               | 754       | 1              | sem significado                  |
+| *Gesu*               | 609       | 4              | 0,71 (0,16–1,00)                 |
+| agregado             | —         | 44             | 0,748 (0,67–0,82)                |
+
+As duas tabs novas somam **5 casos**: a transcrição atual quase não erra oitava para baixo nelas. Com 26 dos 44
+positivos numa música só, comparar candidatos música a música não se sustenta, e nenhum foi testado. Em *Gesu*, o
+limiar de 0,40 alarma em 43,8% das notas corretas (em *Você*, 0,4%), provavelmente porque a música tem pouco grave.
+
+**Decisão:** nada muda. O discriminador espera tab de música com mais erro de oitava para baixo, não só mais tabs.
+
 ## ADR-031 — a grafia do acidente segue o tom, com margem (B9)
 
 **Data:** 2026-09-23 · **Status:** aceito
@@ -1895,6 +1921,60 @@ número único; o aviso por discriminador fica descartado de vez, porque não se
 para a outra (o compasso não pode pular). Antes de construir exportadores e pipeline, a medida seguinte é o resíduo de um
 mapa **contínuo** — fase herdada da janela anterior, mudança de andamento só quando ela paga — e quantas mudanças
 ele escreve nas músicas planas.
+
+### Emenda (2026-10-23) — o mapa contínuo, medido fora da amostra
+
+Etapa 1b, só medição. Antes, a etapa 1 foi refeita, porque o script dela não está no repositório: o resíduo global
+bate com a tabela acima (±0,5 ms) e o resíduo por janela fica a até 1,1 ms dela (*Smooth Operator* 10,2 contra 11,3).
+Os números abaixo usam a reprodução, e não a tabela, como linha de base.
+
+**Método.** Mapa contínuo por programação dinâmica sobre janelas de 20 s. O estado no início de cada janela é o par
+(andamento corrente, fase da semicolcheia), e a fase **não é livre**: vem do fim da janela anterior. O andamento varia
+em ±10% do global, em passos de 0,05 bpm. Trocar de andamento custa λ, em ms·nota. O custo da janela é a mediana do
+resíduo vezes o número de notas, o mesmo "ponderado por nota" da etapa 1. A busca discretiza a fase em 128 posições,
+mas o mapa escolhido é avaliado com a fase exata.
+
+**Controle que faltava: sobreajuste.** A etapa 1 só media no próprio ajuste, e um parâmetro a mais por janela sempre
+baixa o resíduo. Aqui o mapa é ajustado nas notas pares (com λ/2, porque o custo cai à metade) e avaliado nas ímpares.
+A referência é o mesmo procedimento com λ infinito, isto é, um andamento só.
+
+| λ (ms·nota) | músicas piores que o andamento único, fora da amostra   | trocas nas planas (*Gesu*, *Smooth Operator*) |
+| ----------- | ------------------------------------------------------- | --------------------------------------------- |
+| 0           | 3 (*Se Eu Cair* 34,3 × 21,2; *Thalles* 28,6 × 27,1; *Arde Outra Vez* 29,8 × 26,7) | 11 e 12            |
+| 500         | 2 (*Se Eu Cair* 28,2 × 21,2; *Arde Outra Vez* 27,3 × 26,7) | 0 e 2 (0,2 bpm)                            |
+| 1000        | 1 (*Arde Outra Vez* 29,8 × 26,7)                        | 0 e 2 (0,2 bpm)                               |
+| **2000**    | **nenhuma**                                             | **0 e 0**                                     |
+
+Com λ = 2000, fora da amostra, contra o andamento único (ms):
+
+| música                 | único | mapa | trocas | Δ mediano (bpm) |
+| ---------------------- | ----- | ---- | ------ | --------------- |
+| *Hallowed Be Thy Name* | 29,6  | 18,7 | 4      | 0,5             |
+| *And Plague Flowers*   | 18,0  | 10,6 | 6      | 1,8             |
+| *Fear Is the Key*      | 33,3  | 27,6 | 2      | 2,2             |
+| *Fear of the Dark*     | 31,0  | 24,7 | 6      | 5,5             |
+| *Você*                 | 23,4  | 18,6 | 2      | 2,5             |
+| *Equus*                | 15,6  | 12,5 | 2      | 0,3             |
+| *Tive Razão*           | 23,4  | 19,7 | 1      | 2,7             |
+| *Dance of Death*       | 26,5  | 24,0 | 3      | 9,9             |
+
+Outras quatro também ganham: *Eyrie* (28,2 → 22,6), *SOJA*, *Feel Like Makin' Love* e uma fonte local. As nove
+restantes, das 21 fontes, ficam sem troca e com o resíduo do andamento único, entre elas *Gesu*, *Smooth Operator*,
+*O Sol*, *Se Eu Cair* e *Arde Outra Vez*. O ganho no próprio ajuste, de 35% a 73% na etapa 1, **superestimava** o que
+generaliza: fora da amostra, com λ = 2000, ele fica entre 0 e 41%.
+
+**Limites desta medida.** O λ foi escolhido olhando a mesma divisão par/ímpar em que foi avaliado; é um viés pequeno,
+porque ele vale para todas as músicas, mas existe. As trocas caem em fronteiras fixas de 20 s, não em barras de
+compasso, e uma partitura precisa delas no compasso. Os Δ de ~10 bpm (*Dance of Death*, uma fonte local) podem ser uma
+troca real, como na introdução de *Dance of Death* (75 a 170 na tab humana), ou uma grade que pulou para outra
+leitura. Esta medida não separa as duas coisas.
+
+### Decisão da emenda (2026-10-23)
+
+O mapa contínuo com λ = 2000 é o candidato para a etapa 2. Ele não piora música nenhuma fora da amostra, não escreve
+troca nas planas e melhora 12 das 21 fontes do acervo. A etapa 2 é produto e não entra nesta emenda: trocas
+no compasso, `rhythm` quantizando pelo mapa, marcação de andamento no GP5 e no MusicXML, auralização e cursor da página
+seguindo o mapa. Antes dela, conferir as trocas de ~10 bpm contra a tab humana de *Dance of Death*.
 
 ---
 
@@ -3644,6 +3724,29 @@ Uma busca somente de leitura em `cache/` e `out/` não encontrou GP5, MIDI, Musi
 o acervo contém uma referência de baixo para `Equus`, não para esta faixa. A consulta inicial aos canais oficiais
 também não localizou uma partitura/tab licenciada de `Urn`. Isso não prova que tal publicação inexista: por ora, a
 referência humana de `Eyrie` permanece pendente, e não substituímos essa lacuna por tabs colaborativas sem proveniência.
+
+#### Presença por stem no tempo — audibilidade da separação, não inventário por parte (2026-10-23)
+
+Medido sobre os quatro stems da multifaixa (`cache/stems/9771390c94c585ce/htdemucs_ft/4.1.0-multifaixa/`): RMS em
+janelas de 0,5 s, presença a partir de 30 dB abaixo do percentil 95 do próprio stem, histerese de 3 dB, presença e
+vazio com pelo menos 2 s.
+
+| stem   | presente (mm:ss)                                                                              | cobertura |
+| ------ | --------------------------------------------------------------------------------------------- | --------- |
+| bass   | 00:39–00:43, 00:47–00:51, 00:55–00:59, 01:03–03:45, 04:30–08:42, 09:09–11:19                  | 78,3%     |
+| drums  | 01:02–08:28, 09:00–11:00                                                                      | 79,5%     |
+| other  | 00:06–11:37, quase contínuo                                                                   | 97,1%     |
+| vocals | 01:45–02:37, 03:12–03:21, 03:24–03:54, 05:04–06:23, 07:06–07:08, 07:37–08:13, 09:27–10:06     | 34,5%     |
+
+Os níveis se dividem em dois grupos, e o silêncio do Demucs fica perto de −100 dB. Por isso, entre 20 e 50 dB abaixo
+do pico a cobertura quase não muda (bass de 75,6% a 81,4%, vocals de 33,8% a 40,2%), e o limiar relativo à mix dá o
+mesmo resultado. Os eventos do pipeline caem dentro da presença: bass 99,9%, bateria 100%. Os vocais ficam em 78,1%:
+63 eventos `voice` entre 3:55 e 3:57 caem onde o stem está abaixo do limiar, e a causa não foi investigada.
+
+Isso responde onde **cada stem** soa, não onde cada **parte** soa. O `other` mistura duas guitarras, violino, viola e
+cello, e `vocals` mistura voz limpa e extrema: o próprio texto acima já dizia que a entrada e saída por parte não se
+infere pelos stems. Esse mapeamento continua pendente, e depende de anotação humana que o projeto não tem. O usuário
+não é juiz de ouvido (`tasks/lessons/workflow.md`), então isso não volta para ele.
 
 ## ADR-049 — guia didático do baixo lê o GP5 e separa observação de hipótese
 
