@@ -3470,3 +3470,32 @@ com a margem de grafia e graus condicionais. A margem do ADR-031 compara a melho
 calibrada para provar tônica ou modo. Quando é curta, os nomes cromáticos da leitura permanecem com sustenidos por
 cautela. `--tom` informado continua prevalecendo e é identificado como dado do usuário, sem margem. Nenhuma função
 de acorde é afirmada só pela linha do baixo.
+
+## ADR-051 — abrir arquivo pela página: áudio sobe, partitura abre no navegador
+
+**Data:** 2026-10-22 · **Status:** aceito · **Complementa:** ADR-006, ADR-026, ADR-046
+
+### Contexto
+
+A página só aceitava caminho digitado ou URL do YouTube. O usuário quer um botão de abrir arquivo (`.mp3`, `.wav`,
+`.gp5`, `.musicxml`), transcrever só o que é áudio e escolher um WAV para tocar junto com a pauta. O navegador não
+revela o caminho do arquivo escolhido ao servidor.
+
+### Decisão
+
+- **Áudio sobe por `POST /uploads?nome=<arquivo>`**, corpo binário cru (sem `multipart`, sem dependência nova). O
+  servidor grava em `<cache>/uploads/<sha256[:16]>/<nome>` com escrita atômica (ADR-026) e devolve a `ref` que o
+  `POST /jobs` já aceita. O nome original vira o título da partitura; o hash do conteúdo é o mesmo que a ingestão
+  local usa, então reenviar o mesmo áudio reaproveita separação e transcrição. Só `.mp3` e `.wav` são aceitos.
+- **GP5 e MusicXML não passam pelo servidor.** O alphaTab lê os dois formatos a partir dos bytes; o pipeline não roda
+  e nenhum job é criado.
+- **WAV sincronizado é local à página**: um `<audio>` com o arquivo escolhido e o alphaTab em
+  `EnabledExternalMedia`, o mesmo modo do player MPRIS (ADR-046). O áudio manda na posição; o andamento de estudo vira
+  `playbackRate` do `<audio>`. Deslocamento em segundos para partitura que não começa no zero do áudio.
+- A alternativa — um navegador de pastas do servidor dentro da página — evitaria a cópia, mas expõe o sistema de
+  arquivos pela API. Recusada.
+
+### Consequências
+
+- `cache/uploads/` guarda uma cópia de cada áudio enviado; é cache (fora do repositório, ADR-005) e pode ser apagado.
+- Partitura aberta de arquivo não tem job: o painel "Salvar transcrição" não aparece.

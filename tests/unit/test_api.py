@@ -483,3 +483,59 @@ def test_tom_ilegivel_e_recusado_na_entrada(tmp_path: Path) -> None:
     resposta = _cliente(tmp_path).post("/jobs", json={"ref": "x.mp3", "tom": "H menor"})
 
     assert resposta.status_code == 422, resposta.text
+
+
+def test_upload_de_audio_devolve_ref_que_o_job_aceita(tmp_path: Path) -> None:
+    """O navegador não revela o caminho: o áudio sobe e vira `ref` local (ADR-051)."""
+    recebido: dict[str, object] = {}
+
+    def executar(ref: str, out_dir: Path, **kw: object) -> Resultado:
+        recebido["ref"] = ref
+        return _resultado_falso(out_dir)
+
+    cliente = _cliente(tmp_path, executar)
+    enviado = cliente.post("/uploads", params={"nome": "Minha Música.mp3"}, content=b"ID3 bytes")
+
+    assert enviado.status_code == 201, enviado.text
+    ref = Path(enviado.json()["ref"])
+    assert ref.name == "Minha Música.mp3"  # o nome vira o título da partitura
+    assert ref.read_bytes() == b"ID3 bytes"
+    assert ref.is_relative_to(tmp_path / "cache" / "uploads")
+    cliente.post("/jobs", json={"ref": str(ref)})
+    assert recebido["ref"] == str(ref)
+
+
+def test_mesmo_audio_reenviado_cai_no_mesmo_lugar(tmp_path: Path) -> None:
+    cliente = _cliente(tmp_path)
+
+    um = cliente.post("/uploads", params={"nome": "a.wav"}, content=b"RIFF x").json()["ref"]
+    dois = cliente.post("/uploads", params={"nome": "a.wav"}, content=b"RIFF x").json()["ref"]
+    outro = cliente.post("/uploads", params={"nome": "a.wav"}, content=b"RIFF y").json()["ref"]
+
+    assert um == dois
+    assert outro != um
+
+
+@pytest.mark.parametrize("nome", ["tab.gp5", "partitura.musicxml", "script.sh", "sem_extensao", ""])
+def test_upload_recusa_o_que_nao_e_audio(tmp_path: Path, nome: str) -> None:
+    """Partitura abre no navegador, não sobe: só áudio vira transcrição."""
+    resposta = _cliente(tmp_path).post("/uploads", params={"nome": nome}, content=b"x")
+
+    assert resposta.status_code == 422, resposta.text
+
+
+def test_upload_ignora_diretorio_no_nome(tmp_path: Path) -> None:
+    cliente = _cliente(tmp_path)
+
+    ref = Path(
+        cliente.post("/uploads", params={"nome": "../../fora.mp3"}, content=b"x").json()["ref"]
+    )
+
+    assert ref.name == "fora.mp3"
+    assert ref.is_relative_to(tmp_path / "cache" / "uploads")
+
+
+def test_upload_vazio_e_recusado(tmp_path: Path) -> None:
+    resposta = _cliente(tmp_path).post("/uploads", params={"nome": "a.mp3"}, content=b"")
+
+    assert resposta.status_code == 422, resposta.text

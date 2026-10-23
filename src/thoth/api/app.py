@@ -15,6 +15,7 @@ diagnóstico para quem pediu, não defeito do servidor.
 
 from __future__ import annotations
 
+import hashlib
 import math
 import mimetypes
 import threading
@@ -23,12 +24,13 @@ from dataclasses import asdict, dataclass, field
 from pathlib import Path
 from typing import Any, Protocol
 
-from fastapi import BackgroundTasks, FastAPI, HTTPException
+from fastapi import BackgroundTasks, FastAPI, HTTPException, Request
 from fastapi.responses import FileResponse, PlainTextResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field, field_validator, model_validator
 
 from thoth.adapters.playback.mpris import LeitorMpris
+from thoth.arquivos import escrita_atomica
 from thoth.domain.models import AFINACOES, AcordeImpossivel
 from thoth.domain.ports import AtribuidorDeAcordes, FretAssigner
 from thoth.domain.reproducao import LeitorDeReproducao
@@ -141,6 +143,10 @@ class Job:
     status: str = "na fila"  # na fila | rodando | pronto | erro
     resultado: Resultado | None = None
     erro: str | None = None
+
+
+#: O que sobe para transcrever. Partitura (GP5, MusicXML) abre no navegador (ADR-051).
+EXTENSOES_DE_AUDIO = frozenset({".mp3", ".wav"})
 
 
 #: Quantos jobs o histórico guarda. Não há paginação nem banco: o teto é o que
@@ -288,6 +294,27 @@ def criar_app(
         descartar_antigos(estado.jobs)
         tarefas.add_task(_rodar, job)
         return _resumo(job)
+
+    @app.post("/uploads", status_code=201)
+    async def enviar(nome: str, requisicao: Request) -> dict[str, str]:
+        """Corpo cru, não `multipart`: um arquivo só, sem dependência nova (ADR-051).
+
+        O diretório é o hash do conteúdo, o mesmo da ingestão local: reenviar o mesmo
+        áudio cai no mesmo lugar e reaproveita o cache. O nome vira o título.
+        """
+        nome = Path(nome).name  # o caminho do cliente não decide onde se grava
+        if Path(nome).suffix.lower() not in EXTENSOES_DE_AUDIO:
+            raise HTTPException(
+                422, f"{nome!r} não é áudio; aceitos: {', '.join(sorted(EXTENSOES_DE_AUDIO))}"
+            )
+        if not (conteudo := await requisicao.body()):
+            raise HTTPException(422, f"{nome!r} chegou vazio")
+        pasta = hashlib.sha256(conteudo).hexdigest()[:16]
+        destino = estado.cache_dir / "uploads" / pasta / nome
+        if not destino.exists():
+            with escrita_atomica(destino) as parcial:
+                parcial.write_bytes(conteudo)
+        return {"ref": str(destino)}
 
     @app.get("/jobs")
     def listar() -> list[dict[str, Any]]:

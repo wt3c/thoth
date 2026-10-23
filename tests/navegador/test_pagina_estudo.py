@@ -9,9 +9,15 @@ mundos é a contagem de `<svg>` dentro de `#tab`.
 
 from __future__ import annotations
 
+import base64
+import io
+import json
+import math
 import socket
+import struct
 import threading
 import time
+import wave
 from collections.abc import Iterator
 from dataclasses import replace
 from pathlib import Path
@@ -21,6 +27,7 @@ import pytest
 
 from tests.navegador.cdp import CHROMIUM, avaliar, sessao
 from thoth.adapters.export.gp5 import Gp5Exporter, Gp5PercussaoExporter
+from thoth.adapters.export.musicxml import MusicXmlExporter
 from thoth.api.app import WEB_PADRAO, criar_app
 from thoth.domain.instrumentos import PERFIS, TUNING_GUITARRA_6
 from thoth.domain.models import (
@@ -86,11 +93,9 @@ def _bateria_real(out_dir: Path) -> Path:
     return Gp5PercussaoExporter(bpm=BPM).exportar(ataques, out_dir / "estudo.bateria.gp5")
 
 
-def _partitura_real(out_dir: Path, **kw: object) -> Resultado:
-    """Executor de mentira, artefato de verdade: o alphaTab precisa de um GP5 legítimo."""
-    RECEBIDOS.append(kw)
-    out_dir.mkdir(parents=True, exist_ok=True)
-    notas = [
+def _notas_de_baixo() -> list[TabNote]:
+    """Quatro semínimas nas cordas soltas e uma na segunda casa."""
+    return [
         TabNote(
             event=NoteEvent(pitch=p, onset_s=i * 60 / BPM, offset_s=(i + 1) * 60 / BPM,
                             instrument="electric_bass"),
@@ -99,6 +104,13 @@ def _partitura_real(out_dir: Path, **kw: object) -> Resultado:
         )
         for i, (p, s, f) in enumerate([(28, 0, 0), (33, 1, 0), (38, 2, 0), (40, 2, 2)])
     ]
+
+
+def _partitura_real(out_dir: Path, **kw: object) -> Resultado:
+    """Executor de mentira, artefato de verdade: o alphaTab precisa de um GP5 legítimo."""
+    RECEBIDOS.append(kw)
+    out_dir.mkdir(parents=True, exist_ok=True)
+    notas = _notas_de_baixo()
     if kw.get("instrumento", "baixo") == "baixo":
         artefato = Gp5Exporter(bpm=BPM).export(notas, out_dir / "estudo.gp5", TUNING_BASS_4)
     elif kw["instrumento"] == "bateria":
@@ -564,3 +576,117 @@ def test_a_partitura_de_bateria_aparece_e_os_ataques_fora_sao_relatados(servidor
     assert "ataque(s) fora da partitura: 1 além de seis no tique, 2 repetida no tique" in (
         estado["texto"]
     ), estado
+
+
+def _escolher(id_input: str, nome: str, conteudo: bytes) -> str:
+    """Expressão que põe um arquivo no `<input type=file>` como o seletor do sistema poria."""
+    b64 = base64.b64encode(conteudo).decode()
+    return f"""(() => {{
+      const bytes = Uint8Array.from(atob('{b64}'), (c) => c.charCodeAt(0));
+      const dt = new DataTransfer();
+      dt.items.add(new File([bytes], {json.dumps(nome)}));
+      const entrada = document.getElementById('{id_input}');
+      entrada.files = dt.files;
+      entrada.dispatchEvent(new Event('change'));
+      return true;
+    }})()"""
+
+
+def _wav_de_tom(segundos: float) -> bytes:
+    """WAV real, PCM 16 bits: o `<audio>` do navegador precisa decodificar de verdade."""
+    taxa = 8000
+    quadros = b"".join(
+        struct.pack("<h", int(8000 * math.sin(2 * math.pi * 110 * i / taxa)))
+        for i in range(int(segundos * taxa))
+    )
+    saida = io.BytesIO()
+    with wave.open(saida, "wb") as w:
+        w.setnchannels(1)
+        w.setsampwidth(2)
+        w.setframerate(taxa)
+        w.writeframes(quadros)
+    return saida.getvalue()
+
+
+PARTITURA_NA_TELA = (
+    "({svg: document.querySelectorAll('#tab svg').length,"
+    " controles: !document.getElementById('controles').classList.contains('oculto'),"
+    " salvar: !document.getElementById('salvarTranscricao').classList.contains('oculto')})"
+)
+
+
+@pytest.mark.parametrize("formato", ["gp5", "musicxml"])
+def test_abrir_partitura_mostra_na_tela_sem_transcrever(
+    servidor: str, tmp_path: Path, formato: str
+) -> None:
+    """GP5 e MusicXML só abrem: nenhum upload, nenhum job (ADR-051)."""
+    exportador = Gp5Exporter(bpm=BPM) if formato == "gp5" else MusicXmlExporter(bpm=BPM)
+    arquivo = exportador.export(_notas_de_baixo(), tmp_path / f"tab.{formato}", TUNING_BASS_4)
+
+    _, estado = sessao(
+        f"{servidor}/",
+        [(3, _escolher("arquivo", arquivo.name, arquivo.read_bytes())), (8, PARTITURA_NA_TELA)],
+    )
+
+    assert estado["svg"] > 0, f"a partitura aberta não foi desenhada: {estado}"
+    assert estado["controles"] is True, estado
+    assert estado["salvar"] is False, estado
+    assert httpx.get(f"{servidor}/jobs", timeout=5).json() == []
+    assert not (tmp_path / "cache" / "uploads").exists()
+
+
+def test_abrir_audio_sobe_e_transcreve_com_o_nome_do_arquivo(
+    servidor: str, tmp_path: Path
+) -> None:
+    _, ref, _, estado = sessao(
+        f"{servidor}/",
+        [
+            (3, _escolher("arquivo", "Minha Música.mp3", b"ID3 audio falso")),
+            (2, "document.getElementById('ref').value"),
+            (0, "document.getElementById('enviar').click()"),
+            (10, PARTITURA_NA_TELA),
+        ],
+    )
+
+    jobs = httpx.get(f"{servidor}/jobs", timeout=5).json()
+    assert Path(ref).name == "Minha Música.mp3", ref
+    assert Path(ref).is_relative_to(tmp_path / "cache" / "uploads"), ref
+    assert [j["ref"] for j in jobs] == [ref]
+    assert estado["svg"] > 0, estado
+
+
+def test_wav_escolhido_toca_e_o_cursor_acompanha(servidor: str) -> None:
+    """O `<audio>` manda na posição; a pauta segue (modo external media, ADR-051)."""
+    ident = _pronto(servidor, {"ref": "x.wav", "bpm": BPM})
+    leitura = (
+        "(() => { const c = document.querySelector('.at-cursor-beat');"
+        " const x = c && /translate\\(([-\\d.]+)px/.exec(c.style.transform);"
+        " const a = document.getElementById('audioWav');"
+        " return {cursor_x: x ? Number(x[1]) : null, tempo: a.currentTime, pausado: a.paused,"
+        " reproducao: document.getElementById('tab').dataset.reproducaoExterna || null}; })()"
+    )
+
+    _, _, tocando_1, tocando_2, _, pausado = sessao(
+        f"{servidor}/?job={ident}",
+        [
+            (12, _escolher("wav", "auralizacao.wav", _wav_de_tom(6))),
+            (2, "document.getElementById('audioWav').play().then(() => true)"),
+            (0.8, leitura),
+            (1.2, leitura),
+            (0, "document.getElementById('audioWav').pause()"),
+            (0.5, leitura),
+        ],
+    )
+    print(f"tocando {tocando_1} → {tocando_2} · pausado {pausado}")
+
+    assert tocando_1["pausado"] is False, tocando_1
+    assert tocando_2["tempo"] > tocando_1["tempo"], (tocando_1, tocando_2)
+    assert tocando_1["cursor_x"] is not None, tocando_1
+    assert tocando_2["cursor_x"] > tocando_1["cursor_x"], (
+        f"o cursor não seguiu o WAV: {tocando_1} → {tocando_2}"
+    )
+    assert tocando_2["reproducao"] == "playing", tocando_2
+    assert pausado["reproducao"] == "paused", pausado
+    # O alphaTab encaixa a posição no início do tempo ao pausar; com o WAV mandando,
+    # isso puxaria o áudio para trás.
+    assert pausado["tempo"] >= tocando_2["tempo"], f"pausar voltou o áudio: {pausado}"

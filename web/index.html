@@ -175,6 +175,11 @@
             <input id="ref" placeholder="/caminho/musica.mp3" style="width: 100%" />
           </div>
           <div>
+            <!-- Áudio sobe para transcrever; GP5 e MusicXML só abrem na tela (ADR-051). -->
+            <input id="arquivo" type="file" accept=".mp3,.wav,.gp5,.musicxml" class="oculto" />
+            <button id="abrirArquivo">Abrir arquivo…</button>
+          </div>
+          <div>
             <label for="bpm">Andamento da música (BPM) — deixe vazio para o Thoth estimar</label>
             <input id="bpm" type="number" placeholder="estimar do áudio" min="20" max="300" />
           </div>
@@ -227,6 +232,28 @@
           <div><label for="metronomo">Metrônomo</label><input id="metronomo" type="checkbox" /></div>
           <div><label for="repetir">Repetir</label><input id="repetir" type="checkbox" /></div>
           <div><button id="ativarExterno">Usar player externo</button></div>
+          <div>
+            <input id="wav" type="file" accept=".wav" class="oculto" />
+            <button id="escolherWav">Tocar com WAV…</button>
+          </div>
+        </div>
+      </section>
+
+      <section class="painel oculto" id="controlesWav">
+        <h2>Tocar com WAV</h2>
+        <p id="nomeWav"></p>
+        <p>
+          A pauta segue a posição do áudio. A velocidade fica no menu do próprio player. Ajuste o deslocamento se a
+          partitura não começar no início do áudio.
+        </p>
+        <div class="linha">
+          <div class="largo"><audio id="audioWav" controls style="width: 100%"></audio></div>
+          <div>
+            <label for="deslocamentoWav">Deslocamento (segundos)</label>
+            <input id="deslocamentoWav" type="number" step="0.1" value="0" />
+          </div>
+          <div><button id="trocarWav">Trocar WAV</button></div>
+          <div><button id="sairWav">Voltar ao player do Thoth</button></div>
         </div>
       </section>
 
@@ -281,7 +308,17 @@
         }
       };
 
-      const criarApi = (externa) => {
+      // O modo external-media atualiza a partitura; este handler não emite áudio.
+      const handlerMudo = {
+        backingTrackDuration: 0,
+        playbackRate: 1,
+        masterVolume: 1,
+        seekTo() {},
+        play() {},
+        pause() {},
+      };
+
+      const criarApi = (externa, handler = handlerMudo) => {
         if (api) api.destroy();
         $("tab").replaceChildren();
         reproducaoLocalIniciada = false;
@@ -310,17 +347,7 @@
             definirEstadoLocal("paused");
           }
         });
-        if (externa) {
-          // O modo external-media atualiza a partitura, mas este handler não emite áudio.
-          api.player.output.handler = {
-            backingTrackDuration: 0,
-            playbackRate: 1,
-            masterVolume: 1,
-            seekTo() {},
-            play() {},
-            pause() {},
-          };
-        }
+        if (externa) api.player.output.handler = handler;
         if (partitura) api.load(partitura);
       };
 
@@ -455,6 +482,93 @@
         aplicarAndamento();
       });
 
+      // WAV escolhido: o `<audio>` manda na posição e a pauta segue (ADR-051). Clicar
+      // na pauta chama `seekTo`, que move o áudio.
+      const audioWav = $("audioWav");
+      const deslocamentoWav = () => {
+        const valor = Number($("deslocamentoWav").value || 0);
+        return Number.isFinite(valor) ? valor : 0;
+      };
+      // O alphaTab encaixa a posição no início do tempo ao pausar e repassa isso como
+      // `seekTo`. Quando a pausa veio do próprio áudio, o áudio manda: o eco é ignorado.
+      let ecoDoAudio = false;
+      const handlerWav = {
+        get backingTrackDuration() {
+          return (audioWav.duration || 0) * 1000;
+        },
+        get playbackRate() {
+          return audioWav.playbackRate;
+        },
+        set playbackRate(valor) {
+          audioWav.playbackRate = valor;
+        },
+        get masterVolume() {
+          return audioWav.volume;
+        },
+        set masterVolume(valor) {
+          audioWav.volume = valor;
+        },
+        seekTo(ms) {
+          if (ecoDoAudio) return;
+          audioWav.currentTime = Math.max(0, ms / 1000 - deslocamentoWav());
+        },
+        play() {
+          void audioWav.play();
+        },
+        pause() {
+          audioWav.pause();
+        },
+      };
+      const posicaoWav = () => {
+        api.player.output.updatePosition(Math.max(0, audioWav.currentTime + deslocamentoWav()) * 1000);
+      };
+      const seguirWav = () => {
+        if (audioWav.paused) return;
+        posicaoWav();
+        requestAnimationFrame(seguirWav);
+      };
+      audioWav.addEventListener("play", () => {
+        definirEstadoReproducao("Playing");
+        api.play();
+        seguirWav();
+      });
+      audioWav.addEventListener("pause", () => {
+        definirEstadoReproducao("Paused");
+        ecoDoAudio = true;
+        try {
+          api.pause();
+        } finally {
+          ecoDoAudio = false;
+        }
+        posicaoWav();
+      });
+      audioWav.addEventListener("seeked", posicaoWav);
+      audioWav.addEventListener("ended", () => definirEstadoReproducao(null));
+
+      const escolherWav = () => $("wav").click();
+      $("escolherWav").addEventListener("click", escolherWav);
+      $("trocarWav").addEventListener("click", escolherWav);
+      $("wav").addEventListener("change", () => {
+        const arquivo = $("wav").files[0];
+        if (!arquivo) return;
+        api.stop();
+        audioWav.pause();
+        if (audioWav.src) URL.revokeObjectURL(audioWav.src);
+        audioWav.src = URL.createObjectURL(arquivo);
+        $("nomeWav").textContent = arquivo.name;
+        criarApi(true, handlerWav);
+        $("controlesLocais").classList.add("oculto");
+        $("controlesWav").classList.remove("oculto");
+      });
+      $("sairWav").addEventListener("click", () => {
+        audioWav.pause();
+        definirEstadoReproducao(null);
+        criarApi(false);
+        $("controlesWav").classList.add("oculto");
+        $("controlesLocais").classList.remove("oculto");
+        aplicarAndamento();
+      });
+
       // A guitarra usa a afinação do perfil; o servidor recusa `afinacao` nela (ADR-044).
       const ehBaixo = () => $("instrumento").value === "baixo";
       $("instrumento").addEventListener("change", () => {
@@ -543,6 +657,13 @@
         $("salvarTranscricao").classList.toggle("oculto", !disponiveis.length);
       };
 
+      const exibir = (bytes) => {
+        partitura = bytes;
+        api.load(partitura);
+        $("controles").classList.remove("oculto");
+        aplicarAndamento();
+      };
+
       const carregar = async (ident, formatos) => {
         prepararDownloads(ident, formatos);
         // O alphaTab só lê GP5. Alvo sem ele tem os outros arquivos, mas não a tela (ADR-044).
@@ -552,10 +673,7 @@
           return;
         }
         const resposta = await fetch(`/jobs/${ident}/artifacts/gp5`);
-        partitura = new Uint8Array(await resposta.arrayBuffer());
-        api.load(partitura);
-        $("controles").classList.remove("oculto");
-        aplicarAndamento();
+        exibir(new Uint8Array(await resposta.arrayBuffer()));
       };
 
       const acompanhar = async (ident) => {
@@ -578,6 +696,36 @@
 
       const jobDaUrl = new URLSearchParams(location.search).get("job");
       if (jobDaUrl) acompanhar(jobDaUrl);
+
+      // Partitura abre aqui mesmo, o alphaTab lê GP5 e MusicXML; áudio sobe e vira a
+      // `ref` do formulário, para escolher instrumento e BPM antes de transcrever.
+      $("abrirArquivo").addEventListener("click", () => $("arquivo").click());
+      $("arquivo").addEventListener("change", async () => {
+        const arquivo = $("arquivo").files[0];
+        $("arquivo").value = "";
+        if (!arquivo) return;
+        estado.classList.remove("aviso");
+        if (/\.(gp5|musicxml)$/i.test(arquivo.name)) {
+          $("salvarTranscricao").classList.add("oculto");
+          exibir(new Uint8Array(await arquivo.arrayBuffer()));
+          estado.textContent = `${arquivo.name} aberto — sem transcrição.`;
+          return;
+        }
+        estado.textContent = `enviando ${arquivo.name}…`;
+        try {
+          const resposta = await fetch(`/uploads?nome=${encodeURIComponent(arquivo.name)}`, {
+            method: "POST",
+            headers: { "Content-Type": "application/octet-stream" },
+            body: arquivo,
+          });
+          if (!resposta.ok) throw new Error(await resposta.text());
+          $("ref").value = (await resposta.json()).ref;
+          estado.textContent = `${arquivo.name} pronto — ajuste as opções e clique em Transcrever.`;
+        } catch (erro) {
+          estado.textContent = `falhou: ${erro.message}`;
+          estado.classList.add("aviso");
+        }
+      });
 
       $("enviar").addEventListener("click", async () => {
         const botao = $("enviar");

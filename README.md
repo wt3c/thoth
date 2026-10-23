@@ -450,6 +450,19 @@ servidor apaga o histórico de jobs, mas não remove os artefatos de `out/` nem 
 o alphaTab tenha sido instalado com `uv run python scripts/vendor_alphatab.py`; sem ele, a raiz responde 503 e mostra
 esse comando.
 
+#### Abrir arquivo e tocar com WAV
+
+**Abrir arquivo…** abre o seletor do sistema e aceita `.mp3`, `.wav`, `.gp5` e `.musicxml`. Um arquivo de áudio é
+enviado ao servidor, copiado para `cache/uploads/` e colocado no campo de referência. Ajuste instrumento, BPM e as
+demais opções e clique em **Transcrever**; o nome do arquivo vira o título da partitura, e reenviar o mesmo áudio
+reaproveita o cache. GP5 e MusicXML apenas **abrem** na tela: não sobem ao servidor e nenhuma transcrição é feita
+(ADR-051).
+
+Com a partitura na tela, **Tocar com WAV…** escolhe um WAV local — a auralização, um stem ou a mix — para tocar no
+player da página, com o cursor acompanhando a posição do áudio. Clicar na pauta move o áudio. A velocidade fica no menu
+do próprio player. Use **Deslocamento (segundos)** se a partitura não começar no início do áudio. **Voltar ao player do
+Thoth** restaura o áudio sintetizado.
+
 #### Acompanhar a reprodução de outro player no Linux
 
 Depois de gerar uma partitura GP5, escolha **Usar player externo** para trocar o alphaTab para o modo de mídia externa.

@@ -2,6 +2,21 @@
 
 > Áudio → partitura e tablatura, foco em contrabaixo. Uso pessoal. CPU-only. Decisões em `tasks/decisions.md`.
 
+## Página de estudo: abrir arquivo e tocar com WAV (2026-10-22)
+
+Abrir arquivo pelo seletor do sistema (`.mp3`, `.wav`, `.gp5`, `.musicxml`). O áudio é transcrito; GP5 e MusicXML só
+abrem na tela. Um WAV escolhido toca sincronizado com a pauta (ADR-051).
+
+1. [x] `POST /uploads`: recebe o áudio, recusa extensão fora da lista, devolve a `ref` (teste de API real).
+2. [x] Página: botão "Abrir arquivo…" — áudio vira upload + job; GP5/MusicXML abrem direto no alphaTab (teste
+   `navegador`).
+3. [x] Página: "Tocar com WAV…" — `<audio>` local no modo *external media*, cursor segue o áudio (teste `navegador`).
+4. [x] Verificação de entrega (`pytest -n auto`, `-m navegador`, `ruff`, `mypy`) e README.
+   **Resultado:** suíte padrão 575 passed; `-m navegador` 19 passed (numa primeira rodada,
+   `test_o_formulario_manda_afinacao_e_digitacao_por_nome` falhou uma vez e passou isolado e na repetição);
+   ruff e mypy limpos. O alphaTab encaixa a posição no início do tempo ao pausar e repassava isso como `seekTo`,
+   puxando o WAV para trás; a pausa vinda do áudio agora ignora esse eco (teste cobre).
+
 ## Conformidade Markdown do repositório (2026-09-29)
 
 1. [x] Aplicar correções automáticas seguras com `.markdownlint-cli2.jsonc`.
