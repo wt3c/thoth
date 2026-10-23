@@ -2865,6 +2865,14 @@ sem impossível.
 - Tornar o Demucs determinístico (`--shifts 0`) mudaria também o stem do baixo e exigiria remedir o baixo; fica fora do
   M4, como decisão própria se for preciso.
 
+### Emenda (2026-10-23) — folga do Demucs nos acordes de seis notas
+
+- A folga de uma nota nos acordes de seis notas do `mix-stem` era menor que a variação do Demucs. Três rodadas seguidas
+  da `guitarra-acustica` `mix-stem`, sem mudança de código, deram 23, 21 e 21 notas de 24, com F1 0,981, 0,961 e 0,961.
+  A `FOLGA_DEMUCS = 0,03` do F1 já absorvia as duas notas; a dos acordes, não.
+- A folga dos acordes de seis notas no `mix-stem` passa a duas notas (`FOLGA_DEMUCS_SEIS_NOTAS = 2`). `isolada` e `mix`
+  continuam exatos. O Demucs determinístico continua sendo a saída que tira as folgas, com a mesma ressalva do baixo.
+
 ### Emenda (2026-09-25) — GP5 com acordes de guitarra
 
 - `Gp5Exporter(acordes=True, faixa=..., programa_gm=...)`: as notas do mesmo tique da grade viram **um beat com uma nota

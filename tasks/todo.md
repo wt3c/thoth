@@ -45,6 +45,11 @@ existente.
   desde o `1c91fcf`. Não era o modelo nem o fluidsynth (2.6.0 falha igual): o piso foi medido quando o transcritor
   devolvia `drums` como nota, e a `Transcricao` passou a pô-los em `ataques`, fora de "qualquer rótulo". Com os
   ataques de volta, 3/8 exatos nos dois pianos. Causa confirmada pelo Codex (`gpt-6.1-sol`, leitura).
+- [x] `test_mede_perfil[guitarra-acustica-mix-stem]` intermitente nos acordes de seis notas (21 < 22): três rodadas
+  sem mudança deram 23, 21 e 21 — variação do Demucs. Folga dos acordes de seis no `mix-stem` passou a 2 notas,
+  como a `FOLGA_DEMUCS` do F1 já absorvia (emenda do ADR-044, 2026-10-23).
+- [ ] Demucs determinístico (`--shifts 0`) para tirar as folgas do `mix-stem`: muda também o stem do baixo, exige
+  remedir os pisos do baixo. Decisão própria.
 
 ### Fora, por ora
 
