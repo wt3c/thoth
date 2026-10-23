@@ -31,12 +31,14 @@ def localizar_stems(out_dir: Path, stem: str = "bass") -> dict[str, Path]:
     """Acha os stems por varredura sob `out_dir`, não reconstruindo o caminho.
 
     O demucs aninha a saída em `<out>/<modelo>/<nome do arquivo>/`, e o nome do
-    arquivo aqui é o `source_id` — um SHA-256. Procurar o arquivo é mais barato e
-    mais honesto do que remontar essa convenção.
+    arquivo aqui é `mix` — o `source_id` já está em `out_dir`. Procurar o arquivo é
+    mais barato e mais honesto do que remontar essa convenção.
 
     **Quem chama decide o escopo.** `separate` passa `<out>/<modelo>/<versão>`,
     porque stem de outro modelo ou de outra versão não é cache deste (ADR-026): a
-    diferença entre dois separadores é exatamente o que o ADR-010 mede.
+    diferença entre dois separadores é exatamente o que o ADR-010 mede. Quem lê o
+    cache fora do pipeline (o `comparar`) usa `DemucsSeparator().escopo` pelo mesmo
+    motivo.
     """
     encontrados = {
         caminho.stem: caminho
@@ -65,7 +67,7 @@ class DemucsSeparator:
                 f"stem {self.stem!r} não existe no demucs; há {sorted(STEMS_DO_HTDEMUCS)}"
             )
 
-    def _escopo(self, out_dir: Path) -> Path:
+    def escopo(self, out_dir: Path) -> Path:
         """Onde fica o cache deste stem. Irmãos, nunca aninhados: `diretorio_atomico`
         apaga o destino inteiro antes de promover, e levaria o stem vizinho junto.
 
@@ -91,7 +93,7 @@ class DemucsSeparator:
         out_dir.mkdir(parents=True, exist_ok=True)
         # O cache pertence ao modelo *e* à versão que o produziram: sem a versão, um
         # stem de outro demucs passaria por este (emenda do ADR-026).
-        meu = self._escopo(out_dir)
+        meu = self.escopo(out_dir)
         try:
             return localizar_stems(meu, self.stem)
         except FileNotFoundError:

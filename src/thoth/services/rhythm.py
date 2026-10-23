@@ -56,14 +56,26 @@ def deslocar(notes: Sequence[NoteEvent], recuo: float) -> list[NoteEvent]:
     return [replace(n, onset_s=n.onset_s - recuo, offset_s=n.offset_s - recuo) for n in notes]
 
 
+def a_partir_do_zero(notes: Sequence[NoteEvent]) -> list[NoteEvent]:
+    """Encosta no zero a nota que o recuo de outra parte levou a tempo negativo.
+
+    Na partitura multifaixa todas as partes usam o recuo do baixo (ADR-047), e uma
+    parte que entra antes da fase dele cairia antes do primeiro tique. Só acontece
+    nos primeiros milissegundos, e nenhum formato de partitura representa tempo
+    negativo; a duração é preservada.
+    """
+    return [
+        replace(n, onset_s=0.0, offset_s=n.offset_s - n.onset_s) if n.onset_s < 0 else n
+        for n in notes
+    ]
+
+
 def para_ticks(segundos: float, bpm: float) -> int:
     """Quantiza para a grade de semicolcheia."""
     return round(segundos * bpm / 60 * PPQ / GRADE) * GRADE
 
 
-def monofonizar(
-    notes: Sequence[NoteEvent], bpm: float
-) -> tuple[list[NoteEvent], list[NoteEvent]]:
+def monofonizar(notes: Sequence[NoteEvent], bpm: float) -> tuple[list[NoteEvent], list[NoteEvent]]:
     """Reduz cada grupo simultâneo à nota mais grave; devolve `(mantidas, descartadas)`.
 
     A colisão é medida **na grade**, não no relógio: duas notas a 20 ms de

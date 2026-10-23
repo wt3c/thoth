@@ -22,6 +22,17 @@ TIMEOUT_S = 900
 
 _PADRAO_ID = re.compile(r"^[A-Za-z0-9_-]{11}$")
 
+#: Só estes hosts chegam ao yt-dlp. O `ref` vem também da API, e o yt-dlp baixa de
+#: mil sites: qualquer endereço com `?v=` virava download arbitrário pela máquina.
+_HOSTS_DO_YOUTUBE = frozenset({
+    "youtube.com",
+    "www.youtube.com",
+    "m.youtube.com",
+    "music.youtube.com",
+    "youtu.be",
+    "www.youtube-nocookie.com",
+})
+
 
 class IngestError(RuntimeError):
     """Falha ao obter o áudio da fonte."""
@@ -30,8 +41,10 @@ class IngestError(RuntimeError):
 def extrair_video_id(url: str) -> str:
     """Aceita watch?v=, youtu.be/, /embed/ e /shorts/, com ou sem parâmetros."""
     partes = urlparse(url)
+    if partes.hostname not in _HOSTS_DO_YOUTUBE:
+        raise IngestError(f"Só baixo do YouTube, e {partes.hostname!r} não é: {url}")
 
-    if partes.hostname and partes.hostname.endswith("youtu.be"):
+    if partes.hostname == "youtu.be":
         candidato = partes.path.lstrip("/")
     elif match := re.match(r"^/(?:embed|shorts|v)/([^/?]+)", partes.path):
         candidato = match.group(1)
@@ -47,7 +60,8 @@ class YtDlpSource:
     """Implementa `AudioSource` para URLs do YouTube."""
 
     def fetch(self, ref: str, cache_dir: Path) -> AudioAsset:
-        source_id = f"yt_{extrair_video_id(ref)}"
+        video_id = extrair_video_id(ref)
+        source_id = f"yt_{video_id}"
         destino = cache_dir / source_id
         wav = destino / "mix.wav"
         meta = destino / "meta.json"
@@ -59,7 +73,7 @@ class YtDlpSource:
             # que o teste de cache — `existe?` — aceitaria na próxima execução.
             destino.mkdir(parents=True, exist_ok=True)
             with escrita_atomica(wav) as parcial:
-                dados = self._baixar(ref, parcial)
+                dados = self._baixar(video_id, parcial)
             with escrita_atomica(meta) as parcial:
                 parcial.write_text(json.dumps(dados, ensure_ascii=False))
 
@@ -71,7 +85,10 @@ class YtDlpSource:
             duration_s=dados["duration_s"],
         )
 
-    def _baixar(self, url: str, wav: Path) -> dict[str, object]:
+    def _baixar(self, video_id: str, wav: Path) -> dict[str, object]:
+        # A URL canônica, e não a digitada: parâmetro de playlist ou de tempo não
+        # chega ao yt-dlp, e o `--` impede que um ID começado por `-` vire opção.
+        url = f"https://www.youtube.com/watch?v={video_id}"
         comando = [
             "yt-dlp",
             "--no-playlist",
@@ -82,6 +99,7 @@ class YtDlpSource:
             str(wav.with_suffix(".meta.tsv")),
             "--no-simulate",
             "-o", str(wav.with_suffix("")),
+            "--",
             url,
         ]
         try:

@@ -38,12 +38,12 @@ O MuScriptor exige Python 3.10–3.12 (ADR-004). O teto é deliberado. **Não "a
 
 `addopts = "-m 'not slow and not network and not navegador'"`. Ou seja:
 
-| Seleção                          | O que exercita                                   |
-|----------------------------------|--------------------------------------------------|
-| padrão                           | tudo que é barato, inclusive `ffmpeg`/`fluidsynth` reais |
-| `-m "slow and not network"`      | modelo e ferramenta pesada local (MuScriptor, Demucs) — minutos em CPU |
-| `-m network`                     | o canário do `yt-dlp` contra o YouTube (também é `slow`) |
-| `-m navegador`                   | Chromium de verdade via CDP, página renderizada  |
+| Seleção | O que exercita |
+| --- | --- |
+| padrão | tudo que é barato, inclusive `ffmpeg`/`fluidsynth` reais |
+| `-m "slow and not network"` | modelo e ferramenta pesada local (MuScriptor, Demucs) — minutos em CPU |
+| `-m network` | o canário do `yt-dlp` contra o YouTube (também é `slow`) |
+| `-m navegador` | Chromium de verdade via CDP, página renderizada |
 
 `-m slow` sozinho **inclui** o teste de rede. Para exercitar só os modelos locais, use
 `-m "slow and not network"`.
@@ -72,13 +72,13 @@ ADR da área e corrija junto.
 
 ## Arquitetura — ports e adapters
 
-```
+```text
 domain/     models.py (dataclasses frozen, slots) · ports.py (Protocol)
             sem I/O, sem torch, sem dependência de ML
 adapters/   ingest · transcription · separation · export — cada um implementa um Protocol
 services/   lógica própria: fretboard (Viterbi), rhythm, tempo, tonalidade, notas,
             octave_check, evaluation, comparacao, tab_referencia, auralizacao,
-            cache_notas, nomes, model_lock, pipeline
+            cache_notas, cache_transcricao, nomes, model_lock, pipeline
 api/        FastAPI: jobs em memória, estado serializado, artefatos e página de estudo
 cli.py      fachada fina sobre services
 ```

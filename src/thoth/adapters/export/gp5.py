@@ -27,10 +27,11 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from pathlib import Path
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 import guitarpro as gp
 
+from thoth.domain.instrumentos import PECAS_POR_ATAQUE
 from thoth.domain.models import EventoPercussivo, TabNote
 from thoth.domain.ports import ExportadorDePercussao, Exporter
 from thoth.services.notas import nome_da_nota
@@ -47,7 +48,7 @@ BAIXO_GM = 33  # Electric Bass (finger)
 #: Canal 10 do GM, 0-indexado: o canal que os sintetizadores tocam como bateria.
 CANAL_PERCUSSAO = 9
 #: Uma peça por corda no beat; seis é o que o Guitar Pro cria para faixa de bateria.
-CORDAS_PERCUSSAO = 6
+CORDAS_PERCUSSAO = PECAS_POR_ATAQUE
 
 assert gp.Duration.quarterTime // 4 == GRADE, "a grade tem que casar com o PPQ do GP5"
 
@@ -60,6 +61,16 @@ _FIGURAS = sorted(
     ),
     reverse=True,
 )
+
+
+def _texto_gp5(texto: str) -> str:
+    """O GP5 guarda texto em cp1252, a codificação que o PyGuitarPro usa ao gravar.
+
+    Título de vídeo em japonês não cabe e derrubava a exportação no fim do
+    pipeline. O que não cabe vira `?`; acentos cabem e passam intactos. O título
+    original continua no nome do arquivo (ADR-017).
+    """
+    return texto.encode("cp1252", errors="replace").decode("cp1252")
 
 
 def _decompor(ticks: int) -> list[tuple[int, bool]]:
@@ -92,6 +103,18 @@ def _fatiar_na_barra(inicio: int, duracao: int) -> list[tuple[int, int]]:
     return fatias
 
 
+def _por_compasso[T: tuple[Any, ...]](eventos: list[T]) -> dict[int, list[T]]:
+    """Os eventos de cada compasso, na ordem em que vieram.
+
+    Varrer a lista inteira a cada compasso era quadrático: 3.000 notas em 750
+    compassos, mais de dois milhões de comparações para separar o que é de quem.
+    """
+    por_compasso: dict[int, list[T]] = {}
+    for evento in eventos:
+        por_compasso.setdefault(evento[0] // COMPASSO, []).append(evento)
+    return por_compasso
+
+
 @dataclass(frozen=True, slots=True)
 class Gp5Exporter:
     """Implementa o `Exporter`. Round-trip verificado contra o próprio PyGuitarPro."""
@@ -114,7 +137,7 @@ class Gp5Exporter:
         # O GP5 só guarda andamento inteiro no cabeçalho, mas a quantização usa o
         # fracionário: as posições ficam certas e só a reprodução corre ~0,5%
         # fora. O inverso — quantizar no inteiro — desloca as notas (ADR-021).
-        song = gp.Song(title=self.titulo, tempo=round(self.bpm))
+        song = gp.Song(title=_texto_gp5(self.titulo), tempo=round(self.bpm))
         song.tracks.clear()
         track = gp.Track(song, number=1, name=self.faixa)
         # O GP numera as cordas da mais aguda para a mais grave; nós, o contrário.
@@ -136,6 +159,7 @@ class Gp5Exporter:
             for i, (ini, dur) in enumerate(_fatiar_na_barra(inicio, duracao))
         ]
         total = (marcados[-1][0] + marcados[-1][1] - 1) // COMPASSO + 1
+        por_compasso = _por_compasso(marcados)
         cursor = 0
         for numero in range(total):
             while numero >= len(song.measureHeaders):
@@ -144,9 +168,7 @@ class Gp5Exporter:
             voz = gp.Voice(medida)
             fim_do_compasso = (numero + 1) * COMPASSO
 
-            for inicio, duracao, acorde, continuacao in marcados:
-                if not numero * COMPASSO <= inicio < fim_do_compasso:
-                    continue
+            for inicio, duracao, acorde, continuacao in por_compasso.get(numero, ()):
                 for valor, pontuada in _decompor(inicio - cursor):
                     voz.beats.append(self._pausa(voz, valor, pontuada))
                 # Só a primeira figura da primeira fatia é ataque; o resto da
@@ -229,7 +251,7 @@ class Gp5PercussaoExporter:
                     f"({grupo[0].instante_s:.2f}s): a faixa tem {CORDAS_PERCUSSAO} cordas"
                 )
 
-        song = gp.Song(title=self.titulo, tempo=round(self.bpm))
+        song = gp.Song(title=_texto_gp5(self.titulo), tempo=round(self.bpm))
         song.tracks.clear()
         track = gp.Track(song, number=1, name=self.faixa, isPercussionTrack=True)
         track.strings = [gp.GuitarString(i + 1, 0) for i in range(CORDAS_PERCUSSAO)]
@@ -240,6 +262,7 @@ class Gp5PercussaoExporter:
         # Só a fatia até a barra é figura; o resto do espaço é pausa.
         cortados = [(inicio, _fatiar_na_barra(inicio, dur)[0][1], g) for inicio, dur, g in grupos]
         total = (cortados[-1][0] + cortados[-1][1] - 1) // COMPASSO + 1
+        por_compasso = _por_compasso(cortados)
         cursor = 0
         for numero in range(total):
             while numero >= len(song.measureHeaders):
@@ -247,9 +270,7 @@ class Gp5PercussaoExporter:
             medida = gp.Measure(track, song.measureHeaders[numero])
             voz = gp.Voice(medida)
             fim_do_compasso = (numero + 1) * COMPASSO
-            for inicio, duracao, grupo in cortados:
-                if not numero * COMPASSO <= inicio < fim_do_compasso:
-                    continue
+            for inicio, duracao, grupo in por_compasso.get(numero, ()):
                 for valor, pontuada in _decompor(inicio - cursor):
                     voz.beats.append(Gp5Exporter._pausa(voz, valor, pontuada))
                 (valor, pontuada), *resto = _decompor(duracao)

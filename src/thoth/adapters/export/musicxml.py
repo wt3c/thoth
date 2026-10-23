@@ -111,11 +111,13 @@ class MusicXmlExporter:
         # Sem `Metadata` explícita o music21 imprime a partitura anônima. Era o que
         # acontecia: o nome da música chegava ao nome do arquivo e não ao papel.
         score.insert(0, metadata.Metadata(title=self.titulo))
-        pronto = score.makeNotation()
-        _consertar_beams(pronto)
+        # No lugar: a cópia que o `makeNotation` faria custava um terço do tempo de
+        # exportação, e o `score` montado aqui não serve a mais ninguém.
+        score.makeNotation(inPlace=True)
+        _consertar_beams(score)
 
         out.parent.mkdir(parents=True, exist_ok=True)
-        pronto.write("musicxml", fp=str(out))
+        score.write("musicxml", fp=str(out))
         xml = _com_afinacao(out.read_text(), tuning)
         if guitarra:
             xml = _com_digitacao(xml, posicionadas, len(tuning))
@@ -230,9 +232,7 @@ def _refazer_beams(camada: stream.Measure | stream.Voice, formula: meter.TimeSig
             continue
         # Cópias: o `getBeams` só lê durações, mas não mexer no `activeSite`
         # das notas da partitura custa uma linha.
-        novos = formula.getBeams(
-            deepcopy(trecho), measureStartOffset=trecho[0].offset
-        )
+        novos = formula.getBeams(deepcopy(trecho), measureStartOffset=trecho[0].offset)
         for elemento, beams in zip(trecho, novos, strict=True):
             if isinstance(elemento, note.NotRest):
                 elemento.beams = beams or beam.Beams()
@@ -436,7 +436,8 @@ class MusicXmlPercussaoExporter:
         score.insert(0, pauta)
         score.insert(0, metadata.Metadata(title=self.titulo))
         out.parent.mkdir(parents=True, exist_ok=True)
-        score.makeNotation().write("musicxml", fp=str(out))
+        score.makeNotation(inPlace=True)
+        score.write("musicxml", fp=str(out))
         ordem = [p.peca_gm for _, _, pecas in grupos for p in pecas]
         out.write_text(_com_pecas(out.read_text(), ordem), encoding="utf-8")
         return out
@@ -517,9 +518,9 @@ class MusicXmlPianoExporter:
         for n in notas:
             inicio = para_ticks(n.onset_s, self.bpm)
             duracao = max(GRADE, para_ticks(n.offset_s, self.bpm) - inicio)
-            acordes[0 if n.pitch >= DO_CENTRAL else 1].setdefault(
-                (inicio, duracao), []
-            ).append(n.pitch)
+            acordes[0 if n.pitch >= DO_CENTRAL else 1].setdefault((inicio, duracao), []).append(
+                n.pitch
+            )
         fim = max(i + d for pauta in acordes for i, d in pauta)
         fim = -(-fim // COMPASSO) * COMPASSO
 
@@ -530,6 +531,8 @@ class MusicXmlPianoExporter:
         score.insert(0, inferior)
         score.insert(0, layout.StaffGroup([superior, inferior], symbol="brace", barTogether=True))
         score.insert(0, metadata.Metadata(title=self.titulo))
+        # No lugar, como no baixo: poupa a cópia que o `write` faria do `score`.
+        score.makeNotation(inPlace=True)
         _consertar_beams(score)
         out.parent.mkdir(parents=True, exist_ok=True)
         score.write("musicxml", fp=str(out))
@@ -539,9 +542,9 @@ class MusicXmlPianoExporter:
         self, acordes: Acordes, clave: clef.Clef, fim: int, *, primeira: bool
     ) -> stream.PartStaff:
         """Uma pauta já em compassos, com uma voz por camada de durações sobrepostas."""
-        compassos_por_voz = [
-            _em_compassos(voz, fim) for voz in _vozes(acordes)
-        ] or [_em_compassos([], fim)]
+        compassos_por_voz = [_em_compassos(voz, fim) for voz in _vozes(acordes)] or [
+            _em_compassos([], fim)
+        ]
         pauta = stream.PartStaff()
         for numero, grupo in enumerate(zip(*compassos_por_voz, strict=True), start=1):
             compasso = stream.Measure(number=numero)

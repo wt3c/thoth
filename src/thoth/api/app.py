@@ -15,20 +15,29 @@ diagnóstico para quem pediu, não defeito do servidor.
 
 from __future__ import annotations
 
+import hashlib
 import math
 import mimetypes
+import os
+import queue
 import threading
 import uuid
+from collections.abc import Sequence
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
 from typing import Any, Protocol
+from urllib.parse import urlparse
 
-from fastapi import BackgroundTasks, FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Request
+from fastapi.middleware.trustedhost import TrustedHostMiddleware
 from fastapi.responses import FileResponse, PlainTextResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field, field_validator, model_validator
+from starlette.concurrency import run_in_threadpool
 
+from thoth.adapters.ingest.ytdlp_source import IngestError, extrair_video_id
 from thoth.adapters.playback.mpris import LeitorMpris
+from thoth.arquivos import SUFIXO
 from thoth.domain.models import AFINACOES, AcordeImpossivel
 from thoth.domain.ports import AtribuidorDeAcordes, FretAssigner
 from thoth.domain.reproducao import LeitorDeReproducao
@@ -39,6 +48,12 @@ from thoth.services.octave_check import OctaveWarning
 from thoth.services.pipeline import Resultado
 from thoth.services.tempo import BPM_MAXIMO, BPM_MINIMO
 from thoth.services.tonalidade import Tonalidade, tom_de_texto
+
+#: O maior áudio que a página sobe. Dez minutos de WAV estéreo a 96 kHz/24 bits cabem.
+TETO_DE_UPLOAD = 512 * 2**20
+
+#: Os nomes desta máquina. `serve --host` acrescenta o que você escolher.
+HOSTS_LOCAIS = ("127.0.0.1", "localhost")
 
 #: Raiz do `web/`, servida como está — a UI não passa por build.
 WEB_PADRAO = Path(__file__).resolve().parents[3] / "web"
@@ -67,6 +82,10 @@ class Executor(Protocol):
     ) -> Resultado: ...
 
 
+#: O que sobe para transcrever. Partitura (GP5, MusicXML) abre no navegador (ADR-051).
+EXTENSOES_DE_AUDIO = frozenset({".mp3", ".wav"})
+
+
 class Pedido(BaseModel):
     """`bpm` vazio faz o Thoth estimar do áudio (ADR-019); os outros dois são nomes.
 
@@ -82,13 +101,28 @@ class Pedido(BaseModel):
     tom: str | None = Field(
         None, description="Tom, p.ex. 'Bb maior'. Vazio: estimado das notas (ADR-031)."
     )
-    instrumento: str = Field(
-        "baixo", description=f"Uma de: {', '.join(pipeline.INSTRUMENTOS)}."
-    )
+    instrumento: str = Field("baixo", description=f"Uma de: {', '.join(pipeline.INSTRUMENTOS)}.")
     afinacao: str | None = Field(
         None, description=f"Só para o baixo; uma de: {', '.join(AFINACOES)}. Vazia: '4'."
     )
     digitacao: str = Field("iniciante", description=f"Uma de: {', '.join(DIGITACOES)}.")
+
+    @field_validator("ref")
+    @classmethod
+    def _ref_de_audio(cls, valor: str) -> str:
+        # O `ref` decide o que o servidor lê do disco e de onde o yt-dlp baixa: uma URL
+        # tem de ser do YouTube, e um caminho, de áudio. A CLI segue aceitando qualquer
+        # coisa que o ffmpeg leia; quem a chama é você, não uma página.
+        if urlparse(valor).scheme in {"http", "https"}:
+            try:
+                extrair_video_id(valor)
+            except IngestError as erro:
+                raise ValueError(str(erro)) from erro
+        elif Path(valor).suffix.lower() not in EXTENSOES_DE_AUDIO:
+            raise ValueError(
+                f"{valor!r} não é áudio; aceitos: {', '.join(sorted(EXTENSOES_DE_AUDIO))}"
+            )
+        return valor
 
     @field_validator("tom")
     @classmethod
@@ -114,9 +148,7 @@ class Pedido(BaseModel):
     @model_validator(mode="after")
     def _afinacao_so_no_baixo(self) -> Pedido:
         if self.afinacao is not None and self.instrumento != "baixo":
-            raise ValueError(
-                f"afinacao só vale para o baixo; {self.instrumento} usa a do perfil"
-            )
+            raise ValueError(f"afinacao só vale para o baixo; {self.instrumento} usa a do perfil")
         return self
 
     @field_validator("digitacao")
@@ -215,9 +247,7 @@ def _resumo(job: Job) -> dict[str, Any]:
         "descartadas": len(r.descartadas) if r else None,
         "erro_de_rotulo": r.erro_de_rotulo if r else None,
         "contaminacao": r.contaminacao if r else None,
-        "ataques_descartados": {m: len(a) for m, a in r.ataques_descartados.items()}
-        if r
-        else None,
+        "ataques_descartados": {m: len(a) for m, a in r.ataques_descartados.items()} if r else None,
         "acordes_impossiveis": [_acorde_impossivel(a) for a in r.acordes_impossiveis]
         if r
         else None,
@@ -238,8 +268,12 @@ class _Estado:
     cache_dir: Path
     executar: Executor
     jobs: dict[str, Job] = field(default_factory=dict)
-    #: Serializa a execução (ADR-027). Dois pipelines simultâneos escrevem no
-    #: mesmo diretório encenado do cache e no mesmo artefato nomeado pelo título.
+    #: Os jobs esperando o trabalhador. Um por vez (ADR-027): dois pipelines
+    #: simultâneos escrevem no mesmo diretório encenado do cache e no mesmo artefato
+    #: nomeado pelo título.
+    fila: queue.Queue[Job] = field(default_factory=queue.Queue)
+    #: Guarda `jobs`: as requisições chegam por threads do pool e o descarte dos
+    #: antigos percorre o dicionário enquanto outra requisição o altera.
     trava: threading.Lock = field(default_factory=threading.Lock)
 
 
@@ -250,48 +284,102 @@ def criar_app(
     executar: Executor | None = None,
     web_dir: Path = WEB_PADRAO,
     leitor_reproducao: LeitorDeReproducao | None = None,
+    teto_de_upload: int = TETO_DE_UPLOAD,
+    hosts: Sequence[str] = (),
 ) -> FastAPI:
     estado = _Estado(out_dir, cache_dir, executar or pipeline.transcrever)
     leitor = leitor_reproducao or LeitorMpris()
     app = FastAPI(title="Thoth", summary="Áudio → tablatura de contrabaixo e guitarra.")
+    # DNS rebinding: uma página de fora que resolve o próprio domínio para 127.0.0.1
+    # fala com o servidor como se fosse daqui. O `Host` dela denuncia, e é recusado.
+    app.add_middleware(TrustedHostMiddleware, allowed_hosts=[*HOSTS_LOCAIS, *hosts])
 
     def _rodar(job: Job) -> None:
-        # Um por vez (ADR-027): esperar na fila é o que o pedido seguinte faz aqui.
-        with estado.trava:
-            job.status = "rodando"
-            custos = DIGITACOES[job.pedido.digitacao]
-            try:
-                job.resultado = estado.executar(
-                    job.pedido.ref,
-                    estado.out_dir,
-                    bpm=job.pedido.bpm,
-                    tuning=_afinacao(job.pedido),
-                    cache_dir=estado.cache_dir,
-                    tom=job.pedido.tom,
-                    assigner=ViterbiFretAssigner(custos=custos),
-                    instrumento=job.pedido.instrumento,
-                    atribuidor_de_acordes=ViterbiAcordes(custos=custos),
-                )
-                job.status = "pronto"
-            except Exception as erro:  # vira estado do job, não 500 do servidor
-                job.status, job.erro = "erro", str(erro)
+        job.status = "rodando"
+        custos = DIGITACOES[job.pedido.digitacao]
+        try:
+            job.resultado = estado.executar(
+                job.pedido.ref,
+                estado.out_dir,
+                bpm=job.pedido.bpm,
+                tuning=_afinacao(job.pedido),
+                cache_dir=estado.cache_dir,
+                tom=job.pedido.tom,
+                assigner=ViterbiFretAssigner(custos=custos),
+                instrumento=job.pedido.instrumento,
+                atribuidor_de_acordes=ViterbiAcordes(custos=custos),
+            )
+            job.status = "pronto"
+        except Exception as erro:  # vira estado do job, não 500 do servidor
+            job.status, job.erro = "erro", str(erro)
+
+    def _trabalhar() -> None:
+        while True:
+            _rodar(estado.fila.get())
+
+    # Um trabalhador só, numa fila (ADR-027): os jobs rodam um por vez e na ordem em
+    # que chegaram, e a requisição volta na hora em vez de segurar uma thread do pool.
+    threading.Thread(target=_trabalhar, name="thoth-jobs", daemon=True).start()
 
     def _buscar(ident: str) -> Job:
-        if (job := estado.jobs.get(ident)) is None:
+        with estado.trava:
+            job = estado.jobs.get(ident)
+        if job is None:
             raise HTTPException(404, f"job {ident} não existe")
         return job
 
     @app.post("/jobs", status_code=202)
-    def criar(pedido: Pedido, tarefas: BackgroundTasks) -> dict[str, Any]:
+    def criar(pedido: Pedido) -> dict[str, Any]:
         job = Job(id=uuid.uuid4().hex[:12], pedido=pedido)
-        estado.jobs[job.id] = job
-        descartar_antigos(estado.jobs)
-        tarefas.add_task(_rodar, job)
+        with estado.trava:
+            estado.jobs[job.id] = job
+            descartar_antigos(estado.jobs)
+        estado.fila.put(job)
         return _resumo(job)
+
+    @app.post("/uploads", status_code=201)
+    async def enviar(nome: str, requisicao: Request) -> dict[str, str]:
+        """Corpo cru, não `multipart`: um arquivo só, sem dependência nova (ADR-051).
+
+        O diretório é o hash do conteúdo: reenviar o mesmo áudio cai no mesmo lugar e
+        reaproveita o cache. O nome vira o título. O hash vai inteiro, e não truncado
+        como o `source_id`: uma pasta de 16 hex com `mix.wav` dentro é o que o
+        `LocalFileSource` reconhece como cache, e trocaria o título pelo id.
+        """
+        nome = Path(nome).name  # o caminho do cliente não decide onde se grava
+        if Path(nome).suffix.lower() not in EXTENSOES_DE_AUDIO:
+            raise HTTPException(
+                422, f"{nome!r} não é áudio; aceitos: {', '.join(sorted(EXTENSOES_DE_AUDIO))}"
+            )
+        # Em blocos, e não `body()`: o arquivo inteiro na memória antes de qualquer
+        # verificação. O hash sai junto, e o disco é escrito fora do laço de eventos.
+        uploads = estado.cache_dir / "uploads"
+        uploads.mkdir(parents=True, exist_ok=True)
+        parcial = uploads / f"{uuid.uuid4().hex}{SUFIXO}"
+        resumo, tamanho = hashlib.sha256(), 0
+        try:
+            with parcial.open("wb") as arquivo:
+                async for bloco in requisicao.stream():
+                    tamanho += len(bloco)
+                    if tamanho > teto_de_upload:
+                        raise HTTPException(413, f"{nome!r} passa de {teto_de_upload // 2**20} MiB")
+                    resumo.update(bloco)
+                    await run_in_threadpool(arquivo.write, bloco)
+            if not tamanho:
+                raise HTTPException(422, f"{nome!r} chegou vazio")
+            destino = uploads / resumo.hexdigest() / nome
+            if not destino.exists():
+                destino.parent.mkdir(exist_ok=True)
+                os.replace(parcial, destino)
+        finally:
+            parcial.unlink(missing_ok=True)
+        return {"ref": str(destino)}
 
     @app.get("/jobs")
     def listar() -> list[dict[str, Any]]:
-        return [_resumo(j) for j in estado.jobs.values()]
+        with estado.trava:
+            jobs = list(estado.jobs.values())
+        return [_resumo(j) for j in jobs]
 
     @app.get("/playback/players")
     async def players_de_reproducao() -> list[dict[str, Any]]:

@@ -85,6 +85,11 @@ class Posicionamento:
 #: Rótulo que o MuScriptor dá à bateria; nele, `pitch` é a peça GM, não altura.
 ROTULO_BATERIA = "drums"
 
+#: Dois ataques a menos disto um do outro são o mesmo instante. Padrão do mir_eval e
+#: da literatura de AMT; mora aqui, e não no avaliador, para que usá-la não custe o
+#: import do `mir_eval`.
+TOLERANCIA_S = 0.05
+
 
 @dataclass(frozen=True, slots=True)
 class EventoPercussivo:

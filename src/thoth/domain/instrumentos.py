@@ -5,7 +5,9 @@ rótulos, de qual stem do Demucs, com qual programa GM e, se houver braço, qual
 afinação. Os três rótulos de guitarra ficam em perfis separados: somá-los faria
 duas guitarras virarem um acorde impossível.
 
-Por enquanto só a medição usa estes perfis; o pipeline segue produzindo baixo.
+O pipeline produz a partitura de cada perfil com exportador — baixo, guitarras e
+bateria, sozinhos ou juntos no modo `todos` (ADR-047). O piano tem exportador
+MusicXML (M3 do ADR-044), mas ainda não chega ao pipeline.
 """
 
 from __future__ import annotations
@@ -19,6 +21,14 @@ Familia = Literal["baixo", "bateria", "piano", "guitarra"]
 
 #: Afinação padrão de guitarra, E2 A2 D3 G3 B3 E4, da corda mais grave para a mais aguda.
 TUNING_GUITARRA_6 = (40, 45, 50, 55, 59, 64)
+
+#: As peças do kit GM (35 a 59) que as duas partituras de bateria sabem escrever. Ataque
+#: de outra peça é descartado e relatado, nunca inventado numa posição qualquer.
+PECAS_DA_BATERIA = frozenset(range(35, 60))
+
+#: Quantas peças cabem num mesmo ataque: a faixa de bateria do GP5 tem seis cordas, uma
+#: peça por corda. O MusicXML não tem esse teto; vale o menor, para as duas concordarem.
+PECAS_POR_ATAQUE = 6
 
 
 @dataclass(frozen=True, slots=True)

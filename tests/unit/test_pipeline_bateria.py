@@ -23,6 +23,7 @@ import soundfile as sf
 from tests.sintetico import BPM as BPM_FIXTURE
 from tests.sintetico import SOUNDFONT, renderizar
 from tests.sintetico_multi import FIXTURES_MULTI, referencia, renderizar_multi
+from thoth.adapters.transcription.muscriptor import MuscriptorTranscriber
 from thoth.domain.instrumentos import PERFIS
 from thoth.domain.models import ROTULO_BATERIA, EventoPercussivo, NoteEvent, Transcricao
 from thoth.services.cache_notas import ler
@@ -249,3 +250,22 @@ def test_caminho_completo_de_bateria_com_demucs_e_muscriptor_reais(tmp_path: Pat
     assert not {"baixo", "sem-baixo"} & set(r.artefatos)
     bytes_de = {k: r.artefatos[k].read_bytes() for k in ("mix", "bateria", "sem-bateria")}
     assert len({*bytes_de.values()}) == 3, "mix, bateria e sem-bateria têm que diferir"
+
+
+def test_a_segunda_corrida_nao_paga_a_transcricao_de_novo(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Sem transcritor injetado, o MuScriptor padrão passa pelo cache em disco (ADR-052)."""
+    chamadas: list[Path] = []
+
+    def transcrever_contando(self: MuscriptorTranscriber, audio: Path) -> Transcricao:
+        chamadas.append(audio)
+        return Transcricao.do_muscriptor(_groove())
+
+    monkeypatch.setattr(MuscriptorTranscriber, "transcribe", transcrever_contando)
+
+    primeira = _rodar(tmp_path, [], transcriber=None)
+    segunda = _rodar(tmp_path, [], transcriber=None)
+
+    assert len(chamadas) == 1
+    assert segunda.descartadas == primeira.descartadas

@@ -31,6 +31,37 @@ def test_url_sem_video_id_falha_claro() -> None:
         extrair_video_id("https://www.youtube.com/results?search_query=baixo")
 
 
+@pytest.mark.parametrize(
+    "url",
+    [
+        "https://exemplo.com/watch?v=QTOyeFQgZKk",
+        "https://naoyoutu.be/QTOyeFQgZKk",
+        "https://youtube.com.exemplo.com/watch?v=QTOyeFQgZKk",
+        "http://127.0.0.1:8000/embed/QTOyeFQgZKk",
+    ],
+)
+def test_host_que_nao_e_do_youtube_e_recusado(url: str) -> None:
+    """O `ref` vem também da API: qualquer host com `?v=` virava download arbitrário."""
+    with pytest.raises(IngestError, match="YouTube"):
+        extrair_video_id(url)
+
+
+def test_o_yt_dlp_recebe_a_url_canonica_e_nao_a_digitada(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Parâmetro extra da URL (`list=`, `t=`) não chega ao yt-dlp, nem como opção."""
+    recebidos: list[list[str]] = []
+
+    def run(comando: list[str], **_: object) -> None:
+        recebidos.append(comando)
+        Path(comando[comando.index("-o") + 1] + ".wav").write_bytes(b"fake")
+
+    monkeypatch.setattr("thoth.adapters.ingest.ytdlp_source.subprocess.run", run)
+    YtDlpSource().fetch("https://youtu.be/QTOyeFQgZKk?list=PLabc&t=42", tmp_path)
+
+    assert recebidos[0][-2:] == ["--", "https://www.youtube.com/watch?v=QTOyeFQgZKk"]
+
+
 def test_cache_hit_nao_toca_a_rede(tmp_path: Path) -> None:
     """Com mix.wav e meta.json no cache, fetch devolve sem chamar o yt-dlp."""
     destino = tmp_path / "yt_QTOyeFQgZKk"

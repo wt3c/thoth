@@ -2,6 +2,193 @@
 
 > Áudio → partitura e tablatura, foco em contrabaixo. Uso pessoal. CPU-only. Decisões em `tasks/decisions.md`.
 
+## Eficiência: revisão conjunta Claude + Codex (2026-10-23)
+
+Revisão somente leitura: Claude (`fable`) e Codex (`gpt-6.1-sol`, `high`). Os achados principais foram conferidos na
+fonte. Linha de base: suíte padrão em 39 s de relógio (487 s de CPU em 20 workers). [M] = medido pelo revisor, [E] =
+estimado. Cada mudança começa por um teste de equivalência com a versão atual (saída idêntica), não só pelo teste
+existente.
+
+### Lote A — risco baixo, sem ADR
+
+1. [x] MusicXML: `makeNotation(inPlace=True)` nos três exportadores (`musicxml.py:114, 439` e piano). [M] 3.000
+   notas: 17,4 s → 11,5 s, saída idêntica. `write(makeNotation=False)` muda a saída: não usar.
+2. [x] `tempo.ajustar`: vetorizar as 120 fases por BPM (mediana em `axis=1`, primeiro mínimo no desempate). [M] 64
+   onsets: 1,9 s → 0,1 s; 3.000: 12,7 s → 4,7 s. A grade do ADR-021 não muda.
+3. [x] Imports leves: `TOLERANCIA_S` sai de `evaluation` (que puxa `mir_eval`/`scipy`/`pretty_midi`) para o
+   domínio; `fastapi`/`uvicorn` importados só no `serve`. [M] ~1,6 s a cada processo da CLI e worker do xdist.
+4. [x] `test_trecho_denso_fecha_beams_e_so_encolhe_duracao`: 60 sementes parametrizadas. É a cauda da suíte (25 s).
+5. [-] Fixtures caras compartilhadas por worker (`tests/conftest.py` novo): MIDI renderizado, MP3 de
+   `test_local_source`, auralização de `test_auralizacao`. Cópia para `tmp_path`, bytes idênticos (a fixture é
+   **copiada**, não reescrita; `lessons/workflow.md`).
+   Medido, não compensa: o setup mais caro dessas fixtures é ≤ 0,33 s; a cauda era o item 4.
+6. [x] Modo `todos`: `fetch` uma vez, o `AudioAsset` passa às partes (hoje são 5 hashes e 5 `ffprobe`).
+7. [x] MuScriptor: o silêncio inicial da bateria (ADR-045) é escrito em blocos, sem duas cópias do stem na memória.
+8. [x] Ganhos pequenos, mesma natureza: eventos do GP5 indexados por compasso (O(c×e) → O(c+e)); média do caminho do
+   DTW por `bincount`; `octave_check` com frequências e índices de banda pré-calculados; `tempo.residuo` sem
+   reconverter a lista de onsets.
+
+### Lote B — ganho grande, pede ADR ou emenda antes
+
+9. [x] Cache em disco da transcrição bruta do MuScriptor, chave = sha256 do stem + identidade dos pesos
+   (`models.lock.toml`) + versão do adapter, escrita atômica (ADR-026). Hoje mudar só `--bpm` ou a digitação
+   retranscreve a música (minutos de CPU); `notas.jsonl` (ADR-020) guarda as notas já processadas e não evita isso.
+   ADR-052. Real: `escala` 5,7 s no modelo, 0,006 s do disco, saída igual.
+10. [-] Modo `todos` roda o Demucs duas vezes (two-stems do baixo + separação completa). Duplicação deliberada na
+    emenda de 2026-09-27 ao ADR-047; só muda se o `bass.wav` das duas for medido idêntico ou equivalente.
+    Medido, não muda: nos 15 pares do cache, nenhum byte a byte igual; SNR de 19,4 a 31,8 dB, pico da diferença até
+    0,31. Trocar a fonte do stem mudaria a entrada medida do baixo — equivalência exigiria remedir F1, não compensa.
+
+### Aberto
+
+- [x] `test_mede_perfil[piano-acustico-mix]` e `[piano-eletrico-mix]` falhavam ("mão esquerda regrediu", 1 < 3)
+  desde o `1c91fcf`. Não era o modelo nem o fluidsynth (2.6.0 falha igual): o piso foi medido quando o transcritor
+  devolvia `drums` como nota, e a `Transcricao` passou a pô-los em `ataques`, fora de "qualquer rótulo". Com os
+  ataques de volta, 3/8 exatos nos dois pianos. Causa confirmada pelo Codex (`gpt-6.1-sol`, leitura).
+- [x] `test_mede_perfil[guitarra-acustica-mix-stem]` intermitente nos acordes de seis notas (21 < 22): três rodadas
+  sem mudança deram 23, 21 e 21 — variação do Demucs. Folga dos acordes de seis no `mix-stem` passou a 2 notas,
+  como a `FOLGA_DEMUCS` do F1 já absorvia (emenda do ADR-044, 2026-10-23).
+- [ ] Demucs determinístico (`--shifts 0`) para tirar as folgas do `mix-stem`: muda também o stem do baixo, exige
+  remedir os pisos do baixo. Decisão própria.
+
+### Fora, por ora
+
+- Segunda passada do MuScriptor só nos buracos: mexe em comportamento medido (F1).
+- DTW em banda sem matriz densa (ADR-042): risco alto, só se a memória virar problema.
+- Espectrograma compartilhado entre os estimadores de andamento (ADR-019), cache da auralização (ADR-037), busca
+  grossa → fina na comparação: ganho incerto para o risco.
+
+## Revisão conjunta Claude + Codex do código inteiro (2026-10-22)
+
+Revisão somente leitura: Claude (`fable`) e Codex (`gpt-6.1-sol`, `high`). Os achados foram conferidos na fonte antes de
+entrar aqui; cada correção nasce de um teste vermelho.
+
+1. [x] `transcribe --tom` validado e descartado: encaminhar ao pipeline (ADR-031).
+2. [x] `todos`: grade e recuo de fase comuns a todas as partes — a mesma nota cai no mesmo tick em toda faixa.
+3. [x] `todos`: parte sem evento exportável é relatada como ausente, não derruba a música (ADR-014); sem decidir
+   por prefixo de mensagem.
+4. [x] `todos`: diagnósticos de guitarra e bateria chegam ao resultado; histograma de `other` contado uma vez.
+5. [x] Baixo com todas as notas fora do braço: erro claro antes de exportar.
+6. [x] yt-dlp: só hosts do YouTube; o downloader recebe a URL canônica montada do ID.
+7. [x] `/uploads`: leitura em blocos com teto, hash incremental, escrita fora do event loop; `escrita_atomica` com
+   temporário exclusivo (upload `foo.parcial.wav` não pode apagar outro).
+8. [x] Jobs: uma thread trabalhadora com fila FIFO (ADR-027) e o dicionário de jobs sob trava.
+9. [x] `POST /jobs`: `ref` local restrita; `TrustedHostMiddleware` contra DNS rebinding.
+10. [x] Nome de saída limitado em bytes, com espaço para o maior sufixo.
+11. [x] `comparar` usa o escopo de stem do `DemucsSeparator` (ADR-026). `escopo` ficou público; stem de outra
+   versão do demucs dá "sem stem do baixo".
+12. [x] Upload chamado `mix.wav` mantém o título: a pasta passou a ser o sha256 inteiro, que `LocalFileSource` não
+   confunde com cache (emenda ao ADR-051).
+13. [x] Ligaduras rastreadas por voz e corda em `tab_referencia` e `guia_estudo`; fixture GP5 de duas vozes.
+14. [x] MuScriptor: energia por segundo lida em blocos (`sf.blocks`); teste prova que `sf.read` não é chamado.
+15. [x] Página: `Paused → Stopped` do MPRIS volta o cursor ao início (ADR-046); teste `navegador` com player falso.
+16. [x] Arquitetura: `PECAS_DA_BATERIA` e `PECAS_POR_ATAQUE` em `domain/instrumentos.py`, seguidas pelos
+   exportadores; `ROTULOS_DE_BAIXO` é `PERFIS["baixo"].rotulos`. Avaliadas e mantidas: `pipeline`/`vocais`
+   importando adapters (são a raiz de composição) e `gp5`/`musicxml` importando `services.rhythm`/`notas` (lógica
+   pura, sem I/O).
+17. [x] Docstrings e comentários conferidos contra os ADRs (`instrumentos`, `pipeline`, `auralizacao`, `demucs`,
+   página). `ExportadorDePiano` mantido: tem uso planejado no M3 do ADR-044 e implementação testada
+   (`MusicXmlPianoExporter`).
+18. [x] Teste de upload com WAV real passando por `LocalFileSource` (nome acentuado e `mix.wav`).
+19. [x] Verificação de entrega (`pytest -n auto`, `-m navegador`, `-m "slow and not network"`, `ruff`, `mypy`),
+   emendas aos ADR-026, 027, 047 e 051, e README.
+
+## Página de estudo: abrir arquivo e tocar com WAV (2026-10-22)
+
+Abrir arquivo pelo seletor do sistema (`.mp3`, `.wav`, `.gp5`, `.musicxml`). O áudio é transcrito; GP5 e MusicXML só
+abrem na tela. Um WAV escolhido toca sincronizado com a pauta (ADR-051).
+
+1. [x] `POST /uploads`: recebe o áudio, recusa extensão fora da lista, devolve a `ref` (teste de API real).
+2. [x] Página: botão "Abrir arquivo…" — áudio vira upload + job; GP5/MusicXML abrem direto no alphaTab (teste
+   `navegador`).
+3. [x] Página: "Tocar com WAV…" — `<audio>` local no modo *external media*, cursor segue o áudio (teste `navegador`).
+4. [x] Verificação de entrega (`pytest -n auto`, `-m navegador`, `ruff`, `mypy`) e README.
+   **Resultado:** suíte padrão 575 passed; `-m navegador` 19 passed (numa primeira rodada,
+   `test_o_formulario_manda_afinacao_e_digitacao_por_nome` falhou uma vez e passou isolado e na repetição);
+   ruff e mypy limpos. O alphaTab encaixa a posição no início do tempo ao pausar e repassava isso como `seekTo`,
+   puxando o WAV para trás; a pausa vinda do áudio agora ignora esse eco (teste cobre).
+
+## Tabs humanas como referência: digitação, andamento e nota errada (2026-09-30)
+
+Comparação de _Você_ (Catedral) e _Watashi Igai Watashi Ja Nai No_ (Gesu) com tabs humanas de `samples/`: nota certa
+95,6% e 82,0%; corda/casa iguais em 74% e 43%; andamento de _Você_ 120 contra 106 da tab humana.
+
+1. [x] Digitação: medir os perfis contra as 6 tabs de baixo de `samples/` (alturas humanas → Viterbi → corda humana);
+   recalibrar só o `experiente` (o default `iniciante` é do ADR-006), com teste de frase real e ADR.
+   **Resultado:** concordância de corda média 0,521 → 0,627, sem piorar nenhuma tab (ADR-050).
+2. [x] Andamento de _Você_: achar a causa do 120 contra 106 antes de propor correção.
+   **Resultado:** não é erro. A tab humana acelera de 106 a 124 (média 116,2); o Thoth escreve um BPM só (119,86).
+   Limite já conhecido do ADR-034, registrado como emenda; nenhum código mudou.
+3. [x] Nota errada em _Gesu_: localizar onde se concentram os 15,6% (registro, trecho, tipo de erro).
+   **Resultado:** 78 de 103 erradas são a altura da nota vizinha. A causa é o DTW, que deixava a tab 18 a 50 ms
+   atrasada. Ajuste fino pelos ataques do stem (emenda ao ADR-042): errada de _Gesu_ 15,6% → 9,1%, melhora em
+   quatro de cinco tabs, nenhum piso subiu.
+4. [x] Verificação de entrega e registro dos resultados.
+5. [x] Mapa de andamento por trecho, etapa 1 (medir): por janela de 20 s acompanha a tab humana de _Você_ (erro
+   mediano 0,3 contra 2,7 BPM do global) e nunca erra mais que o global nas cinco tabs; a razão do ADR-034 não
+   separa; resíduo da grade cai 35–73% no acervo inteiro, com fase livre (teto otimista). Emenda ao ADR-034.
+6. [ ] Mapa de andamento, etapa 1b: resíduo de um mapa contínuo (fase herdada, mudança só quando paga) e quantas
+   mudanças ele escreve nas músicas planas. Só depois decidir exportadores e pipeline.
+
+## Conformidade Markdown do repositório (2026-09-29)
+
+1. [x] Aplicar correções automáticas seguras com `.markdownlint-cli2.jsonc`.
+2. [x] Corrigir manualmente os diagnósticos restantes sem alterar o sentido.
+3. [x] Rodar o lint em todos os Markdown selecionados e revisar o diff completo.
+
+## Reprocessamento multifaixa do acervo (2026-09-28)
+
+**Plano (execução não interativa):** reprocessar as músicas reais do acervo com o perfil `todos`, começando por _Thalles
+Roberto - A Resposta (vídeo oficial)_. Usar os URLs correspondentes aos IDs já registrados em `cache/` para aproveitar a
+mix e as notas de baixo existentes. Preservar a afinação de cinco ou seis cordas das músicas que a usam. Deixar _Eyrie_
+fora do lote por já ter sido concluída, e ignorar a fixture `misto` e a cópia técnica `.aural`.
+
+1. [x] Reprocessar e conferir _A Resposta_: GP5/MusicXML multifaixa com Baixo e Bateria; as três categorias de guitarra
+   não tiveram eventos válidos. Os dois guias de estudo foram regenerados e a afinação de quatro cordas foi preservada.
+2. [x] Reprocessar as outras 12 músicas e comunicar cada conclusão: _Dance of Death_, _Fear Is the Key_, _Fear of the
+   Dark_, _Feel Like Makin' Love_, _Hallowed Be Thy Name_, _And Plague Flowers the Kaleidoscope_, _Equus_, _Everything
+   Changes_, _SOU EU_, _Is It A Crime_, _Smooth Operator_ e _Tive Razão_. Todos os GP5/MusicXML multifaixa e os guias
+   solo/multifaixa foram gerados e conferidos; os perfis sem eventos válidos foram relatados e as afinações de quatro,
+   cinco ou seis cordas foram preservadas.
+3. [x] Conferir cobertura: 13 músicas do acervo reprocessadas, _Eyrie_ excluída por já estar concluída; GP5 e MusicXML
+   com faixas disponíveis, guias solo e multifaixa presentes, sem falhas finais. As faixas incluídas dependem dos
+   eventos válidos encontrados nos stems; o processamento em CPU não garante que cada música tenha eventos em todas as
+   categorias de guitarra.
+
+### Resultado por música (GP5/MusicXML `todos`)
+
+| Música | Afinação do baixo | Faixas presentes |
+| --- | ---: | --- |
+| _A Resposta_ | 4 cordas | Baixo, Bateria |
+| _Dance of Death_ | 4 cordas | Baixo, Guitarra distorcida, Guitarra acústica, Bateria |
+| _Fear Is the Key_ | 4 cordas | Baixo, Guitarra distorcida, Bateria |
+| _Fear of the Dark_ | 4 cordas | Baixo, Guitarra distorcida, Bateria |
+| _Feel Like Makin' Love_ | 4 cordas | Baixo, Guitarra limpa, Bateria |
+| _Hallowed Be Thy Name_ | 4 cordas | Baixo, Guitarra distorcida, Guitarra acústica, Bateria |
+| _And Plague Flowers the Kaleidoscope_ | 6 cordas | Baixo, Guitarra acústica, Bateria |
+| _Equus_ | 5 cordas | Baixo, Guitarra limpa, Guitarra distorcida, Guitarra acústica, Bateria |
+| _Everything Changes_ | 4 cordas | Baixo, Guitarra limpa, Guitarra acústica, Bateria |
+| _SOU EU_ | 4 cordas | Baixo, Guitarra distorcida, Guitarra acústica, Bateria |
+| _Is It A Crime_ | 4 cordas | Baixo, Guitarra limpa, Guitarra distorcida, Bateria |
+| _Smooth Operator_ | 4 cordas | Baixo, Guitarra limpa, Bateria |
+| _Tive Razão_ | 4 cordas | Baixo, Guitarra acústica, Bateria |
+
+_Eyrie_ já tinha sido processada separadamente e não integra as 13 acima.
+
+## Guias de estudo das músicas do acervo, exceto _Eyrie_ (2026-09-28)
+
+**Plano (execução não interativa):** gerar os guias Markdown com `thoth estudar` para os GP5 musicais já presentes em
+`out/`, começando por _Thalles Roberto - A Resposta (vídeo oficial)_. Incluir as versões solo e multifaixa quando houver
+baixo em ambas. Excluir _Eyrie_, a fixture sintética `misto` e a cópia técnica `.aural`; arquivos sem faixa de baixo
+serão relatados.
+
+1. [x] Gerar e conferir os dois guias de _Thalles Roberto - A Resposta (vídeo oficial)_: 431 ataques, primeiro ataque no
+   compasso 23 e tom candidato F# menor (margem 0,28) em ambos.
+2. [x] Gerar e conferir os guias das outras 12 músicas com faixa de baixo, informando a conclusão de cada música.
+3. [x] Conferir a cobertura: 14 GP5 musicais alvo, 14 guias presentes e completos, sem falhas; os dois guias
+   preexistentes de _Eyrie_ ficaram fora do lote. O tom de cada guia é candidato inferido da linha de baixo, sujeito a
+   conferência harmônica.
+
 ## Publicação do guia didático (2026-09-28)
 
 1. [x] Revisar o diff e executar a verificação de entrega antes do commit: 561 testes padrão, Ruff e mypy passaram.
@@ -11,38 +198,55 @@
 ## Teste do guia com _Eyrie_ (2026-09-28)
 
 1. [x] Gerar Markdown a partir dos GP5 de baixo solo e multifaixa já existentes em `out/Ne Obliviscaris - Eyrie/`.
-2. [x] Conferir as saídas: ambas selecionam `Baixo`, apresentam 1.578 ataques, primeiro ataque no compasso 23, afinação E1-A1-D2-G2 e tom candidato A menor (margem de grafia 0,37). A comparação de altura, corda, casa, compasso, posição e duração encontrou zero diferenças entre os ataques. As pausas escritas são 154 na tab solo e 163 na multifaixa.
-3. [x] Corrigir o título `mix` herdado dos GP5 antigos, explicar a entrada tardia do baixo e verificar: 561 testes padrão, Ruff e mypy passaram. Os dois guias finais estão ao lado dos respectivos GP5.
+2. [x] Conferir as saídas: ambas selecionam `Baixo`, apresentam 1.578 ataques, primeiro ataque no compasso 23, afinação
+   E1-A1-D2-G2 e tom candidato A menor (margem de grafia 0,37). A comparação de altura, corda, casa, compasso, posição e
+   duração encontrou zero diferenças entre os ataques. As pausas escritas são 154 na tab solo e 163 na multifaixa.
+3. [x] Corrigir o título `mix` herdado dos GP5 antigos, explicar a entrada tardia do baixo e verificar: 561 testes
+   padrão, Ruff e mypy passaram. Os dois guias finais estão ao lado dos respectivos GP5.
 
 ## Guia didático de tablatura de baixo (2026-09-28)
 
-**Plano (execução não interativa):** criar `thoth estudar <arquivo.gp5>` para ler uma tablatura local já produzida e gerar Markdown em português, sem repetir a transcrição. O relatório distinguirá observações da tab, conceitos gerais e hipóteses musicais. Técnicas de execução e intenção harmônica não serão apresentadas como fatos quando não estiverem codificadas no arquivo.
+**Plano (execução não interativa):** criar `thoth estudar <arquivo.gp5>` para ler uma tablatura local já produzida e
+gerar Markdown em português, sem repetir a transcrição. O relatório distinguirá observações da tab, conceitos gerais e
+hipóteses musicais. Técnicas de execução e intenção harmônica não serão apresentadas como fatos quando não estiverem
+codificadas no arquivo.
 
 1. [x] Pesquisar teoria e técnica de baixo; conferir as limitações do GP5 e os ADRs.
-2. [x] Escrever testes de leitura real do GP5 e das explicações por nota, inclusive intervalos, oitavas, quintas, ritmo e incerteza de técnica.
+2. [x] Escrever testes de leitura real do GP5 e das explicações por nota, inclusive intervalos, oitavas, quintas, ritmo
+   e incerteza de técnica.
 3. [x] Implementar o gerador Markdown e o comando CLI com seleção de faixa e caminho de saída.
-4. [x] Documentar uso, registrar decisão arquitetural e verificar: 557 testes padrão, Ruff e mypy passaram; `thoth estudar` gerou Markdown de `out/misto/misto.gp5`.
+4. [x] Documentar uso, registrar decisão arquitetural e verificar: 557 testes padrão, Ruff e mypy passaram; `thoth
+   estudar` gerou Markdown de `out/misto/misto.gp5`.
 
 ### Emenda — estimar o tom a partir da tablatura
 
 1. [x] Testar com GP5 real a estimativa automática, a indicação de incerteza e a precedência de `--tom`.
-2. [x] Reutilizar `estimar_tom` sobre as notas lidas do GP5; mostrar origem e margem no guia sem tratar a margem como confirmação de tônica/modo.
-3. [x] Atualizar README, ADR e lição; 559 testes padrão, Ruff e mypy passaram; comando real gerou o guia de `out/misto/misto.gp5`.
+2. [x] Reutilizar `estimar_tom` sobre as notas lidas do GP5; mostrar origem e margem no guia sem tratar a margem como
+   confirmação de tônica/modo.
+3. [x] Atualizar README, ADR e lição; 559 testes padrão, Ruff e mypy passaram; comando real gerou o guia de
+   `out/misto/misto.gp5`.
 
 ## Contrato livre do transcritor e metadados MusicXML (2026-09-28)
 
-**Plano (execução não interativa):** ignorar suporte a piano conforme orientação do usuário; registrar MPRIS como aceito conforme confirmação do usuário; generalizar a saída do transcritor para notas e ataques de bateria, remover o seletor de instrumento do contrato e corrigir nomes/título das partes no MusicXML multifaixa.
+**Plano (execução não interativa):** ignorar suporte a piano conforme orientação do usuário; registrar MPRIS como aceito
+conforme confirmação do usuário; generalizar a saída do transcritor para notas e ataques de bateria, remover o seletor
+de instrumento do contrato e corrigir nomes/título das partes no MusicXML multifaixa.
 
-1. [x] Escrever testes de regressão primeiro para o parsing completo do JSONL, o contrato e a passagem da transcrição estruturada pelo pipeline.
-2. [x] Implementar o retorno `Transcricao` e adaptar filtros/consumidores preservando comportamento de baixo, guitarra e bateria.
-3. [x] Escrever testes primeiro para metadados corretos de baixo/guitarras e título de fonte local no MusicXML composto; corrigir a origem dos metadados.
+1. [x] Escrever testes de regressão primeiro para o parsing completo do JSONL, o contrato e a passagem da transcrição
+   estruturada pelo pipeline.
+2. [x] Implementar o retorno `Transcricao` e adaptar filtros/consumidores preservando comportamento de baixo, guitarra e
+   bateria.
+3. [x] Escrever testes primeiro para metadados corretos de baixo/guitarras e título de fonte local no MusicXML composto;
+   corrigir a origem dos metadados.
 4. [x] Marcar MPRIS como aceito e piano como fora da prioridade atual; revisar diff e rodar verificações aplicáveis.
 
 ## WAVs publicados por padrão e perfis adiados (2026-09-28)
 
-**Escopo:** manter somente os perfis já cobertos pelo trabalho e adiar novas famílias sem inventário/validação independente,
+**Escopo:** manter somente os perfis já cobertos pelo trabalho e adiar novas famílias sem inventário/validação
+independente,
 incluindo violino e cello. Todo WAV entregue ao usuário deve ter cópia padrão sob `out/`; cópias técnicas para cache e
-processamento continuam em `cache/`. `fetch` publicará a mix normalizada em `out/<música>/`, além de preservá-la no cache.
+processamento continuam em `cache/`. `fetch` publicará a mix normalizada em `out/<música>/`, além de preservá-la no
+cache.
 
 1. [x] Registrar o adiamento das famílias não cobertas sem remover perfis ou medições existentes.
 2. [x] Escrever teste de regressão para `fetch` publicar a mix WAV por padrão e respeitar `--out`.
@@ -62,20 +266,24 @@ decidem se cada instrumento está correto.
 2. [x] Confirmar disponibilidade técnica dos quatro stems em `_Eyrie_`, todos com a duração da mix; inventário musical
    por escuta e intervalos ainda pendente.
 3. [x] Manter o trabalho nos perfis já cobertos pelo pipeline e suas medições. Não adicionar perfis para violino,
-   viola ou cello nesta etapa; ficam adiados. O inventário de _Eyrie_ pode continuar como pesquisa, sem virar compromisso
+   viola ou cello nesta etapa; ficam adiados. O inventário de _Eyrie_ pode continuar como pesquisa, sem virar
+   compromisso
    de suporte ou mudança de código.
    - [x] Consultar créditos do encarte de `Urn`: baixo, bateria, duas guitarras, violino, viola, cello e vozes são
      candidatos confirmados para `Eyrie`; não há crédito de piano/teclado ou coro confirmado para esta faixa.
-   - [ ] Mapear timestamps de entrada/saída no áudio local; os créditos não substituem escuta nem anotação de referência.
+   - [ ] Mapear timestamps de entrada/saída no áudio local; os créditos não substituem escuta nem anotação de
+     referência.
 4. [ ] Obter referência humana independente por parte quando existir e registrar cobertura temporal, afinação e
    confiabilidade. Sem referência, limitar o veredito a separação/audibilidade e marcar a transcrição como
    inconclusiva.
    - [x] Procurar referência local de `Eyrie` em GP5/MIDI/MusicXML/PDF e consultar canais oficiais; nenhuma partitura
      licenciada foi localizada nesta busca inicial. Não tratar isso como prova de inexistência.
 5. [x] Congelar uma linha de base exploratória por família, antes de ajustes; durações de eventos e contagens estão na
-   emenda do ADR-048. Sem referência humana independente, não há métrica de acerto. As entradas mix/stem seguem o ADR-044.
+   emenda do ADR-048. Sem referência humana independente, não há métrica de acerto. As entradas mix/stem seguem o
+   ADR-044.
 6. [ ] Tratar apenas perfis existentes e já cobertos, uma família por vez, por TDD; não ampliar a matriz nesta etapa.
-   Preservar o baixo como controle de regressão. Qualquer família nova exige retomada explícita e teste real com veredito.
+   Preservar o baixo como controle de regressão. Qualquer família nova exige retomada explícita e teste real com
+   veredito.
 7. [x] Exportar a partitura multifaixa apenas com os perfis existentes. A guitarra distorcida não gerou eventos e não
    foi incluída; violino, viola, cello e melodia vocal não foram inferidos.
 8. [x] Execução real do pipeline concluída e resultados por parte registrados na emenda do ADR-048; 543 testes,
@@ -89,7 +297,8 @@ decidem se cada instrumento está correto.
 
 - [x] Registrar que a RX 5500 XT (`gfx1012`) tem caminho experimental via wheels ROCm/TheRock, sem suporte equivalente
   na distribuição ROCm estável; ver emenda do ADR-002.
-- [x] Manter a configuração CPU-only: não instalar/configurar ROCm, não alterar dependências e não iniciar benchmark GPU.
+- [x] Manter a configuração CPU-only: não instalar/configurar ROCm, não alterar dependências e não iniciar benchmark
+  GPU.
 - [ ] Se o usuário reabrir esta investigação, começar por preflight no host (`/dev/kfd`, `/dev/dri`, permissões),
   virtualenv descartável com versão noturna fixada, teste de kernel GPU e só depois comparação curta CPU/GPU.
 
@@ -140,8 +349,8 @@ decidem se cada instrumento está correto.
 - [x] Conferir requisitos e ferramentas externas contra o código, o contêiner e os ADRs.
 - [x] Reestruturar o `README.md` com instalação nativa, pesos, alphaTab, validação, primeiro uso e contêiner.
 - [x] Fechar a verificação da entrega:
-    - [x] `git diff --check`, `thoth --help`, Ruff e mypy.
-    - [x] Suíte padrão: 530 testes passaram em 26,87 s na repetição de 2026-09-26.
+  - [x] `git diff --check`, `thoth --help`, Ruff e mypy.
+  - [x] Suíte padrão: 530 testes passaram em 26,87 s na repetição de 2026-09-26.
 
 ## Continuidade — backlog ativo (revisado em 2026-09-26)
 
@@ -178,9 +387,13 @@ decidem se cada instrumento está correto.
 
 ### Implementação — acompanhar player MPRIS (2026-09-26)
 
-**Plano (execução não interativa):** 1) confirmar contrato AlphaTab/MPRIS e limites de correspondência; 2) registrar a decisão arquitetural; 3) escrever testes primeiro para consulta real ao barramento e transições/ausência de player; 4) implementar adaptador MPRIS opcional, endpoint local e controles na página; 5) documentar instalação/uso Linux e executar suíte, lint, tipagem e teste com barramento D-Bus isolado.
+**Plano (execução não interativa):** 1) confirmar contrato AlphaTab/MPRIS e limites de correspondência; 2) registrar a
+decisão arquitetural; 3) escrever testes primeiro para consulta real ao barramento e transições/ausência de player; 4)
+implementar adaptador MPRIS opcional, endpoint local e controles na página; 5) documentar instalação/uso Linux e
+executar suíte, lint, tipagem e teste com barramento D-Bus isolado.
 
-- [x] Pesquisa de MPRIS e AlphaTab concluída; solução restrita a players locais compatíveis no Linux, com Spotify excluído e sem OAuth/Web API.
+- [x] Pesquisa de MPRIS e AlphaTab concluída; solução restrita a players locais compatíveis no Linux, com Spotify
+  excluído e sem OAuth/Web API.
 - [x] ADR da leitura MPRIS, isolamento local e sincronização manual registrados (ADR-046).
 - [x] Testes escritos antes do adaptador e da interface; inclui teste D-Bus real em sessão isolada.
 - [x] Endpoint lista players e informa estado, faixa e posição; barramento/players ausentes não derrubam a aplicação.
@@ -202,7 +415,8 @@ prioridade por orientação do usuário (2026-09-28); o piano elétrico segue fo
 
 1. [x] Generalizar o contrato do transcritor (ADR-044, M1), mantendo notas e ataques de bateria separados no domínio.
 2. [x] Corrigir os nomes das partes e o título de origem na exportação MusicXML multifaixa.
-3. [x] ~~Spike e integração do piano acústico (ADR-044, M3)~~ — fora da prioridade por orientação do usuário; não agendado.
+3. [x] ~~Spike e integração do piano acústico (ADR-044, M3)~~ — fora da prioridade por orientação do usuário; não
+   agendado.
 
 O caminho do baixo é uma restrição permanente: qualquer mudança compartilhada precisa preservar os pisos, descartes e
 artefatos existentes.
@@ -276,26 +490,26 @@ Sem escrever código do pipeline. Medir se a qualidade justifica o projeto. A av
 - [x] Tabs humanas escolhidas: três `.gp5` da comunidade do UG, baixados à mão pelo usuário para `samples/` (ignorada
   pelo git): _Fear Is the Key_, _Dance of Death_, _And Plague Flowers_. O Songsterr ficou fora (emenda do ADR-007)
 - [x] `thoth comparar <tab.gp5> <fonte>` (ADR-041):
-    - [x] leitor da tab → `NoteEvent` em segundos: faixa de baixo, andamento de **todas** as faixas na posição exata,
+  - [x] leitor da tab → `NoteEvent` em segundos: faixa de baixo, andamento de **todas** as faixas na posição exata,
       repetições com finais alternativos, ligaduras, compasso que não é 4/4. D.S./coda fora, declarado
-    - [x] ~~alinhamento só por ataque~~ — medido e derrubado: a tab deslocada casava quase tanto quanto a alinhada.
+  - [x] ~~alinhamento só por ataque~~ — medido e derrubado: a tab deslocada casava quase tanto quanto a alinhada.
       Alinhamento pelo nome da nota (sem oitava), escala + deslocamento globais, correção por trecho de ±80 ms
-    - [x] relatório: mesma oitava / acima / abaixo nos pares de mesmo nome, com o piso de acaso (tab deslocada) ao lado;
+  - [x] relatório: mesma oitava / acima / abaixo nos pares de mesmo nome, com o piso de acaso (tab deslocada) ao lado;
       escala na borda da grade é recusada
-    - [x] subcomando na CLI, lendo `notas.jsonl` do cache como o `auralizar`
-    - [x] rodar nas três músicas → ADR-041
+  - [x] subcomando na CLI, lendo `notas.jsonl` do cache como o `auralizar`
+  - [x] rodar nas três músicas → ADR-041
 - [x] Conferir oitava contra essa tab: duas oitavas quase nunca (6 de 1266 pares, só em _And Plague Flowers_); 5–15% a
   uma. _Dance of Death_ ficou no piso de acaso — não confirma nada; _And Plague Flowers_ só alinhou em 60–300 s
 - [x] "Nota errada" contra tab: exige alinhar a tab ao stem do baixo (DTW), não à transcrição (ADR-041, consequência) →
   ADR-042
-    - [x] medir: DTW sobre croma do stem nas três tabs (78/≤64, 79/≤45, 60/≤55); porta só de áudio não separa da música
+  - [x] medir: DTW sobre croma do stem nas três tabs (78/≤64, 79/≤45, 60/≤55); porta só de áudio não separa da música
       errada — descartada
-    - [x] `services/alinhamento_audio.py`: tab → tempo do stem por DTW (porte literal do script de medição), teste com
+  - [x] `services/alinhamento_audio.py`: tab → tempo do stem por DTW (porte literal do script de medição), teste com
       áudio sintético
-    - [x] `comparacao.veredito_de_nota`: certa/oitava/errada por janela de 60 s, piso ao lado, janela conclusiva só com
+  - [x] `comparacao.veredito_de_nota`: certa/oitava/errada por janela de 60 s, piso ao lado, janela conclusiva só com
       certa ≥ piso + 10 pontos; o resto "inconclusivo"
-    - [x] CLI `comparar`: tabela por janela quando há stem em cache; sem stem, recado
-    - [x] rodar nas três músicas, conferir contra a medição → ADR-042: errada 14,1% / 15,4% nas janelas conclusivas de
+  - [x] CLI `comparar`: tabela por janela quando há stem em cache; sem stem, recado
+  - [x] rodar nas três músicas, conferir contra a medição → ADR-042: errada 14,1% / 15,4% nas janelas conclusivas de
       _Fear_ e _And Plague Flowers_; _Dance_ 1 de 9
 - [x] Refazer _And Plague Flowers_ com `--afinacao 5` (emenda do ADR-041): 89,3% contra piso de 71,9%, alinhamento igual
   — a afinação não mudava o quadro

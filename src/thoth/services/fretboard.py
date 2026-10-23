@@ -61,15 +61,21 @@ class Custos:
     quase nunca inverte a escolha; este só morde fora da zona confortável."""
 
 
-#: Baixista experiente: deslocar é barato, subir o braço nem incomoda.
-PADRAO = Custos(traste_alto=0.3, corda_solta=1.0, deslocamento=0.6, troca_corda=0.4,
-                acima_da_janela=0.0)
+#: Baixista experiente: quase só mover a mão e atravessar cordas custa.
+#: Calibrado contra seis tabs humanas (ADR-050): custo por traste de verdade
+#: puxa a linha para o grave e afasta a tab da do baixista. O `traste_alto`
+#: residual só desempata a mesma forma tocada em alturas diferentes do braço,
+#: que sem ele custariam igual e cairiam na ordem das cordas.
+PADRAO = Custos(
+    traste_alto=0.002, corda_solta=0.0, deslocamento=1.0, troca_corda=0.4, acima_da_janela=0.0
+)
 
 #: ADR-006 — quem está aprendendo. Traste alto e deslocamento custam caro;
 #: corda solta vale muito. Resultado: fica na primeira posição sempre que a
 #: linha permitir, mesmo trocando de corda com mais frequência.
-INICIANTE = Custos(traste_alto=1.2, corda_solta=3.0, deslocamento=1.5, troca_corda=0.3,
-                   acima_da_janela=2.0)
+INICIANTE = Custos(
+    traste_alto=1.2, corda_solta=3.0, deslocamento=1.5, troca_corda=0.3, acima_da_janela=2.0
+)
 
 #: Os dois perfis com porta de entrada, por nome (ADR-028). **`INICIANTE` é o
 #: default** do `ViterbiFretAssigner`, apesar de `PADRAO` se chamar assim: o

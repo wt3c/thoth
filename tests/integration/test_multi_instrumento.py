@@ -73,6 +73,11 @@ MEDIDO: dict[tuple[str, str], float] = {
 #: onde há separação — emenda do ADR-044 (2026-09-25).
 FOLGA_DEMUCS = 0.03
 
+#: A mesma variação contada em notas dos acordes de seis: três rodadas seguidas da
+#: `guitarra-acustica` `mix-stem`, sem mudar nada, deram 23, 21 e 21 de 24 — com F1
+#: 0,981, 0,961 e 0,961, que a `FOLGA_DEMUCS` já absorve (2026-10-23).
+FOLGA_DEMUCS_SEIS_NOTAS = 2
+
 
 #: Silêncio na frente do áudio só para a bateria (ADR-045): nos outros perfis ele troca
 #: o rótulo — guitarra acústica e piano acústico vão a zero com qualquer valor medido.
@@ -81,7 +86,7 @@ SILENCIO_BATERIA = 0.1
 
 #: Notas acertadas nos acordes de seis notas da guitarra, de 24 (M4, 2026-09-25): o
 #: teto do ADR-011 é a sobreposição de notas do mesmo instrumento, e é aqui que ele
-#: apareceria primeiro. Uma nota de folga onde há Demucs, como na `FOLGA_DEMUCS`.
+#: apareceria primeiro.
 MEDIDO_SEIS_NOTAS: dict[tuple[str, str], int] = {
     ("guitarra-acustica", "isolada"): 23,
     ("guitarra-acustica", "mix"): 23,
@@ -132,31 +137,49 @@ def _achadas_por_parte(
 #: rótulo), medidas em 2026-09-25. Uma nota de folga onde há Demucs.
 MEDIDO_PARTES_PIANO: dict[tuple[str, str], dict[str, tuple[int, int]]] = {
     ("piano-acustico", "isolada"): {
-        "extremos": (0, 0), "mão esquerda": (8, 8), "fundamental": (9, 9),
-        "inversão": (7, 7), "repetido": (6, 6),
+        "extremos": (0, 0),
+        "mão esquerda": (8, 8),
+        "fundamental": (9, 9),
+        "inversão": (7, 7),
+        "repetido": (6, 6),
     },
     # A mão esquerda some do rótulo na mix: 3 das 8 saem com outro rótulo, o resto some.
     ("piano-acustico", "mix"): {
-        "extremos": (0, 0), "mão esquerda": (0, 3), "fundamental": (9, 9),
-        "inversão": (9, 9), "repetido": (6, 6),
+        "extremos": (0, 0),
+        "mão esquerda": (0, 3),
+        "fundamental": (9, 9),
+        "inversão": (9, 9),
+        "repetido": (6, 6),
     },
     ("piano-acustico", "mix-stem"): {
-        "extremos": (0, 0), "mão esquerda": (8, 8), "fundamental": (9, 9),
-        "inversão": (6, 6), "repetido": (6, 6),
+        "extremos": (0, 0),
+        "mão esquerda": (8, 8),
+        "fundamental": (9, 9),
+        "inversão": (6, 6),
+        "repetido": (6, 6),
     },
     # O piano elétrico acerta as notas com o rótulo errado: `clean_electric_guitar`
     # isolado, `acoustic_piano` no stem.
     ("piano-eletrico", "isolada"): {
-        "extremos": (0, 0), "mão esquerda": (0, 4), "fundamental": (0, 9),
-        "inversão": (0, 9), "repetido": (0, 6),
+        "extremos": (0, 0),
+        "mão esquerda": (0, 4),
+        "fundamental": (0, 9),
+        "inversão": (0, 9),
+        "repetido": (0, 6),
     },
     ("piano-eletrico", "mix"): {
-        "extremos": (0, 0), "mão esquerda": (0, 3), "fundamental": (9, 9),
-        "inversão": (8, 8), "repetido": (6, 6),
+        "extremos": (0, 0),
+        "mão esquerda": (0, 3),
+        "fundamental": (9, 9),
+        "inversão": (8, 8),
+        "repetido": (6, 6),
     },
     ("piano-eletrico", "mix-stem"): {
-        "extremos": (0, 0), "mão esquerda": (0, 6), "fundamental": (0, 9),
-        "inversão": (0, 7), "repetido": (0, 6),
+        "extremos": (0, 0),
+        "mão esquerda": (0, 6),
+        "fundamental": (0, 9),
+        "inversão": (0, 7),
+        "repetido": (0, 6),
     },
 }
 
@@ -200,10 +223,16 @@ def test_mede_perfil(perfil: str, condicao: str, tmp_path: Path) -> None:
             f"macro {b.macro_f1:.3f} ref={b.n_ref} est={b.n_est} peças[{pecas}]"
         )
         confusao = confusao_bateria(ref.ataques, do_perfil.ataques)
-        resultado += " confusão[" + " ".join(
-            f"{r if r is not None else '-'}→{e if e is not None else '-'}:{n}"
-            for (r, e), n in sorted(confusao.items(), key=lambda x: (x[0][0] or 0, x[0][1] or 0))
-        ) + "]"
+        resultado += (
+            " confusão["
+            + " ".join(
+                f"{r if r is not None else '-'}→{e if e is not None else '-'}:{n}"
+                for (r, e), n in sorted(
+                    confusao.items(), key=lambda x: (x[0][0] or 0, x[0][1] or 0)
+                )
+            )
+            + "]"
+        )
     else:
         s = avaliar_polifonico(ref.notas, do_perfil.notas)
         f1 = s.nota.f1
@@ -212,9 +241,9 @@ def test_mede_perfil(perfil: str, condicao: str, tmp_path: Path) -> None:
             f"ataque F1 {s.ataque.f1:.3f} ref={s.n_ref} est={s.n_est}"
         )
         por_acorde = revocacao_por_acorde(ref.notas, do_perfil.notas)
-        resultado += " acordes[" + " ".join(
-            f"{k}:{c}/{t}" for k, (c, t) in por_acorde.items()
-        ) + "]"
+        resultado += (
+            " acordes[" + " ".join(f"{k}:{c}/{t}" for k, (c, t) in por_acorde.items()) + "]"
+        )
     piso = max(0.0, MEDIDO[(perfil, condicao)] - (FOLGA_DEMUCS if condicao == "mix-stem" else 0))
     print(
         f"\nMEDIDO {perfil} {condicao}: {resultado} {segundos:.0f}s rótulos={dict(rotulos)} "
@@ -224,10 +253,19 @@ def test_mede_perfil(perfil: str, condicao: str, tmp_path: Path) -> None:
     assert bruto.notas or bruto.ataques, f"MuScriptor não devolveu nada para {perfil} {condicao}"
     assert f1 >= piso, f"{perfil} {condicao} regrediu: {f1} < {piso} medido no ADR-044"
     if PERFIS[perfil].familia == "piano":
-        _confere_partes_do_piano(perfil, condicao, ref.notas, list(bruto.notas))
+        # O piso foi medido quando o transcritor devolvia tudo como nota, `drums` incluso;
+        # desde a `Transcricao` esse rótulo vai para `ataques` e sumia de "qualquer rótulo".
+        # A peça GM do ataque é o número cru do modelo, não altura: preserva a métrica
+        # medida, não quer dizer nota de piano recuperada.
+        como_notas = [
+            NoteEvent(a.peca_gm, a.instante_s, a.instante_s + 0.01, a.rotulo) for a in bruto.ataques
+        ]
+        _confere_partes_do_piano(perfil, condicao, ref.notas, [*bruto.notas, *como_notas])
     if (perfil, condicao) in MEDIDO_SEIS_NOTAS:
         seis = por_acorde[6][0]
-        piso_seis = MEDIDO_SEIS_NOTAS[(perfil, condicao)] - (condicao == "mix-stem")
+        piso_seis = MEDIDO_SEIS_NOTAS[(perfil, condicao)] - (
+            FOLGA_DEMUCS_SEIS_NOTAS if condicao == "mix-stem" else 0
+        )
         print(f"SEIS NOTAS {perfil} {condicao}: {seis}/24 piso={piso_seis}")
         assert seis >= piso_seis, f"acordes de seis notas regrediram: {seis} < {piso_seis}"
 

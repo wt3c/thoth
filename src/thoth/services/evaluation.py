@@ -28,10 +28,8 @@ from mir_eval.onset import f_measure
 from mir_eval.transcription import match_notes, precision_recall_f1_overlap
 from mir_eval.util import match_events
 
-from thoth.domain.models import EventoPercussivo, NoteEvent
+from thoth.domain.models import TOLERANCIA_S, EventoPercussivo, NoteEvent
 
-#: Padrão do mir_eval e da literatura de AMT.
-TOLERANCIA_S = 0.05
 #: Quanto a duração pode errar e ainda contar como a mesma nota — padrão do mir_eval.
 OFFSET_RATIO = 0.2
 

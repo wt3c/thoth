@@ -132,7 +132,19 @@ def test_iniciante_desce_o_braco_onde_o_experiente_nao_se_importa() -> None:
 
     assert iniciante != padrao
     assert iniciante[0] == (3, 3)  # Bb2 na corda G, dentro da janela da mão
-    assert padrao[0] == (2, 8)
+    assert padrao[0] == (1, 13)  # a frase vive nos trastes 12 a 15; a mão já começa lá
+
+
+def test_experiente_fica_na_posicao_como_o_baixista_da_tab_humana() -> None:
+    """Frase real de _Watashi Igai Watashi Ja Nai No_, tab humana de `samples/`.
+
+    O baixista desce cruzando as cordas com a mão parada nos trastes 7 e 8. Com
+    custo por traste de verdade, o experiente fugia para o traste 3 — o puxão
+    para o grave que, medido nas seis tabs humanas, derrubava a concordância de
+    corda a 21% em _Dance of Death_ (ADR-050). A frase foi escolhida por dar o
+    mesmo resultado nas duas ordens de corda: não depende de desempate.
+    """
+    assert _posicoes([50, 46, 41, 36], custos=PADRAO) == [(3, 7), (2, 8), (1, 8), (0, 8)]
 
 
 @pytest.mark.parametrize(
@@ -176,11 +188,11 @@ def test_a_corda_solta_nao_apaga_a_posicao_da_mao() -> None:
     Perfil experiente, onde o teleporte disparava: o `acima_da_janela` do
     iniciante já prende a mão no grave e esconde o defeito.
 
-    G3 (52) só é barato no traste 9; depois da corda solta, E2 (40) cabe no
-    traste 2 (longe da mão) ou no 7 (do lado dela). Antes do ADR-032 a solta
-    zerava a conta e o 2 saía de graça.
+    G3 (52) fica no traste 14; depois da corda solta, E2 (40) cabe no traste 2
+    (longe da mão) ou no 12 (do lado dela). Antes do ADR-032 a solta zerava a
+    conta e o 2 saía de graça.
     """
-    assert _posicoes([52, 28, 40], custos=PADRAO) == [(3, 9), (0, 0), (1, 7)]
+    assert _posicoes([52, 28, 40], custos=PADRAO) == [(2, 14), (0, 0), (0, 12)]
 
 
 def test_a_primeira_nota_solta_nao_ancora_a_mao_na_pestana() -> None:
@@ -192,7 +204,10 @@ def test_a_primeira_nota_solta_nao_ancora_a_mao_na_pestana() -> None:
     corda é de graça.
     """
     so_deslocamento = Custos(
-        traste_alto=0.0, corda_solta=1.0, deslocamento=1.0, troca_corda=0.5,
+        traste_alto=0.0,
+        corda_solta=1.0,
+        deslocamento=1.0,
+        troca_corda=0.5,
         acima_da_janela=0.0,
     )
     assert _posicoes([28, 40], custos=so_deslocamento) == [(0, 0), (0, 12)]

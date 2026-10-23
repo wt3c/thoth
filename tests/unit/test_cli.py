@@ -23,8 +23,7 @@ def test_separar_vocais_relata_os_tres_audios(tmp_path: Path, monkeypatch) -> No
 
     asset = AudioAsset(wav=tmp_path / "mix.wav", source_id="voz", title="Música")
     artefatos = {
-        nome: tmp_path / "Música" / f"Música.{nome}.wav"
-        for nome in ("mix", "vocais", "sem-vocais")
+        nome: tmp_path / "Música" / f"Música.{nome}.wav" for nome in ("mix", "vocais", "sem-vocais")
     }
     monkeypatch.setattr(
         modulo,
@@ -47,8 +46,19 @@ def test_separar_vocais_relata_os_tres_audios(tmp_path: Path, monkeypatch) -> No
 def test_fetch_publica_mix_wav_em_out_configuravel(tmp_path: Path) -> None:
     origem = tmp_path / "t.mp3"
     subprocess.run(
-        ["ffmpeg", "-y", "-f", "lavfi", "-i", "sine=frequency=110:duration=1",
-         "-ac", "2", "-loglevel", "error", str(origem)],
+        [
+            "ffmpeg",
+            "-y",
+            "-f",
+            "lavfi",
+            "-i",
+            "sine=frequency=110:duration=1",
+            "-ac",
+            "2",
+            "-loglevel",
+            "error",
+            str(origem),
+        ],
         check=True,
     )
 
@@ -83,11 +93,17 @@ def test_transcribe_relata_descartes_e_avisos(tmp_path: Path, monkeypatch) -> No
     asset = AudioAsset(wav=tmp_path / "mix.wav", source_id="abc123", title="t", duration_s=1.0)
     nota = NoteEvent(pitch=43, onset_s=0.0, offset_s=0.5, instrument="electric_bass")
     monkeypatch.setattr(
-        modulo, "transcrever",
+        modulo,
+        "transcrever",
         lambda *a, **k: Resultado(
-            asset=asset, stem=tmp_path / "bass.wav",
-            artefatos={"gp5": tmp_path / "abc123.gp5"}, notas=12,
-            rotulos={"electric_bass": 13}, descartadas=[nota], fora_do_braco=[], bpm=90,
+            asset=asset,
+            stem=tmp_path / "bass.wav",
+            artefatos={"gp5": tmp_path / "abc123.gp5"},
+            notas=12,
+            rotulos={"electric_bass": 13},
+            descartadas=[nota],
+            fora_do_braco=[],
+            bpm=90,
             avisos_de_oitava=[],
         ),
     )
@@ -108,11 +124,19 @@ def test_transcribe_avisa_trecho_sem_baixo(tmp_path: Path, monkeypatch) -> None:
     asset = AudioAsset(wav=tmp_path / "mix.wav", source_id="abc123", title="t", duration_s=1.0)
     trecho = TrechoSemBaixo(516.5, 654.88, {"clean_electric_guitar": 621})
     monkeypatch.setattr(
-        pipeline, "transcrever",
+        pipeline,
+        "transcrever",
         lambda *a, **k: Resultado(
-            asset=asset, stem=tmp_path / "bass.wav", artefatos={}, notas=12,
-            rotulos={"electric_bass": 12}, descartadas=[], fora_do_braco=[], bpm=90,
-            avisos_de_oitava=[], trechos_sem_baixo=[trecho],
+            asset=asset,
+            stem=tmp_path / "bass.wav",
+            artefatos={},
+            notas=12,
+            rotulos={"electric_bass": 12},
+            descartadas=[],
+            fora_do_braco=[],
+            bpm=90,
+            avisos_de_oitava=[],
+            trechos_sem_baixo=[trecho],
         ),
     )
 
@@ -125,10 +149,9 @@ def test_transcribe_avisa_trecho_sem_baixo(tmp_path: Path, monkeypatch) -> None:
 
 def test_serve_monta_o_app_sem_subir_o_servidor(monkeypatch) -> None:
     """Checa a fiação até o uvicorn — subir servidor de verdade é teste de outro nível."""
-    from thoth import cli
 
     recebido: dict[str, object] = {}
-    monkeypatch.setattr(cli.uvicorn, "run", lambda app, **kw: recebido.update(kw, app=app))
+    monkeypatch.setattr("uvicorn.run", lambda app, **kw: recebido.update(kw, app=app))
 
     resultado = runner.invoke(app, ["serve", "--port", "9123"])
 
@@ -137,10 +160,40 @@ def test_serve_monta_o_app_sem_subir_o_servidor(monkeypatch) -> None:
     assert recebido["app"].title == "Thoth"
 
 
+@pytest.mark.parametrize(
+    ("host", "pela_rede"), [("pandora.lan", "pandora.lan"), ("0.0.0.0", "192.168.0.160")]
+)
+def test_serve_aceita_o_host_em_que_foi_aberto(monkeypatch, host: str, pela_rede: str) -> None:
+    """`--host` abre a página para a rede: o endereço pelo qual ela chega tem de passar."""
+    from fastapi.testclient import TestClient
+
+
+    recebido: dict[str, object] = {}
+    monkeypatch.setattr("uvicorn.run", lambda app, **kw: recebido.update(kw, app=app))
+
+    runner.invoke(app, ["serve", "--host", host])
+
+    cliente = TestClient(recebido["app"], base_url=f"http://{pela_rede}:8000")
+    assert cliente.get("/jobs").status_code == 200
+
+
 def _wav(destino: Path, segundos: int = 2) -> Path:
     subprocess.run(
-        ["ffmpeg", "-y", "-f", "lavfi", "-i", f"sine=frequency=110:duration={segundos}",
-         "-ac", "2", "-ar", "44100", "-loglevel", "error", str(destino)],
+        [
+            "ffmpeg",
+            "-y",
+            "-f",
+            "lavfi",
+            "-i",
+            f"sine=frequency=110:duration={segundos}",
+            "-ac",
+            "2",
+            "-ar",
+            "44100",
+            "-loglevel",
+            "error",
+            str(destino),
+        ],
         check=True,
     )
     return destino
@@ -175,8 +228,8 @@ def test_auralizar_sem_cache_orienta_a_transcrever(tmp_path: Path) -> None:
     origem = _wav(tmp_path / "t.wav", segundos=1)
 
     resultado = runner.invoke(
-        app, ["auralizar", str(origem), "--cache", str(tmp_path / "c"),
-              "--out", str(tmp_path / "o")]
+        app,
+        ["auralizar", str(origem), "--cache", str(tmp_path / "c"), "--out", str(tmp_path / "o")],
     )
 
     assert resultado.exit_code != 0
@@ -242,7 +295,7 @@ def test_comparar_com_stem_relata_nota_errada_por_janela(tmp_path: Path) -> None
     tab, origem, cache = _tab_e_cache(tmp_path, {0: 12, 5: -12, 9: 7})
     fonte = next(p for p in cache.iterdir() if p.is_dir() and p.name != "stems")
     notas = ler(fonte / "notas.jsonl")
-    pasta = cache / "stems" / fonte.name / "htdemucs_ft"
+    pasta = cache / "stems" / fonte.name / "htdemucs_ft" / "4.1.0"
     pasta.mkdir(parents=True)
     _stem(pasta / "bass.wav", notas, notas[-1].offset_s + 2.0)
 
@@ -255,6 +308,24 @@ def test_comparar_com_stem_relata_nota_errada_por_janela(tmp_path: Path) -> None
     assert "0 s" in saida
     assert "1 de 1 janela conclusiva" in saida
     assert "limite inferior" in saida
+
+
+def test_comparar_ignora_stem_de_outra_versao_do_demucs(tmp_path: Path) -> None:
+    """O stem é o do separador do pipeline (ADR-026): o de outra versão não mede nada."""
+    from tests.unit.test_alinhamento_audio import _stem
+    from thoth.services.cache_notas import ler
+
+    tab, origem, cache = _tab_e_cache(tmp_path, {})
+    fonte = next(p for p in cache.iterdir() if p.is_dir() and p.name != "stems")
+    notas = ler(fonte / "notas.jsonl")
+    pasta = cache / "stems" / fonte.name / "htdemucs_ft" / "4.0.0"
+    pasta.mkdir(parents=True)
+    _stem(pasta / "bass.wav", notas, notas[-1].offset_s + 2.0)
+
+    resultado = runner.invoke(app, ["comparar", str(tab), str(origem), "--cache", str(cache)])
+
+    assert resultado.exit_code == 0, resultado.output
+    assert "sem stem do baixo" in resultado.output
 
 
 def test_comparar_sem_cache_orienta_a_transcrever(tmp_path: Path) -> None:
@@ -343,12 +414,39 @@ def test_afinacao_e_digitacao_escolhidas_chegam_ao_pipeline(
 
     monkeypatch.setattr(pipeline, "transcrever", espiao)
 
-    runner.invoke(
-        app, ["transcribe", "x.mp3", "--afinacao", "drop-d", "--digitacao", "experiente"]
-    )
+    runner.invoke(app, ["transcribe", "x.mp3", "--afinacao", "drop-d", "--digitacao", "experiente"])
 
     assert recebido["tuning"] == TUNING_BASS_DROP_D
     assert recebido["assigner"].custos is PADRAO
+
+
+def test_o_tom_informado_chega_ao_pipeline(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Validar e não encaminhar fazia o Thoth estimar o tom que você já disse (ADR-031)."""
+    recebido: dict[str, object] = {}
+
+    def espiao(ref: str, out: Path, **kw: object):
+        recebido.update(kw)
+        raise typer.Exit(code=0)
+
+    monkeypatch.setattr(pipeline, "transcrever", espiao)
+
+    runner.invoke(app, ["transcribe", "x.mp3", "--tom", "Bb maior"])
+
+    assert recebido["tom"] == "Bb maior"
+
+
+def test_sem_tom_o_pipeline_estima(monkeypatch: pytest.MonkeyPatch) -> None:
+    recebido: dict[str, object] = {}
+
+    def espiao(ref: str, out: Path, **kw: object):
+        recebido.update(kw)
+        raise typer.Exit(code=0)
+
+    monkeypatch.setattr(pipeline, "transcrever", espiao)
+
+    runner.invoke(app, ["transcribe", "x.mp3"])
+
+    assert recebido["tom"] is None
 
 
 def test_seis_cordas_chega_ao_pipeline_com_o_do_agudo(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -377,11 +475,17 @@ def test_o_aviso_de_oitava_diz_a_alternativa_ou_a_falta_dela(tmp_path: Path, mon
     asset = AudioAsset(wav=tmp_path / "mix.wav", source_id="abc123", title="t", duration_s=1.0)
     nota = NoteEvent(pitch=23, onset_s=1.25, offset_s=1.8, instrument="electric_bass")
     monkeypatch.setattr(
-        modulo, "transcrever",
+        modulo,
+        "transcrever",
         lambda *a, **k: Resultado(
-            asset=asset, stem=tmp_path / "bass.wav",
-            artefatos={"gp5": tmp_path / "abc123.gp5"}, notas=12,
-            rotulos={"electric_bass": 12}, descartadas=[], fora_do_braco=[], bpm=90,
+            asset=asset,
+            stem=tmp_path / "bass.wav",
+            artefatos={"gp5": tmp_path / "abc123.gp5"},
+            notas=12,
+            rotulos={"electric_bass": 12},
+            descartadas=[],
+            fora_do_braco=[],
+            bpm=90,
             avisos_de_oitava=[
                 OctaveWarning(nota, 35, 0.12, 3.0),
                 OctaveWarning(nota, None, 0.33, 0.12),
@@ -406,12 +510,19 @@ def test_o_tom_estimado_e_relatado_com_a_margem(tmp_path: Path, monkeypatch) -> 
     asset = AudioAsset(wav=tmp_path / "mix.wav", source_id="abc123", title="t", duration_s=1.0)
     nota = NoteEvent(pitch=34, onset_s=0.0, offset_s=0.5, instrument="electric_bass")
     monkeypatch.setattr(
-        modulo, "transcrever",
+        modulo,
+        "transcrever",
         lambda *a, **k: Resultado(
-            asset=asset, stem=tmp_path / "bass.wav",
-            artefatos={"gp5": tmp_path / "abc123.gp5"}, notas=1,
-            rotulos={"electric_bass": 1}, descartadas=[nota], fora_do_braco=[], bpm=90,
-            avisos_de_oitava=[], tonalidade=Tonalidade("f minor", -4, 0.33),
+            asset=asset,
+            stem=tmp_path / "bass.wav",
+            artefatos={"gp5": tmp_path / "abc123.gp5"},
+            notas=1,
+            rotulos={"electric_bass": 1},
+            descartadas=[nota],
+            fora_do_braco=[],
+            bpm=90,
+            avisos_de_oitava=[],
+            tonalidade=Tonalidade("f minor", -4, 0.33),
         ),
     )
 
@@ -455,9 +566,14 @@ def test_transcribe_desenha_cada_estagio_que_o_pipeline_anuncia(
         progresso.inicia("separando o baixo", "Demucs")  # type: ignore[attr-defined]
         progresso.inicia("transcrevendo as notas")  # type: ignore[attr-defined]
         return Resultado(
-            asset=asset, stem=tmp_path / "bass.wav",
-            artefatos={"gp5": tmp_path / "t" / "t.gp5"}, notas=3,
-            rotulos={"electric_bass": 3}, descartadas=[], fora_do_braco=[], bpm=90,
+            asset=asset,
+            stem=tmp_path / "bass.wav",
+            artefatos={"gp5": tmp_path / "t" / "t.gp5"},
+            notas=3,
+            rotulos={"electric_bass": 3},
+            descartadas=[],
+            fora_do_braco=[],
+            bpm=90,
             avisos_de_oitava=[],
         )
 
@@ -477,12 +593,19 @@ def test_transcribe_avisa_quando_a_auralizacao_falha(tmp_path: Path, monkeypatch
 
     asset = AudioAsset(wav=tmp_path / "mix.wav", source_id="abc123", title="t", duration_s=1.0)
     monkeypatch.setattr(
-        pipeline, "transcrever",
+        pipeline,
+        "transcrever",
         lambda *a, **k: Resultado(
-            asset=asset, stem=tmp_path / "bass.wav",
-            artefatos={"gp5": tmp_path / "t" / "t.gp5"}, notas=3,
-            rotulos={"electric_bass": 3}, descartadas=[], fora_do_braco=[], bpm=90,
-            avisos_de_oitava=[], falha_na_auralizacao="soundfont ausente: /nao/existe.sf2",
+            asset=asset,
+            stem=tmp_path / "bass.wav",
+            artefatos={"gp5": tmp_path / "t" / "t.gp5"},
+            notas=3,
+            rotulos={"electric_bass": 3},
+            descartadas=[],
+            fora_do_braco=[],
+            bpm=90,
+            avisos_de_oitava=[],
+            falha_na_auralizacao="soundfont ausente: /nao/existe.sf2",
         ),
     )
 
@@ -563,10 +686,18 @@ def test_a_guitarra_relata_rotulo_contaminacao_e_acorde_impossivel(
     asset = AudioAsset(wav=tmp_path / "mix.wav", source_id="abc", title="t", duration_s=1.0)
     notas = (NoteEvent(40, 61.0, 61.5, "g"), NoteEvent(41, 61.0, 61.5, "g"))
     monkeypatch.setattr(
-        pipeline, "transcrever",
+        pipeline,
+        "transcrever",
         lambda *a, **k: Resultado(
-            asset=asset, stem=tmp_path / "other.wav", artefatos={}, notas=7,
-            rotulos={}, descartadas=[], fora_do_braco=[], bpm=90, avisos_de_oitava=[],
+            asset=asset,
+            stem=tmp_path / "other.wav",
+            artefatos={},
+            notas=7,
+            rotulos={},
+            descartadas=[],
+            fora_do_braco=[],
+            bpm=90,
+            avisos_de_oitava=[],
             instrumento="guitarra-limpa",
             erro_de_rotulo={"distorted_electric_guitar": 3},
             contaminacao={"acoustic_piano": 5},
@@ -601,9 +732,16 @@ def test_a_bateria_relata_cada_causa_de_ataque_fora(
     def falso(ref: str, out: Path, **kw: object) -> Resultado:
         recebido.update(kw)
         return Resultado(
-            asset=asset, stem=tmp_path / "drums.wav", artefatos={}, notas=40,
-            rotulos={"drums": 43}, descartadas=[], fora_do_braco=[], bpm=90,
-            avisos_de_oitava=[], instrumento="bateria",
+            asset=asset,
+            stem=tmp_path / "drums.wav",
+            artefatos={},
+            notas=40,
+            rotulos={"drums": 43},
+            descartadas=[],
+            fora_do_braco=[],
+            bpm=90,
+            avisos_de_oitava=[],
+            instrumento="bateria",
             ataques_descartados={
                 "repetida no tique": [EventoPercussivo(1.0, 36), EventoPercussivo(2.0, 38)],
                 "fora do mapa de percussão": [EventoPercussivo(3.0, 81)],

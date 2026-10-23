@@ -17,6 +17,7 @@ from __future__ import annotations
 
 import os
 import shutil
+import uuid
 from collections.abc import Iterator
 from contextlib import contextmanager
 from pathlib import Path
@@ -30,11 +31,12 @@ def escrita_atomica(destino: Path) -> Iterator[Path]:
     """Dá um caminho vizinho para escrever; promove a destino ao sair sem erro.
 
     A extensão do destino é preservada no provisório (`mix.wav` →
-    `mix.parcial.wav`): ffmpeg e yt-dlp escolhem o formato de saída por ela.
+    `mix.parcial-<token>.wav`): ffmpeg e yt-dlp escolhem o formato de saída por ela.
+    O token faz o provisório ser só desta escrita — com nome fixo, duas escritas do
+    mesmo destino (dois jobs, o servidor e a CLI) apagavam o provisório uma da outra.
     """
     destino.parent.mkdir(parents=True, exist_ok=True)
-    parcial = destino.with_name(f"{destino.stem}{SUFIXO}{destino.suffix}")
-    parcial.unlink(missing_ok=True)
+    parcial = destino.with_name(f"{destino.stem}{SUFIXO}-{uuid.uuid4().hex[:8]}{destino.suffix}")
     try:
         yield parcial
         os.replace(parcial, destino)

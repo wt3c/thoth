@@ -12,7 +12,7 @@ primeira tab lida:
 - **a ordem de execução não é a ordem do arquivo.** Repetição toca o trecho de novo, e
   final alternativo só toca na passada marcada. Limites: cada final ocupa **um**
   compasso, e D.S./coda não são seguidos — nenhuma das tabs lidas até aqui usa isso;
-- **ligadura é continuação, não ataque.** Ela estende a nota anterior da mesma corda;
+- **ligadura é continuação, não ataque.** Ela estende a nota anterior da mesma voz e corda;
   contá-la como nota nova inventaria ataques que ninguém tocou. Nota morta não tem
   altura e fica fora.
 """
@@ -113,24 +113,27 @@ def _notas(song: gp.Song, track: gp.Track) -> list[NoteEvent]:
     bpm = song.tempo
     relogio = 0.0
     notas: list[NoteEvent] = []
-    soando: dict[int, int] = {}  # corda → índice da nota em `notas`
+    # (voz, corda) → índice da nota em `notas`. A corda sozinha não basta: a outra
+    # voz pode atacar na mesma corda antes da continuação.
+    soando: dict[tuple[int, int], int] = {}
     for indice in _ordem(song.measureHeaders):
         medida = track.measures[indice]
         trechos = [(0, bpm), *andamentos.get(indice, [])]
-        for voz in medida.voices:
+        for v, voz in enumerate(medida.voices):
             for beat in voz.beats:
                 posicao = beat.start - medida.header.start
                 inicio = relogio + _segundos(posicao, trechos)
                 fim = relogio + _segundos(posicao + beat.duration.time, trechos)
                 for nota in beat.notes:
-                    if nota.type == gp.NoteType.tie and nota.string in soando:
-                        anterior = notas[soando[nota.string]]
-                        notas[soando[nota.string]] = NoteEvent(
+                    chave = (v, nota.string)
+                    if nota.type == gp.NoteType.tie and chave in soando:
+                        anterior = notas[soando[chave]]
+                        notas[soando[chave]] = NoteEvent(
                             anterior.pitch, anterior.onset_s, fim, anterior.instrument
                         )
                     elif nota.type == gp.NoteType.normal:
                         altura = track.strings[nota.string - 1].value + nota.value
-                        soando[nota.string] = len(notas)
+                        soando[chave] = len(notas)
                         notas.append(NoteEvent(altura, inicio, fim, "electric_bass"))
         relogio += _segundos(medida.header.length, trechos)
         bpm = trechos[-1][1]

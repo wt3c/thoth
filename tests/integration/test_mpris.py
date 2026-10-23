@@ -70,7 +70,7 @@ def test_le_a_posicao_e_os_metadados_de_um_servico_mpris_real(tmp_path: Path) ->
         try:
             app = criar_app(out_dir=tmp_path / "out", cache_dir=tmp_path / "cache")
             async with httpx.AsyncClient(
-                transport=ASGITransport(app=app), base_url="http://thoth.test"
+                transport=ASGITransport(app=app), base_url="http://localhost"
             ) as cliente:
                 resposta = await cliente.get("/playback/players")
                 assert resposta.status_code == 200, resposta.text

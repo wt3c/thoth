@@ -18,8 +18,13 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING
 
-from thoth.domain.models import AcordeImpossivel, NoteEvent, Posicionamento, TabNote
-from thoth.services.evaluation import TOLERANCIA_S
+from thoth.domain.models import (
+    TOLERANCIA_S,
+    AcordeImpossivel,
+    NoteEvent,
+    Posicionamento,
+    TabNote,
+)
 from thoth.services.fretboard import INICIANTE, Custos, _posicoes, custo_de_emissao
 
 if TYPE_CHECKING:

@@ -76,7 +76,8 @@ Mesma família do `Beat.status`: `gp.Note(...)` sem `type` é `NoteType.rest`. O
 nota como pausa. O exportador de cordas sempre passou o `type` e nunca viu isso; o de percussão nasceu sem ele. O
 **MuseScore importou as peças mesmo assim** — o leitor independente não pegou; quem pegou foi o round-trip afirmando
 `note.type`. Todo `gp.Note` leva `type` explícito, e o teste afirma o tipo relido, não só o `value`.
-# Partes e pautas no MusicXML multifaixa
+
+## Partes e pautas no MusicXML multifaixa
 
 Um baixo exportado pelo Thoth ocupa uma única `<part>` com duas pautas. No
 round-trip, porém, o music21 expande cada pauta como um objeto `Part`: baixo mais
@@ -104,3 +105,15 @@ aviso específico do MuseScore não foi reproduzido nesta estação. Uma ediçã
 manual dos nomes das partes no arquivo gerado não comprovou que eles fossem a
 causa do aviso. Não alterar o GP5 para contornar um aviso que ocorreu no
 MusicXML.
+
+## O GP5 guarda texto em cp1252 (2026-09-30)
+
+`uv run thoth transcribe` de um vídeo com título em japonês rodou os estágios caros inteiros e morreu no último, no
+`gp.write`: `UnicodeEncodeError` do cp1252 ao gravar `song.title`. Os títulos anteriores do acervo tinham só acento
+latino, que cabe no cp1252 — por isso nunca apareceu.
+
+**Correção:** `_texto_gp5()` em `adapters/export/gp5.py` troca por `?` o que não cabe, nos dois exportadores GP5. O
+título original continua no nome do arquivo (ADR-017), e o guia de estudo cai nele quando o título lido do GP5 é só `?`.
+
+**Regra:** todo texto que entra num campo do GP5 vindo de fora (título, nome de faixa) passa por `_texto_gp5`. MusicXML
+é UTF-8 e não precisa.

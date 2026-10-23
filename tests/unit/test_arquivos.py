@@ -86,3 +86,17 @@ def test_diretorio_substitui_sobra_de_execucao_anterior(tmp_path: Path) -> None:
 
     assert (destino / "x" / "bass.wav").exists()
     assert not (destino / "x" / "no_bass.wav").exists()
+
+
+def test_duas_escritas_do_mesmo_destino_nao_compartilham_o_parcial(tmp_path: Path) -> None:
+    """O parcial tinha nome fixo: a segunda escrita apagava o da primeira no meio."""
+    destino = tmp_path / "meta.json"
+    with escrita_atomica(destino) as primeiro:
+        primeiro.write_text("primeira")
+        with escrita_atomica(destino) as segundo:
+            assert segundo != primeiro
+            segundo.write_text("segunda")
+        assert primeiro.read_text() == "primeira"
+
+    assert destino.read_text() == "primeira"
+    assert list(tmp_path.iterdir()) == [destino]

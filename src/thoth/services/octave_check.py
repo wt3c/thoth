@@ -84,8 +84,11 @@ def _trecho_mono(w: wave.Wave_read, inicio: int, quadros: int) -> np.ndarray:
 
 
 def _pico_na_banda(espectro: np.ndarray, frequencias: np.ndarray, f: float) -> float:
-    banda = (frequencias > f / _LARGURA) & (frequencias < f * _LARGURA)
-    return float(espectro[banda].max()) if banda.any() else 0.0
+    # A grade é crescente: a banda aberta (f/L, f·L) é uma fatia contínua, achada por
+    # busca em vez de comparar o espectro inteiro três vezes por nota.
+    inicio = int(np.searchsorted(frequencias, f / _LARGURA, side="right"))
+    fim = int(np.searchsorted(frequencias, f * _LARGURA, side="left"))
+    return float(espectro[inicio:fim].max()) if fim > inicio else 0.0
 
 
 def verificar_oitavas(
