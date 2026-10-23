@@ -31,6 +31,7 @@ from typing import TYPE_CHECKING
 
 import guitarpro as gp
 
+from thoth.domain.instrumentos import PECAS_POR_ATAQUE
 from thoth.domain.models import EventoPercussivo, TabNote
 from thoth.domain.ports import ExportadorDePercussao, Exporter
 from thoth.services.notas import nome_da_nota
@@ -47,7 +48,7 @@ BAIXO_GM = 33  # Electric Bass (finger)
 #: Canal 10 do GM, 0-indexado: o canal que os sintetizadores tocam como bateria.
 CANAL_PERCUSSAO = 9
 #: Uma peça por corda no beat; seis é o que o Guitar Pro cria para faixa de bateria.
-CORDAS_PERCUSSAO = 6
+CORDAS_PERCUSSAO = PECAS_POR_ATAQUE
 
 assert gp.Duration.quarterTime // 4 == GRADE, "a grade tem que casar com o PPQ do GP5"
 

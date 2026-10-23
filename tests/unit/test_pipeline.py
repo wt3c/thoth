@@ -18,7 +18,7 @@ import soundfile as sf
 from tests.sintetico import SOUNDFONT, renderizar
 from thoth.domain.models import TUNING_BASS_5, AudioAsset, NoteEvent, Transcricao
 from thoth.services.cache_notas import ler
-from thoth.services.pipeline import ROTULOS_DE_BAIXO, transcrever
+from thoth.services.pipeline import ROTULOS_DE_BAIXO, ParteVazia, transcrever
 
 
 @dataclass(frozen=True, slots=True)
@@ -451,3 +451,10 @@ def test_o_estagio_da_estimativa_aparece_quando_nao_ha_bpm(tmp_path: Path) -> No
         "estimando o andamento",
         "separando o baixo",
     ]
+
+
+@requer_soundfont
+def test_baixo_inteiro_fora_do_braco_e_erro_que_cita_a_afinacao(tmp_path: Path) -> None:
+    """Sem isto o erro vinha do exportador: "sem notas para exportar", sem dizer por quê."""
+    with pytest.raises(ParteVazia, match="afinação"):
+        _rodar(tmp_path, (_nota(90, 0.0), _nota(92, 0.7)))

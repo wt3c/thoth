@@ -2,6 +2,41 @@
 
 > Áudio → partitura e tablatura, foco em contrabaixo. Uso pessoal. CPU-only. Decisões em `tasks/decisions.md`.
 
+## Revisão conjunta Claude + Codex do código inteiro (2026-10-22)
+
+Revisão somente leitura: Claude (`fable`) e Codex (`gpt-6.1-sol`, `high`). Os achados foram conferidos na fonte antes de
+entrar aqui; cada correção nasce de um teste vermelho.
+
+1. [x] `transcribe --tom` validado e descartado: encaminhar ao pipeline (ADR-031).
+2. [x] `todos`: grade e recuo de fase comuns a todas as partes — a mesma nota cai no mesmo tick em toda faixa.
+3. [x] `todos`: parte sem evento exportável é relatada como ausente, não derruba a música (ADR-014); sem decidir
+   por prefixo de mensagem.
+4. [x] `todos`: diagnósticos de guitarra e bateria chegam ao resultado; histograma de `other` contado uma vez.
+5. [x] Baixo com todas as notas fora do braço: erro claro antes de exportar.
+6. [x] yt-dlp: só hosts do YouTube; o downloader recebe a URL canônica montada do ID.
+7. [x] `/uploads`: leitura em blocos com teto, hash incremental, escrita fora do event loop; `escrita_atomica` com
+   temporário exclusivo (upload `foo.parcial.wav` não pode apagar outro).
+8. [x] Jobs: uma thread trabalhadora com fila FIFO (ADR-027) e o dicionário de jobs sob trava.
+9. [x] `POST /jobs`: `ref` local restrita; `TrustedHostMiddleware` contra DNS rebinding.
+10. [x] Nome de saída limitado em bytes, com espaço para o maior sufixo.
+11. [x] `comparar` usa o escopo de stem do `DemucsSeparator` (ADR-026). `escopo` ficou público; stem de outra
+   versão do demucs dá "sem stem do baixo".
+12. [x] Upload chamado `mix.wav` mantém o título: a pasta passou a ser o sha256 inteiro, que `LocalFileSource` não
+   confunde com cache (emenda ao ADR-051).
+13. [x] Ligaduras rastreadas por voz e corda em `tab_referencia` e `guia_estudo`; fixture GP5 de duas vozes.
+14. [x] MuScriptor: energia por segundo lida em blocos (`sf.blocks`); teste prova que `sf.read` não é chamado.
+15. [x] Página: `Paused → Stopped` do MPRIS volta o cursor ao início (ADR-046); teste `navegador` com player falso.
+16. [x] Arquitetura: `PECAS_DA_BATERIA` e `PECAS_POR_ATAQUE` em `domain/instrumentos.py`, seguidas pelos
+   exportadores; `ROTULOS_DE_BAIXO` é `PERFIS["baixo"].rotulos`. Avaliadas e mantidas: `pipeline`/`vocais`
+   importando adapters (são a raiz de composição) e `gp5`/`musicxml` importando `services.rhythm`/`notas` (lógica
+   pura, sem I/O).
+17. [x] Docstrings e comentários conferidos contra os ADRs (`instrumentos`, `pipeline`, `auralizacao`, `demucs`,
+   página). `ExportadorDePiano` mantido: tem uso planejado no M3 do ADR-044 e implementação testada
+   (`MusicXmlPianoExporter`).
+18. [x] Teste de upload com WAV real passando por `LocalFileSource` (nome acentuado e `mix.wav`).
+19. [x] Verificação de entrega (`pytest -n auto`, `-m navegador`, `-m "slow and not network"`, `ruff`, `mypy`),
+   emendas aos ADR-026, 027, 047 e 051, e README.
+
 ## Página de estudo: abrir arquivo e tocar com WAV (2026-10-22)
 
 Abrir arquivo pelo seletor do sistema (`.mp3`, `.wav`, `.gp5`, `.musicxml`). O áudio é transcrito; GP5 e MusicXML só

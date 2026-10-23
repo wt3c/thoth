@@ -16,6 +16,7 @@ import pytest
 
 from thoth.adapters.transcription.muscriptor import (
     MuscriptorTranscriber,
+    _energia_por_segundo,
     parse_jsonl,
     trechos_sem_nota,
 )
@@ -375,3 +376,40 @@ def test_taxonomia_do_escopo_multi_instrumento_existe_no_motor() -> None:
     esperados = set().union(*(p.rotulos for p in PERFIS.values()))
 
     assert esperados <= observados, f"faltam {esperados - observados}; motor: {sorted(observados)}"
+
+
+def _seno(destino: Path, amplitudes: list[float], taxa: int = 8000) -> Path:
+    """Um segundo de seno por amplitude, e meio segundo de sobra no fim."""
+    import numpy as np
+    import soundfile as sf
+
+    t = np.arange(taxa) / taxa
+    partes = [a * np.sin(2 * np.pi * 110 * t) for a in amplitudes]
+    partes.append(0.5 * np.sin(2 * np.pi * 110 * t[: taxa // 2]))
+    sf.write(destino, np.concatenate(partes), taxa)
+    return destino
+
+
+def test_energia_por_segundo_de_wav_real(tmp_path: Path) -> None:
+    """RMS em dB de cada segundo inteiro; a sobra do fim não vira um segundo."""
+    import math
+
+    energia = _energia_por_segundo(_seno(tmp_path / "s.wav", [0.5, 0.05, 0.0]))
+
+    assert len(energia) == 3
+    assert energia[0] == pytest.approx(20 * math.log10(0.5 / math.sqrt(2)), abs=0.1)
+    assert energia[1] == pytest.approx(20 * math.log10(0.05 / math.sqrt(2)), abs=0.1)
+    assert energia[2] < -150
+
+
+def test_energia_nao_carrega_o_stem_inteiro_na_memoria(tmp_path: Path, monkeypatch) -> None:
+    """Um stem de cinco minutos em float64 são ~200 MB: a leitura vai em blocos de um segundo."""
+    import soundfile as sf
+
+    def recusa(*_: object, **__: object) -> None:
+        raise AssertionError("sf.read carrega o arquivo inteiro")
+
+    audio = _seno(tmp_path / "s.wav", [0.5, 0.5])
+    monkeypatch.setattr(sf, "read", recusa)
+
+    assert len(_energia_por_segundo(audio)) == 2

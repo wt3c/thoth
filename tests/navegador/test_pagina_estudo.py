@@ -149,6 +149,8 @@ def servidor(tmp_path: Path) -> Iterator[str]:
 
     class LeitorPlayerDeTeste:
         chamadas = 0
+        estado = "Playing"
+        posicao_s: float | None = None  # `None`: anda a cada leitura
 
         async def listar(self) -> list[ReproducaoExterna]:
             self.chamadas += 1
@@ -156,8 +158,10 @@ def servidor(tmp_path: Path) -> Iterator[str]:
                 ReproducaoExterna(
                     nome="org.mpris.MediaPlayer2.teste",
                     identidade="Player de teste",
-                    estado="Playing",
-                    posicao_s=min(self.chamadas * 0.2, 4.0),
+                    estado=self.estado,
+                    posicao_s=(
+                        min(self.chamadas * 0.2, 4.0) if self.posicao_s is None else self.posicao_s
+                    ),
                     duracao_s=30.0,
                     titulo="Música de teste",
                     artista="Banda",
@@ -166,12 +170,22 @@ def servidor(tmp_path: Path) -> Iterator[str]:
                 )
             ]
 
+    leitor = LeitorPlayerDeTeste()
     app = criar_app(
         out_dir=tmp_path / "out",
         cache_dir=tmp_path / "cache",
         executar=lambda ref, out_dir, **kw: _partitura_real(out_dir, **kw),
-        leitor_reproducao=LeitorPlayerDeTeste(),
+        leitor_reproducao=leitor,
     )
+
+    # Só do teste: a página troca o estado do player falso no meio da sessão. Vai à
+    # frente das rotas, ou a página estática montada em `/` responderia por ela.
+    def trocar_estado(estado: str, posicao_s: float) -> None:
+        leitor.estado, leitor.posicao_s = estado, posicao_s
+
+    app.add_api_route("/teste/player", trocar_estado, methods=["POST"])
+    app.router.routes.insert(0, app.router.routes.pop())
+
     server = uvicorn.Server(uvicorn.Config(app, host="127.0.0.1", port=porta, log_level="warning"))
     thread = threading.Thread(target=server.run, daemon=True)
     thread.start()
@@ -519,6 +533,39 @@ def test_player_externo_move_o_cursor_sem_tocar_audio_local(servidor: str) -> No
     assert local["reproducao_local"] == "playing", local
     assert local["animacao_cursor"] == "pulso-cursor-reproducao", local
     assert local["rms"] > 0.01, f"voltar ao modo local não restaurou o áudio: {local}"
+
+
+def _player(estado: str, posicao_s: float) -> str:
+    return f"fetch('/teste/player?estado={estado}&posicao_s={posicao_s}', {{method: 'POST'}})"
+
+
+def test_player_externo_parado_depois_de_pausado_volta_o_cursor_ao_inicio(
+    servidor: str,
+) -> None:
+    """`Stopped` reinicia o cursor (ADR-046), também quando vem depois de `Paused`."""
+    ident = httpx.post(
+        f"{servidor}/jobs", json={"ref": "x.wav", "bpm": BPM}, timeout=10
+    ).json()["id"]
+    antes, _, _, _, pausado, _, parado = sessao(
+        f"{servidor}/?job={ident}",
+        [
+            (12, LEITURA),
+            (0, "document.getElementById('ativarExterno').click()"),
+            (0.2, "document.getElementById('seguirPlayer').click()"),
+            (1.2, _player("Paused", 2.0)),
+            (1, LEITURA),
+            (0, _player("Stopped", 0.0)),
+            (1, LEITURA),
+        ],
+        script_inicial=OUVIDO,
+    )
+
+    print(antes, pausado, parado)
+    assert pausado["cursor_x"] > antes["cursor_x"], (antes, pausado)
+    assert parado["cursor_x"] == antes["cursor_x"], (
+        f"Stopped depois de Paused deixou o cursor onde estava: {pausado} → {parado}"
+    )
+    assert parado["reproducao_externa"] is None, parado
 
 
 @pytest.mark.parametrize("instrumento", ["bateria", "todos"])

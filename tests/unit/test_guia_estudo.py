@@ -62,6 +62,18 @@ def test_guia_explica_ligadura_dentro_do_mesmo_compasso(tmp_path: Path) -> None:
     assert "ligada a outra figura no mesmo compasso" in guia
 
 
+def test_guia_liga_a_continuacao_a_nota_da_propria_voz(tmp_path: Path) -> None:
+    from tests.unit.test_tab_referencia import _duas_vozes
+
+    guia = gerar_guia(_duas_vozes(tmp_path))
+
+    assert guia.count("ligadura de sustentação atravessa até o compasso 2") == 1
+    e1 = guia.index("**E1**")
+    a1 = guia.index("**A1**")
+    trecho_e1 = guia[e1:a1] if e1 < a1 else guia[e1:]
+    assert "compasso 2" in trecho_e1
+
+
 def test_guia_sem_tom_mostra_candidato_sem_afirmar_acorde(tmp_path: Path) -> None:
     guia = gerar_guia(_tab(tmp_path / "sem_tom.gp5"))
 

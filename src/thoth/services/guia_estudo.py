@@ -91,11 +91,11 @@ def _tecnicas(nota: gp.Note) -> tuple[str, ...]:
 
 def _ler_notas(track: gp.Track) -> tuple[list[_Nota], int]:
     notas: list[_Nota] = []
-    soando: dict[int, _Nota] = {}
+    soando: dict[tuple[int, int], _Nota] = {}  # (voz, corda), como em `tab_referencia`
     pausas = 0
     ppq = gp.Duration.quarterTime
     for numero, medida in enumerate(track.measures, start=1):
-        for voz in medida.voices:
+        for v, voz in enumerate(medida.voices):
             for beat in voz.beats:
                 if beat.status == gp.BeatStatus.rest:
                     pausas += 1
@@ -103,7 +103,7 @@ def _ler_notas(track: gp.Track) -> tuple[list[_Nota], int]:
                 duracao = beat.duration.time / ppq
                 for nota in beat.notes:
                     if nota.type == gp.NoteType.tie:
-                        anterior = soando.get(nota.string)
+                        anterior = soando.get((v, nota.string))
                         if anterior is not None:
                             anterior.duracao += duracao
                             anterior.ultimo_compasso = numero
@@ -126,7 +126,7 @@ def _ler_notas(track: gp.Track) -> tuple[list[_Nota], int]:
                         tecnica=_tecnicas(nota),
                     )
                     notas.append(atual)
-                    soando[nota.string] = atual
+                    soando[(v, nota.string)] = atual
     notas.sort(key=lambda n: (n.compasso, n.tempo, n.altura))
     return notas, pausas
 

@@ -98,8 +98,8 @@ ROTULOS_DO_ESCOPO = {
 
 
 def test_perfil_do_baixo_usa_os_mesmos_rotulos_do_pipeline() -> None:
-    """Duas fontes para o mesmo conjunto divergiriam em silêncio."""
-    assert PERFIS["baixo"].rotulos == ROTULOS_DE_BAIXO
+    """Duas fontes para o mesmo conjunto divergiriam em silêncio: o pipeline lê do perfil."""
+    assert ROTULOS_DE_BAIXO is PERFIS["baixo"].rotulos
     assert PERFIS["baixo"].stem == "bass"
 
 
@@ -141,3 +141,20 @@ def test_perfil_declara_stem_e_se_tem_afinacao(nome: str, stem: str, afinado: bo
     assert perfil.stem == stem
     assert (perfil.afinacao is not None) == afinado
     assert 0 <= perfil.programa_gm <= 127
+
+
+def test_pecas_da_bateria_vivem_no_dominio_e_os_exportadores_as_seguem() -> None:
+    """O pipeline decide o que descartar sem importar constante de exportador (ADR-044)."""
+    from thoth.adapters.export.gp5 import CORDAS_PERCUSSAO
+    from thoth.adapters.export.musicxml import MAPA_PERCUSSAO
+    from thoth.domain.instrumentos import PECAS_DA_BATERIA, PECAS_POR_ATAQUE
+
+    assert MAPA_PERCUSSAO.keys() == PECAS_DA_BATERIA
+    assert CORDAS_PERCUSSAO == PECAS_POR_ATAQUE
+
+
+def test_o_pipeline_nao_le_constante_de_percussao_dos_exportadores() -> None:
+    import thoth.services.pipeline as pipeline
+
+    assert not hasattr(pipeline, "MAPA_PERCUSSAO")
+    assert not hasattr(pipeline, "CORDAS_PERCUSSAO")

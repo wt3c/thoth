@@ -432,38 +432,98 @@ baixo identificável.
 
 ### `serve` — abrir a API e a página de estudo
 
-```bash
-uv run thoth serve
+O `serve` é a forma mais simples de usar o Thoth: uma página no navegador para transcrever, abrir partituras e
+estudar com o cursor acompanhando o áudio. Por trás dela há uma API FastAPI, e a partitura é desenhada pelo alphaTab
+local, sem CDN.
 
+#### 1. Subir o servidor
+
+```bash
+# Uma vez por clone: copia o alphaTab para web/vendor/ (exige Node.js e npm).
+uv run python scripts/vendor_alphatab.py
+
+uv run thoth serve
 # Exemplo com porta e diretórios personalizados.
 uv run thoth serve --port 8080 --out out --cache cache
 ```
 
-O `serve` inicia uma API FastAPI e a página de estudo com o alphaTab local. Por padrão, escuta somente em
-<http://127.0.0.1:8000>, sem expor a aplicação na rede. A página permite informar o caminho de um arquivo local ou uma
-URL do YouTube, escolher o instrumento, iniciar a transcrição, acompanhar o estado do job, abrir a partitura e controlar
-a velocidade de estudo. Quando o job termina, **Salvar transcrição** oferece os formatos de partitura produzidos pelo
-pipeline, como GP5 e MusicXML, preservando no download o nome do arquivo gerado.
+Abra <http://127.0.0.1:8000>. O padrão escuta somente na própria máquina, sem expor a aplicação na rede. Se a raiz
+responder 503, o alphaTab não foi instalado; a resposta mostra o comando acima.
 
-Os jobs ficam apenas na memória e são executados um por vez, pois compartilham caches e caminhos de saída. Encerrar o
-servidor apaga o histórico de jobs, mas não remove os artefatos de `out/` nem o conteúdo de `cache/`. A página exige que
-o alphaTab tenha sido instalado com `uv run python scripts/vendor_alphatab.py`; sem ele, a raiz responde 503 e mostra
-esse comando.
+Opções:
 
-#### Abrir arquivo e tocar com WAV
+- `--host HOST`: endereço de escuta; o padrão seguro é `127.0.0.1`. O servidor só responde a requisições cujo
+  cabeçalho `Host` seja `127.0.0.1`, `localhost` ou o próprio `HOST` (proteção contra DNS rebinding); com `0.0.0.0` ou
+  `::` a aplicação já está aberta à rede por escolha, e qualquer `Host` é aceito;
+- `--port PORT`: porta HTTP, padrão `8000`;
+- `--out PATH`: diretório dos artefatos gerados pelos jobs, padrão `out/`;
+- `--cache PATH`: cache compartilhado pelos jobs e pelos envios da página.
 
-**Abrir arquivo…** abre o seletor do sistema e aceita `.mp3`, `.wav`, `.gp5` e `.musicxml`. Um arquivo de áudio é
-enviado ao servidor, copiado para `cache/uploads/` e colocado no campo de referência. Ajuste instrumento, BPM e as
-demais opções e clique em **Transcrever**; o nome do arquivo vira o título da partitura, e reenviar o mesmo áudio
-reaproveita o cache. GP5 e MusicXML apenas **abrem** na tela: não sobem ao servidor e nenhuma transcrição é feita
-(ADR-051).
+#### 2. Escolher a música
 
-Com a partitura na tela, **Tocar com WAV…** escolhe um WAV local — a auralização, um stem ou a mix — para tocar no
-player da página, com o cursor acompanhando a posição do áudio. Clicar na pauta move o áudio. A velocidade fica no menu
-do próprio player. Use **Deslocamento (segundos)** se a partitura não começar no início do áudio. **Voltar ao player do
-Thoth** restaura o áudio sintetizado.
+Há duas formas de indicar o áudio:
 
-#### Acompanhar a reprodução de outro player no Linux
+- digitar no campo **Arquivo local ou URL do YouTube** um caminho da máquina onde o servidor roda, terminado em `.mp3`
+  ou `.wav`, ou uma URL do YouTube (esta exige `yt-dlp` e rede). Outros endereços e extensões são recusados com `422`;
+- clicar em **Abrir arquivo…** e escolher um arquivo no seletor do sistema. São aceitos `.mp3`, `.wav`, `.gp5` e
+  `.musicxml`.
+
+O que acontece depende do tipo do arquivo (ADR-051):
+
+| Arquivo | O que a página faz |
+| --- | --- |
+| `.mp3` ou `.wav` | envia o áudio ao servidor, que o copia para `cache/uploads/` e preenche o campo de referência. Nada é transcrito ainda: ajuste as opções e clique em **Transcrever**. |
+| `.gp5` ou `.musicxml` | apenas **abre** a partitura na tela, para estudar. O arquivo não sai do navegador e nenhum job é criado. |
+
+O nome do arquivo enviado vira o título da partitura. Reenviar o mesmo áudio, mesmo com outro nome de arquivo
+escolhido antes, cai na mesma pasta de `cache/uploads/<sha256 do conteúdo>/` e reaproveita o cache de ingestão. O envio
+tem teto de 512 MiB; acima disso o servidor responde `413`.
+
+#### 3. Ajustar as opções e transcrever
+
+| Campo | Para que serve |
+| --- | --- |
+| **Andamento da música (BPM)** | vazio, o Thoth estima do áudio; informe quando souber o valor certo |
+| **Tom** | vazio, o tom é estimado das notas; aceita `Bb maior`, `f menor` etc. |
+| **Instrumento** | `baixo` (padrão), `todos` (partitura multifaixa), guitarra limpa, distorcida ou acústica, `bateria` |
+| **Afinação** | só vale para o baixo: 4 cordas, 5 cordas ou drop D; a guitarra usa a afinação do perfil |
+| **Digitação** | `iniciante` prefere casas baixas e cordas soltas; `experiente` fica numa posição do braço (ADR-050) |
+
+Clique em **Transcrever**. A área de estado mostra o job passando por `na fila`, `rodando` e `pronto` (ou `erro`).
+Em CPU, a transcrição leva minutos. Os jobs rodam um por vez, pois compartilham caches e caminhos de saída; um pedido
+novo espera o anterior terminar.
+
+Quando o job termina, o estado também resume o que merece conferência: andamento e tom **estimados** (com margem),
+notas descartadas por serem simultâneas ou fora do braço, notas tiradas da parte por erro de rótulo ou contaminação do
+stem, acordes impossíveis e avisos de oitava. Os avisos com `⚠` pedem que você confira ouvindo.
+
+A partitura GP5 aparece na tela e **Salvar transcrição** oferece os formatos produzidos pelo pipeline, como GP5 e
+MusicXML, preservando no download o nome do arquivo gerado. Os mesmos arquivos ficam em `out/`.
+
+#### 4. Estudar com o player do Thoth
+
+Com a partitura na tela, os controles de estudo tocam um áudio sintetizado a partir da própria partitura:
+
+- **Andamento de estudo**: de 25% a 100% da velocidade original; começa em 60%;
+- **Tocar** e **Parar**;
+- **Metrônomo**: liga o clique junto com a partitura;
+- **Repetir**: volta ao início ao chegar no fim.
+
+Clicar na pauta posiciona o cursor naquele ponto.
+
+#### 5. Tocar com um WAV seu
+
+**Tocar com WAV…** escolhe um WAV local — a auralização, um stem ou a mix — para tocar no player da página, com o
+cursor da partitura acompanhando a posição do áudio. O WAV não é enviado ao servidor.
+
+- O player mostra os controles nativos do navegador: tocar, pausar e arrastar a posição. A velocidade fica no menu do
+  próprio player.
+- Clicar na pauta move o áudio para aquele ponto.
+- **Deslocamento (segundos)** corrige o caso em que a partitura não começa no início do áudio, como uma introdução ou
+  um silêncio inicial.
+- **Trocar WAV** escolhe outro arquivo; **Voltar ao player do Thoth** restaura o áudio sintetizado.
+
+#### 6. Acompanhar a reprodução de outro player no Linux
 
 Depois de gerar uma partitura GP5, escolha **Usar player externo** para trocar o alphaTab para o modo de mídia externa.
 Abra um player compatível com MPRIS 2 — por exemplo, VLC ou Strawberry — na mesma sessão Linux e clique em **Atualizar
@@ -484,12 +544,32 @@ silêncio que não esteja na partitura. Isso corrige o ponto inicial, não deriv
 o Thoth informa que a lista está vazia e a reprodução local continua disponível. O modo externo não é suportado no
 Windows nem no Docker Compose porque a aplicação não acessa a sessão D-Bus do host.
 
-Opções:
+#### Voltar a um job e o que fica guardado
 
-- `--host HOST`: endereço de escuta; o padrão seguro é `127.0.0.1`;
-- `--port PORT`: porta HTTP, padrão `8000`;
-- `--out PATH`: diretório dos artefatos gerados pelos jobs;
-- `--cache PATH`: cache compartilhado pelos jobs.
+Os jobs ficam apenas na memória do servidor, até 50 concluídos; os mais antigos saem primeiro. Enquanto o servidor
+estiver de pé, `http://127.0.0.1:8000/?job=<id>` reabre o estado e a partitura de um job. Encerrar o servidor apaga o
+histórico de jobs, mas não remove os artefatos de `out/` nem o conteúdo de `cache/`, inclusive os áudios enviados em
+`cache/uploads/`. Para estudar uma transcrição antiga depois de reiniciar, abra o GP5 de `out/` com **Abrir arquivo…**.
+
+#### API
+
+A página usa as mesmas rotas que um script pode chamar. A documentação interativa fica em `/docs`.
+
+| Rota | O que faz |
+| --- | --- |
+| `POST /uploads?nome=musica.mp3` | recebe o áudio como corpo cru (`application/octet-stream`); devolve `{"ref": ...}`. Só `.mp3` e `.wav`. |
+| `POST /jobs` | cria um job; corpo JSON com `ref` e, opcionais, `bpm`, `tom`, `instrumento`, `afinacao`, `digitacao` |
+| `GET /jobs` | lista os jobs em memória |
+| `GET /jobs/{id}` | estado e resumo de um job |
+| `GET /jobs/{id}/artifacts/{formato}` | baixa um artefato, por exemplo `gp5` ou `musicxml` |
+| `GET /playback/players` | players MPRIS visíveis na sessão; lista vazia sem player ou sem D-Bus |
+
+```bash
+ref=$(curl -s --data-binary @musica.mp3 -H 'Content-Type: application/octet-stream' \
+  'http://127.0.0.1:8000/uploads?nome=musica.mp3' | jq -r .ref)
+curl -s -X POST http://127.0.0.1:8000/jobs -H 'Content-Type: application/json' \
+  -d "{\"ref\": \"$ref\", \"instrumento\": \"baixo\"}"
+```
 
 ## Desenvolvimento
 

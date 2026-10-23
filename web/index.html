@@ -298,6 +298,7 @@
       let partitura;
       let seguirPlayer = false;
       let posicaoExternaAtiva = false;
+      let estadoExternoAnterior = null;
       let reproducaoLocalIniciada = false;
 
       const definirEstadoLocal = (estadoAtual) => {
@@ -406,6 +407,7 @@
       const acompanharPlayer = async () => {
         seguirPlayer = true;
         posicaoExternaAtiva = false;
+        estadoExternoAnterior = null;
         $("seguirPlayer").textContent = "Parar acompanhamento";
         while (seguirPlayer) {
           try {
@@ -431,9 +433,11 @@
                 api.player.output.updatePosition(posicaoMs);
                 posicaoExternaAtiva = false;
               } else {
-                if (posicaoExternaAtiva) api.stop();
+                // Na entrada em `Stopped`, venha de `Playing` ou de `Paused` (ADR-046).
+                if (estadoExternoAnterior !== "Stopped") api.stop();
                 posicaoExternaAtiva = false;
               }
+              estadoExternoAnterior = atual.estado;
             }
           } catch (erro) {
             definirEstadoReproducao(null);
@@ -666,7 +670,8 @@
 
       const carregar = async (ident, formatos) => {
         prepararDownloads(ident, formatos);
-        // O alphaTab só lê GP5. Alvo sem ele tem os outros arquivos, mas não a tela (ADR-044).
+        // A tela do job mostra o GP5 dele. Sem GP5 ficam os downloads (ADR-044); um
+        // MusicXML abre pelo "Abrir arquivo…", que o alphaTab também lê (ADR-051).
         if (!formatos.includes("gp5")) {
           estado.textContent += `\nsem GP5 para exibir aqui — arquivos: ${formatos.join(", ") || "nenhum"}`;
           estado.classList.add("aviso");

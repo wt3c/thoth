@@ -10,6 +10,7 @@ from thoth.domain.models import EventoPercussivo, NoteEvent, TabNote
 from thoth.services.rhythm import (
     GRADE,
     PPQ,
+    a_partir_do_zero,
     alinhar,
     ataques_em_ticks,
     eventos,
@@ -198,3 +199,10 @@ def test_referencia_da_bateria_vira_uma_colcheia_por_grupo_sem_perder_ataque() -
     assert sum(len(g) for _, _, g in grupos) == len(ref.ataques) == 48
     assert [inicio for inicio, _, _ in grupos] == [i * PPQ // 2 for i in range(32)]
     assert max(len(g) for _, _, g in grupos) == 3
+
+
+def test_nota_antes_do_zero_encosta_no_zero_com_a_mesma_duracao() -> None:
+    antes, depois = NoteEvent(40, -0.02, 0.3, "x"), NoteEvent(41, 0.5, 0.9, "x")
+    encostada, intacta = a_partir_do_zero([antes, depois])
+    assert (encostada.onset_s, encostada.offset_s) == (0.0, pytest.approx(0.32))
+    assert intacta == depois

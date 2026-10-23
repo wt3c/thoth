@@ -1172,6 +1172,15 @@ tratava nem a falha nem a interrupção.
 - O teste da separação foi remedido depois da mudança de layout: 0,968, o mesmo valor, com o demucs real
   (`ref=16 est=15`).
 
+### Emenda (2026-10-22) — provisório único e o `comparar` no escopo do separador
+
+- **O provisório de `escrita_atomica` ganha sufixo aleatório** (`<nome>.parcial-<uuid8><ext>`). Com nome fixo, duas
+  escritas do mesmo destino (dois uploads iguais, por exemplo) dividiam o provisório, e uma podia promover o arquivo
+  que a outra ainda escrevia.
+- **`comparar` lê o stem pelo escopo do separador** (`DemucsSeparator().escopo`), não por `stems/<id>` cru. Stem de
+  outra versão do demucs não é este (emenda acima); antes, o comparador o aceitava e media contra áudio de outro
+  modelo. Sem stem no escopo atual, a mensagem é a mesma de quando não há stem.
+
 ## ADR-027 — Um job por vez, e histórico com teto
 
 **Data:** 2026-09-23 **Contexto:** A API aceitava jobs concorrentes e guardava todos para sempre.
@@ -1203,6 +1212,13 @@ transcritas da música inteira.
 - Paralelismo real (jobs em processos, cache por job) fica fora de escopo; o custo aqui é CPU, e a estação tem uma.
 - O teto é do histórico, não do disco: artefato exportado continua em `out/` depois do job sair da memória — é o que o
   ADR-017 já previa.
+
+### Emenda (2026-10-22) — um trabalhador numa fila, não um lock no `BackgroundTasks`
+
+O lock dentro de `_rodar` serializava os jobs, mas cada um ocupava uma thread do pool do Starlette esperando a vez, e a
+ordem de entrada no lock não é garantida. Agora há **uma thread trabalhadora (`thoth-jobs`) lendo uma `queue.Queue`**:
+`POST /jobs` só enfileira, e os jobs rodam um por vez na ordem de chegada. O lock que sobra protege o dicionário de
+jobs (criação, descarte, leitura do estado), não o pipeline.
 
 ## ADR-028 — Afinação e digitação por nome, não por contagem
 
@@ -3365,6 +3381,17 @@ compatível existente e usa uma única separação completa para `other`, `drums
 `<versão>-multifaixa` evita confundir o novo produto com os caches históricos de
 dois stems.
 
+### Emenda (2026-10-22) — uma grade só, parte vazia marcada, relatório por parte
+
+- **A grade comum é a do baixo.** Cada parte ajustava a própria fase e recuo, e as faixas do mesmo arquivo andavam
+  desencontradas por frações de tempo. Agora guitarra e bateria herdam o BPM e o recuo do baixo; a nota que o recuo
+  leva a tempo negativo é encostada no zero com a duração preservada (`a_partir_do_zero`).
+- **Parte sem nada que a partitura represente levanta `ParteVazia`**, um tipo próprio. No modo `todos` ela torna a
+  parte ausente; antes, a recusa do exportador (lista vazia, com outra redação) passava como falha da música
+  inteira.
+- **O relatório junta as partes**: descartes e avisos de cada uma entram com o nome da parte, e os stems da separação
+  compartilhada (emenda de 2026-09-27) são contados uma vez só.
+
 ## ADR-048 — *Eyrie* como laboratório multifaixa real, não como único gate
 
 **Data:** 2026-09-28 · **Status:** aceito · **Complementa:** ADR-006, ADR-007, ADR-044 e ADR-047
@@ -3657,3 +3684,21 @@ revela o caminho do arquivo escolhido ao servidor.
 
 - `cache/uploads/` guarda uma cópia de cada áudio enviado; é cache (fora do repositório, ADR-005) e pode ser apagado.
 - Partitura aberta de arquivo não tem job: o painel "Salvar transcrição" não aparece.
+
+### Emenda (2026-10-22) — o que a API aceita, de quem e quanto
+
+A revisão conjunta do código apontou que a API confiava demais em quem a chama.
+
+- **`ref` restrita**: URL só do YouTube (lista de hosts no `YtDlpSource`, URL canônica e `--` antes dela no `yt-dlp`),
+  caminho só com extensão de áudio (`.mp3`, `.wav`). Antes, qualquer caminho legível ou URL arbitrária chegava ao
+  `ffmpeg`/`yt-dlp`.
+- **`Host` conferido** (`TrustedHostMiddleware`) contra DNS rebinding: valem `127.0.0.1`, `localhost` e o `--host` do
+  `thoth serve`. Com `--host 0.0.0.0` ou `::`, o servidor já está aberto à rede por escolha, e qualquer `Host` passa.
+- **Upload com teto de 512 MiB**, lido em blocos e recusado com `413` ao passar dele, em vez de ler o corpo inteiro na
+  memória.
+- **A pasta do upload é o sha256 inteiro**: `<cache>/uploads/<sha256>/<nome>`, não `<sha256[:16]>`. Uma pasta de 16
+  hexadecimais com `mix.wav` dentro é o formato que `LocalFileSource` reconhece como cache, e um arquivo enviado com
+  esse nome perdia o título para o id. O teste sobe um WAV real com `mix.wav` e com nome acentuado e confere título e
+  duração.
+- **Player externo de `Paused` para `Stopped`** volta o cursor ao início, como já fazia vindo de `Playing` (ADR-046):
+  a página guarda o estado anterior e para na transição, não em todo tique.

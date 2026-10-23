@@ -35,6 +35,7 @@ class Faixa:
     cordas: tuple[int, ...]
     compassos: list[list[B]]
     percussao: bool = False
+    segunda_voz: list[list[B]] | None = None
 
 
 def _gravar(
@@ -65,24 +66,27 @@ def _gravar(
         track.isPercussionTrack = f.percussao
         track.strings = [gp.GuitarString(i + 1, v) for i, v in enumerate(f.cordas)]
         track.measures.clear()
-        for header, beats in zip(song.measureHeaders, f.compassos, strict=True):
+        segunda = f.segunda_voz or [[] for _ in f.compassos]
+        for header, *vozes in zip(song.measureHeaders, f.compassos, segunda, strict=True):
             medida = gp.Measure(track, header)
-            voz = gp.Voice(medida)
-            for b in beats:
-                beat = gp.Beat(voz, duration=gp.Duration(value=b.figura))
-                if b.casa is None:
-                    beat.status = gp.BeatStatus.rest
-                else:
-                    beat.status = gp.BeatStatus.normal
-                    beat.notes.append(
-                        gp.Note(beat, value=b.casa, string=len(f.cordas), type=b.tipo)
-                    )
-                if b.tempo is not None:
-                    beat.effect.mixTableChange = gp.MixTableChange(
-                        tempo=gp.MixTableItem(value=b.tempo)
-                    )
-                voz.beats.append(beat)
-            medida.voices = [voz, gp.Voice(medida)]
+            medida.voices = []
+            for beats in vozes:
+                voz = gp.Voice(medida)
+                for b in beats:
+                    beat = gp.Beat(voz, duration=gp.Duration(value=b.figura))
+                    if b.casa is None:
+                        beat.status = gp.BeatStatus.rest
+                    else:
+                        beat.status = gp.BeatStatus.normal
+                        beat.notes.append(
+                            gp.Note(beat, value=b.casa, string=len(f.cordas), type=b.tipo)
+                        )
+                    if b.tempo is not None:
+                        beat.effect.mixTableChange = gp.MixTableChange(
+                            tempo=gp.MixTableItem(value=b.tempo)
+                        )
+                    voz.beats.append(beat)
+                medida.voices.append(voz)
             track.measures.append(medida)
         song.tracks.append(track)
 
@@ -153,6 +157,23 @@ def test_ligadura_estende_a_nota_anterior(tmp_path: Path) -> None:
     assert [(n.onset_s, n.offset_s, n.pitch) for n in notas] == [
         (0.0, 2.0, 31),
         (2.0, 4.0, 33),
+    ]
+
+
+def _duas_vozes(tmp_path: Path) -> Path:
+    """Voz 1 sustenta E1 por dois compassos; a voz 2 ataca A1 na mesma corda no meio."""
+    baixo = _baixo([[B(1, 0)], [B(1, 0, gp.NoteType.tie)]])
+    baixo.segunda_voz = [[B(1, 5)], [B(1)]]
+    return _gravar(tmp_path, [baixo])
+
+
+def test_ligadura_estende_a_nota_da_propria_voz(tmp_path: Path) -> None:
+    """A corda sozinha não identifica a nota ligada: a outra voz pode tê-la usado no meio."""
+    notas = ler_tab(_duas_vozes(tmp_path)).notas
+
+    assert [(n.onset_s, n.offset_s, n.pitch) for n in notas] == [
+        (0.0, 4.0, 28),
+        (0.0, 2.0, 33),
     ]
 
 

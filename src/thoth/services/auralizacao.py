@@ -4,7 +4,7 @@
 transcrição descola do original, qualquer pessoa ouve em dez segundos. Números de
 F1 dizem quanto se errou; a auralização diz *onde*.
 
-Duas escolhas que parecem detalhe e não são:
+Três escolhas que parecem detalhe e não são:
 
 - **Soundfont, não onda sintética.** Um seno em E1 (41 Hz) é quase inaudível em
   caixa de notebook. O baixo GM traz harmônicos, e é por eles que se reconhece a

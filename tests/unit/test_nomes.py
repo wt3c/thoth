@@ -59,3 +59,16 @@ def test_cai_no_source_id_quando_nada_sobra() -> None:
 def test_arquivo_local_usa_o_nome_do_arquivo() -> None:
     """LocalSource põe o stem do caminho em `title` — nada a traduzir aqui."""
     assert nome_de_arquivo(_ativo("walking", source_id="9aa6eda3591aa060")) == "walking"
+
+
+def test_titulo_longo_em_escrita_de_varios_bytes_ainda_vira_arquivo(tmp_path: Path) -> None:
+    """O limite era em caracteres; o do sistema de arquivos é em bytes (255 no ext4).
+
+    120 ideogramas são 360 bytes: o pipeline gastava os minutos de CPU e caía no
+    `File name too long` ao gravar a partitura. O sufixo é o mais longo que o Thoth usa.
+    """
+    nome = nome_de_arquivo(_ativo("音" * 200))
+
+    (tmp_path / nome).mkdir()
+    (tmp_path / nome / f"{nome}.guitarra-distorcida.musicxml").write_text("")
+    assert nome == "音" * 40

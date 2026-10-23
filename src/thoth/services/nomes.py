@@ -9,6 +9,8 @@ from thoth.domain.models import AudioAsset
 # `/` e NUL são os únicos proibidos no Linux; os demais vêm do Windows, e
 # títulos de YouTube trazem `:` e `?` o bastante para valer a portabilidade.
 _HOSTIS = re.compile(r'[/\\:*?"<>|\x00-\x1f]')
+#: Em bytes, não em caracteres: o limite do ext4 é 255 bytes por nome, e o nome volta
+#: com sufixo (`.guitarra-distorcida.musicxml`). 120 ideogramas eram 360 bytes.
 _LIMITE = 120
 
 
@@ -17,5 +19,6 @@ def nome_de_arquivo(asset: AudioAsset) -> str:
     nome = _HOSTIS.sub("-", asset.title)
     nome = re.sub(r"\s+", " ", nome)
     nome = re.sub(r"-{2,}", "-", nome)
-    nome = nome[:_LIMITE].strip(" .-")
+    # O corte em bytes pode partir um caractere no meio: o pedaço incompleto cai fora.
+    nome = nome.encode()[:_LIMITE].decode(errors="ignore").strip(" .-")
     return nome or asset.source_id

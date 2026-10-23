@@ -14,7 +14,7 @@ from rich.progress import Progress, SpinnerColumn, TaskID, TextColumn, TimeElaps
 from rich.text import Text
 
 from thoth.adapters.ingest import resolver_fonte
-from thoth.adapters.separation import localizar_stems
+from thoth.adapters.separation import DemucsSeparator, localizar_stems
 from thoth.api.app import criar_app
 from thoth.domain.models import AFINACOES, AcordeImpossivel
 from thoth.services import pipeline
@@ -186,7 +186,8 @@ def comparar(
     )
 
     try:
-        stem = localizar_stems(cache / "stems" / ativo.source_id)["bass"]
+        # O escopo do separador do pipeline: stem de outro modelo ou versão não é este (ADR-026).
+        stem = localizar_stems(DemucsSeparator().escopo(cache / "stems" / ativo.source_id))["bass"]
     except FileNotFoundError:
         _diz("sem stem do baixo em cache: nota errada não medida (ADR-042)", "dim")
         return
@@ -302,6 +303,7 @@ def transcribe(
             ref,
             out,
             bpm=bpm,
+            tom=tom or None,
             tuning=cordas,
             instrumento=instrumento,
             cache_dir=cache,
@@ -430,4 +432,7 @@ def serve(
 ) -> None:
     """Sobe a API e a página de estudo (alphaTab local, sem CDN)."""
     typer.echo(f"http://{host}:{port}")
-    uvicorn.run(criar_app(out_dir=out, cache_dir=cache), host=host, port=port)
+    # Aberto para a rede, a página chega por qualquer endereço da máquina; em host
+    # nomeado, só por ele. O resto é recusado pelo `Host` (DNS rebinding).
+    hosts = ("*",) if host in {"0.0.0.0", "::"} else (host,)
+    uvicorn.run(criar_app(out_dir=out, cache_dir=cache, hosts=hosts), host=host, port=port)

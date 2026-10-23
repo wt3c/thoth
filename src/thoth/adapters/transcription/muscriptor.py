@@ -118,11 +118,13 @@ def trechos_sem_nota(energia_db: list[float], onsets: list[float]) -> list[tuple
 
 
 def _energia_por_segundo(audio: Path) -> list[float]:
-    y, taxa = sf.read(audio, always_2d=True)
-    mono = y.mean(axis=1)
+    """RMS em dB de cada segundo inteiro. Em blocos: o stem inteiro em float64 pesa
+    centenas de MB numa música de cinco minutos, e só um segundo é preciso por vez."""
+    taxa = sf.info(str(audio)).samplerate
     return [
-        float(20 * np.log10(np.sqrt(np.mean(mono[i : i + taxa] ** 2)) + 1e-9))
-        for i in range(0, len(mono) - taxa + 1, taxa)
+        float(20 * np.log10(np.sqrt(np.mean(bloco.mean(axis=1) ** 2)) + 1e-9))
+        for bloco in sf.blocks(audio, blocksize=taxa, always_2d=True)
+        if len(bloco) == taxa
     ]
 
 
