@@ -224,36 +224,34 @@ def test_quinta_duracao_no_mesmo_tique_vira_acorde_com_a_menor(tmp_path: Path) -
     ]
 
 
-def test_trecho_denso_fecha_beams_e_so_encolhe_duracao(tmp_path: Path) -> None:
+@pytest.mark.parametrize("semente", range(60))
+def test_trecho_denso_fecha_beams_e_so_encolhe_duracao(tmp_path: Path, semente: int) -> None:
     """Sementes fixas de notas soltas em colcheias, semicolcheias e pontuadas.
 
     ADR-038 no piano: o music21 escreve `end` sem `begin` também dentro de vozes
     (antes do conserto, 11 compassos quebrados em 60 sementes). E a densidade passa
     de 4 vozes em 20 das 60: ali a duração pode encolher, ataque e altura não.
+
+    Uma semente por teste: juntas, as 60 eram a cauda da suíte paralela (25 s).
     """
     duracoes = [0.125, 0.25, 0.375, 0.5, 0.75, 1.0, 1.5]
-    achados = []
-    encurtadas = 0
-    for semente in range(60):
-        sorteio = random.Random(semente)
-        notas = []
-        for _ in range(40):
-            inicio = sorteio.randrange(64) * 0.125
-            notas.append(_n(sorteio.randint(36, 84), inicio, sorteio.choice(duracoes)))
-        arquivo = _exportar(notas, tmp_path)
-        achados += [f"semente {semente}: {a}" for a in _beams_mal_formados(arquivo)]
-        lidas, esperadas = _lidas(arquivo), _esperadas(notas)
-        assert all(len(v) <= 4 for v in _vozes_por_pauta(arquivo).values()), semente
-        assert _sem_duracao(lidas) == _sem_duracao(esperadas), f"semente {semente}"
-        # As duas listas ordenadas pareiam nota a nota, inclusive altura repetida no
-        # mesmo tique: dentro de cada (pauta, início, altura), durações crescentes.
-        for lida, esperada in zip(lidas, esperadas, strict=True):
-            assert lida[3] <= esperada[3], f"semente {semente}: {lida} cresceu de {esperada}"
-        pares = zip(lidas, esperadas, strict=True)
-        encurtadas += sum(lida[3] < esperada[3] for lida, esperada in pares)
+    sorteio = random.Random(semente)
+    notas = []
+    for _ in range(40):
+        inicio = sorteio.randrange(64) * 0.125
+        notas.append(_n(sorteio.randint(36, 84), inicio, sorteio.choice(duracoes)))
+    arquivo = _exportar(notas, tmp_path)
+    lidas, esperadas = _lidas(arquivo), _esperadas(notas)
 
-    print(f"\nDENSO: {encurtadas} de {60 * 40} notas encurtadas pelo teto de 4 vozes")
-    assert achados == []
+    assert _beams_mal_formados(arquivo) == []
+    assert all(len(v) <= 4 for v in _vozes_por_pauta(arquivo).values())
+    assert _sem_duracao(lidas) == _sem_duracao(esperadas)
+    # As duas listas ordenadas pareiam nota a nota, inclusive altura repetida no
+    # mesmo tique: dentro de cada (pauta, início, altura), durações crescentes.
+    for lida, esperada in zip(lidas, esperadas, strict=True):
+        assert lida[3] <= esperada[3], f"{lida} cresceu de {esperada}"
+    encurtadas = sum(lida[3] < esperada[3] for lida, esperada in zip(lidas, esperadas, strict=True))
+    print(f"\nDENSO semente {semente}: {encurtadas} de 40 notas encurtadas pelo teto de 4 vozes")
 
 
 def test_sem_notas_recusa(tmp_path: Path) -> None:

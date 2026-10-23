@@ -246,6 +246,9 @@ uv run thoth transcribe --help
 Nos comandos que recebem `ref`, a referência pode ser um arquivo local ou uma URL do YouTube. O Thoth escolhe a fonte
 automaticamente. Arquivos intermediários ficam em `cache/`; os arquivos que você abre, escuta ou move ficam em `out/`.
 Use `--cache outro/diretorio` ou `--out outro/diretorio` quando precisar mudar esses locais.
+A transcrição bruta do MuScriptor também fica em `cache/transcricoes/`, chaveada pelo conteúdo do stem, pelos pesos
+de `models.lock.toml` e pela configuração do transcritor: repetir a mesma música com outro `--bpm` ou outra digitação
+não paga o modelo de novo.
 
 ### `fetch` — obter e normalizar o áudio
 

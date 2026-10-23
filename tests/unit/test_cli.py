@@ -149,10 +149,9 @@ def test_transcribe_avisa_trecho_sem_baixo(tmp_path: Path, monkeypatch) -> None:
 
 def test_serve_monta_o_app_sem_subir_o_servidor(monkeypatch) -> None:
     """Checa a fiação até o uvicorn — subir servidor de verdade é teste de outro nível."""
-    from thoth import cli
 
     recebido: dict[str, object] = {}
-    monkeypatch.setattr(cli.uvicorn, "run", lambda app, **kw: recebido.update(kw, app=app))
+    monkeypatch.setattr("uvicorn.run", lambda app, **kw: recebido.update(kw, app=app))
 
     resultado = runner.invoke(app, ["serve", "--port", "9123"])
 
@@ -168,10 +167,9 @@ def test_serve_aceita_o_host_em_que_foi_aberto(monkeypatch, host: str, pela_rede
     """`--host` abre a página para a rede: o endereço pelo qual ela chega tem de passar."""
     from fastapi.testclient import TestClient
 
-    from thoth import cli
 
     recebido: dict[str, object] = {}
-    monkeypatch.setattr(cli.uvicorn, "run", lambda app, **kw: recebido.update(kw, app=app))
+    monkeypatch.setattr("uvicorn.run", lambda app, **kw: recebido.update(kw, app=app))
 
     runner.invoke(app, ["serve", "--host", host])
 

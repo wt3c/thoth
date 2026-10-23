@@ -3702,3 +3702,40 @@ A revisão conjunta do código apontou que a API confiava demais em quem a chama
   duração.
 - **Player externo de `Paused` para `Stopped`** volta o cursor ao início, como já fazia vindo de `Playing` (ADR-046):
   a página guarda o estado anterior e para na transição, não em todo tique.
+
+## ADR-052 — a transcrição bruta do MuScriptor fica em cache, chaveada pelo que a decide
+
+**Data:** 2026-10-23 · **Status:** aceito · **Complementa:** ADR-020, ADR-026
+
+### Contexto
+
+A transcrição é o estágio caro do pipeline: minutos de CPU por música. A separação já tem cache por fonte (ADR-026),
+mas a transcrição não. Mudar só `--bpm`, a digitação ou o tom retranscreve a música inteira, e o resultado sai igual.
+O `notas.jsonl` do ADR-020 não serve para isso, porque guarda as notas **depois** do filtro, do ajuste de grade e do
+recuo. Ele depende do BPM e do instrumento escolhido, e não da transcrição em si.
+
+### Decisão
+
+- **Cache em disco da `Transcricao` bruta**, a saída do `Transcriber` antes de qualquer etapa do pipeline. Fica em
+  `<cache>/transcricoes/<chave>.json`, com escrita atômica (ADR-026).
+- **A chave é tudo o que decide a saída:**
+  - o sha256 do **conteúdo** do stem, não o caminho dele;
+  - a identidade do modelo no `models.lock.toml` (repositório, revisão e sha256 dos arquivos);
+  - a configuração do adapter (`binary`, `model`, `device`, `silencio_inicial_s`);
+  - o sha256 do código-fonte do adapter.
+  - Com isso, mudar a segunda passada (emenda do ADR-008) ou o silêncio (ADR-045) invalida o cache sozinho, sem
+    número de versão para alguém esquecer de incrementar.
+- **Sem o lock, não há cache.** Um checkout sem `models.lock.toml` transcreve sempre: sem identidade dos pesos, um
+  resultado de outro modelo poderia ser servido como se fosse deste.
+- **Só o transcritor padrão é embrulhado.** O `Transcriber` injetado (testes, biblioteca) passa direto, como antes.
+- A alternativa de hashear os pesos a cada execução custaria 1–3 s por corrida e mediria o arquivo, não a declaração.
+  O lock já é a declaração que o teste `test_lock_do_projeto_bate_com_os_pesos_da_estacao` confere contra o disco.
+  Recusada.
+
+### Consequências
+
+- Rodar de novo a mesma música com outro `--bpm`, digitação ou tom pula o MuScriptor. Continuam rodando o hash do stem
+  (frações de segundo) e o pós-processamento.
+- `cache/transcricoes/` pode ser apagado a qualquer momento; o pior caso é transcrever de novo.
+- Se os pesos mudarem upstream sem o lock mudar, o cache serve o resultado antigo. É o mesmo risco que o lock já torna
+  visível (o teste dele falha), e a correção é a mesma: atualizar o lock, o que também invalida o cache.

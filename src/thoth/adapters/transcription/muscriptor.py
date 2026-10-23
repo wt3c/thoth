@@ -48,6 +48,9 @@ _SILENCIO_DB = -60.0
 _VIZINHANCA_S = 2
 _BURACO_MINIMO_S = 10
 
+#: Quadros por bloco ao copiar o stem: 64 Ki, centenas de KB em vez da música inteira.
+_BLOCO = 1 << 16
+
 
 def parse_jsonl(texto: str) -> Transcricao:
     """Converte o JSONL livre em notas e ataques de bateria.
@@ -117,6 +120,20 @@ def trechos_sem_nota(energia_db: list[float], onsets: list[float]) -> list[tuple
     return trechos
 
 
+def _com_silencio_na_frente(audio: Path, destino: Path, segundos: float) -> None:
+    """`audio` com `segundos` de silêncio antes, em float, copiado bloco a bloco.
+
+    Ler o stem inteiro e concatenar punha duas cópias dele na memória — de uma
+    música longa em float32 estéreo, centenas de MB — só para empurrá-lo adiante.
+    """
+    with sf.SoundFile(audio) as origem, sf.SoundFile(
+        destino, "w", samplerate=origem.samplerate, channels=origem.channels, subtype="FLOAT"
+    ) as saida:
+        saida.write(np.zeros((round(segundos * origem.samplerate), origem.channels), "float32"))
+        for bloco in origem.blocks(blocksize=_BLOCO, dtype="float32", always_2d=True):
+            saida.write(bloco)
+
+
 def _energia_por_segundo(audio: Path) -> list[float]:
     """RMS em dB de cada segundo inteiro. Em blocos: o stem inteiro em float64 pesa
     centenas de MB numa música de cinco minutos, e só um segundo é preciso por vez."""
@@ -157,9 +174,7 @@ class MuscriptorTranscriber:
             entrada, saida = audio, Path(tmp) / "notas.jsonl"
             if frente:
                 entrada = Path(tmp) / "entrada.wav"
-                y, taxa = sf.read(audio, always_2d=True, dtype="float32")
-                zeros = np.zeros((round(frente * taxa), y.shape[1]), dtype="float32")
-                sf.write(entrada, np.concatenate([zeros, y]), taxa, subtype="FLOAT")
+                _com_silencio_na_frente(audio, entrada, frente)
             rodar(self._comando(entrada, saida, prelude=prelude))
             # Nota que termina dentro do silêncio não existe no áudio original.
             notas = [

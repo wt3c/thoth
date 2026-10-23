@@ -8,14 +8,12 @@ from dataclasses import dataclass
 from pathlib import Path
 
 import typer
-import uvicorn
 from rich.console import Console
 from rich.progress import Progress, SpinnerColumn, TaskID, TextColumn, TimeElapsedColumn
 from rich.text import Text
 
 from thoth.adapters.ingest import resolver_fonte
 from thoth.adapters.separation import DemucsSeparator, localizar_stems
-from thoth.api.app import criar_app
 from thoth.domain.models import AFINACOES, AcordeImpossivel
 from thoth.services import pipeline
 from thoth.services.acordes import ViterbiAcordes
@@ -435,4 +433,9 @@ def serve(
     # Aberto para a rede, a página chega por qualquer endereço da máquina; em host
     # nomeado, só por ele. O resto é recusado pelo `Host` (DNS rebinding).
     hosts = ("*",) if host in {"0.0.0.0", "::"} else (host,)
+    # Aqui dentro: FastAPI e uvicorn custam o import a todo comando, e só o `serve` os usa.
+    import uvicorn
+
+    from thoth.api.app import criar_app
+
     uvicorn.run(criar_app(out_dir=out, cache_dir=cache, hosts=hosts), host=host, port=port)

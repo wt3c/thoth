@@ -79,6 +79,7 @@ from thoth.domain.ports import (
 from thoth.services.acordes import ViterbiAcordes, inicios_de_acorde
 from thoth.services.auralizacao import AuralizacaoError, auralizar
 from thoth.services.cache_notas import gravar
+from thoth.services.cache_transcricao import em_cache
 from thoth.services.fretboard import ViterbiFretAssigner, cabe_no_braco
 from thoth.services.nomes import nome_de_arquivo
 from thoth.services.octave_check import OctaveWarning, verificar_oitavas
@@ -199,6 +200,16 @@ class _Silencio:
 
     def inicia(self, etapa: str, detalhe: str = "") -> None:
         return None
+
+
+@dataclass(frozen=True, slots=True)
+class _FonteJaObtida:
+    """O áudio que a primeira parte do `todos` buscou, servido às seguintes."""
+
+    asset: AudioAsset
+
+    def fetch(self, ref: str, cache_dir: Path) -> AudioAsset:
+        return self.asset
 
 
 @dataclass(slots=True)
@@ -368,7 +379,8 @@ def transcrever(
 
     relator = progresso or _Silencio()
     separator = separator or DemucsSeparator(stem=perfil.stem)
-    transcriber = transcriber or transcritor_padrao(perfil)
+    # Só o padrão vai ao disco: transcritor injetado não tem identidade a confiar (ADR-052).
+    transcriber = transcriber or em_cache(transcritor_padrao(perfil), cache_dir)
 
     # `resolver_fonte` escolhe entre disco e YouTube pelo `ref`; `source` passa por
     # cima dessa escolha. Era o único estágio que não se deixava substituir, e sem
@@ -591,7 +603,11 @@ def _transcrever_todas_as_partes(
 
     pasta_partes = cache_dir / baixo.asset.source_id / "partes-multifaixa"
     ausentes: list[str] = []
-    transcritor_guitarras = _TranscritorComCache(transcriber or MuscriptorTranscriber())
+    # Buscar de novo a cada parte refazia o hash do arquivo e o `ffprobe` quatro vezes.
+    fonte_das_partes = _FonteJaObtida(baixo.asset)
+    transcritor_guitarras = _TranscritorComCache(
+        transcriber or em_cache(MuscriptorTranscriber(), cache_dir)
+    )
     separador_de_partes = separator or DemucsMultifaixaSeparator()
     for instrumento in _PARTES_MULTIFAIXA[1:]:
         try:
@@ -602,7 +618,7 @@ def _transcrever_todas_as_partes(
                     bpm=baixo.bpm,
                     tom=tom,
                     cache_dir=cache_dir,
-                    source=source,
+                    source=fonte_das_partes,
                     separator=separador_de_partes,
                     transcriber=(
                         transcriber if instrumento == "bateria" else transcritor_guitarras

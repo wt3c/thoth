@@ -16,7 +16,7 @@ from pathlib import Path
 import pytest
 
 from thoth.domain.models import NoteEvent
-from thoth.services.octave_check import verificar_oitavas
+from thoth.services.octave_check import _LARGURA, _pico_na_banda, verificar_oitavas
 
 B0, B1 = 23, 35  # 30,87 Hz e 61,74 Hz
 
@@ -194,3 +194,19 @@ def test_nota_certa_de_qualquer_duracao_nao_gera_aviso(tmp_path: Path) -> None:
 
     assert avisadas == [], f"E1 limpo avisado nas durações {avisadas}"
 
+
+
+@pytest.mark.parametrize("pontos", [22_050, 26_461])
+def test_pico_na_banda_e_o_maximo_da_mascara(pontos: int) -> None:
+    """Achar a banda por busca na grade ordenada dá o mesmo que a máscara sobre o
+    espectro inteiro — inclusive com a borda caindo em cima de um ponto da grade."""
+    import numpy as np
+
+    taxa = 44_100
+    frequencias = np.fft.rfftfreq(pontos, 1 / taxa)
+    espectro = np.random.default_rng(pontos).random(len(frequencias))
+    na_grade = frequencias[1234] * _LARGURA
+    for f in [20.0, 41.2, 55.0, 98.0, 440.0, 1760.0, na_grade, taxa, 0.0]:
+        banda = (frequencias > f / _LARGURA) & (frequencias < f * _LARGURA)
+        esperado = float(espectro[banda].max()) if banda.any() else 0.0
+        assert _pico_na_banda(espectro, frequencias, f) == esperado

@@ -27,7 +27,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from pathlib import Path
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 import guitarpro as gp
 
@@ -103,6 +103,18 @@ def _fatiar_na_barra(inicio: int, duracao: int) -> list[tuple[int, int]]:
     return fatias
 
 
+def _por_compasso[T: tuple[Any, ...]](eventos: list[T]) -> dict[int, list[T]]:
+    """Os eventos de cada compasso, na ordem em que vieram.
+
+    Varrer a lista inteira a cada compasso era quadrático: 3.000 notas em 750
+    compassos, mais de dois milhões de comparações para separar o que é de quem.
+    """
+    por_compasso: dict[int, list[T]] = {}
+    for evento in eventos:
+        por_compasso.setdefault(evento[0] // COMPASSO, []).append(evento)
+    return por_compasso
+
+
 @dataclass(frozen=True, slots=True)
 class Gp5Exporter:
     """Implementa o `Exporter`. Round-trip verificado contra o próprio PyGuitarPro."""
@@ -147,6 +159,7 @@ class Gp5Exporter:
             for i, (ini, dur) in enumerate(_fatiar_na_barra(inicio, duracao))
         ]
         total = (marcados[-1][0] + marcados[-1][1] - 1) // COMPASSO + 1
+        por_compasso = _por_compasso(marcados)
         cursor = 0
         for numero in range(total):
             while numero >= len(song.measureHeaders):
@@ -155,9 +168,7 @@ class Gp5Exporter:
             voz = gp.Voice(medida)
             fim_do_compasso = (numero + 1) * COMPASSO
 
-            for inicio, duracao, acorde, continuacao in marcados:
-                if not numero * COMPASSO <= inicio < fim_do_compasso:
-                    continue
+            for inicio, duracao, acorde, continuacao in por_compasso.get(numero, ()):
                 for valor, pontuada in _decompor(inicio - cursor):
                     voz.beats.append(self._pausa(voz, valor, pontuada))
                 # Só a primeira figura da primeira fatia é ataque; o resto da
@@ -251,6 +262,7 @@ class Gp5PercussaoExporter:
         # Só a fatia até a barra é figura; o resto do espaço é pausa.
         cortados = [(inicio, _fatiar_na_barra(inicio, dur)[0][1], g) for inicio, dur, g in grupos]
         total = (cortados[-1][0] + cortados[-1][1] - 1) // COMPASSO + 1
+        por_compasso = _por_compasso(cortados)
         cursor = 0
         for numero in range(total):
             while numero >= len(song.measureHeaders):
@@ -258,9 +270,7 @@ class Gp5PercussaoExporter:
             medida = gp.Measure(track, song.measureHeaders[numero])
             voz = gp.Voice(medida)
             fim_do_compasso = (numero + 1) * COMPASSO
-            for inicio, duracao, grupo in cortados:
-                if not numero * COMPASSO <= inicio < fim_do_compasso:
-                    continue
+            for inicio, duracao, grupo in por_compasso.get(numero, ()):
                 for valor, pontuada in _decompor(inicio - cursor):
                     voz.beats.append(Gp5Exporter._pausa(voz, valor, pontuada))
                 (valor, pontuada), *resto = _decompor(duracao)

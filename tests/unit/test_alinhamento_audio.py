@@ -8,7 +8,7 @@ import numpy as np
 import soundfile as sf
 
 from thoth.domain.models import NoteEvent
-from thoth.services.alinhamento_audio import HOP, SR, alinhar_ao_stem
+from thoth.services.alinhamento_audio import HOP, SR, _media_por_quadro, alinhar_ao_stem
 
 HOP_S = HOP / SR
 
@@ -95,3 +95,18 @@ def test_ataque_alinhado_nao_fica_atrasado_em_relacao_ao_stem(tmp_path: Path) ->
     erros = np.array([a.onset_s - t.onset_s for a, t in zip(alinhada, tocada, strict=True)])
     print(f"erro mediano com sinal {np.median(erros) * 1000:+.0f} ms")
     assert abs(np.median(erros)) < 0.015
+
+
+def test_media_por_quadro_e_a_media_do_caminho_em_cada_quadro_da_tab() -> None:
+    """Contra a conta direta, quadro a quadro: o caminho monótono do DTW, com paradas
+    de vários quadros de áudio num quadro da tab e vice-versa."""
+    sorteio = np.random.default_rng(0)
+    passos = np.array([(1, 0), (0, 1), (1, 1)])[sorteio.integers(0, 3, 5_000)]
+    caminho = np.vstack([(0, 0), np.cumsum(passos, axis=0)])
+
+    quadros_tab, quadros_audio = _media_por_quadro(caminho)
+
+    esperado_tab = np.unique(caminho[:, 0])
+    esperado_audio = [caminho[caminho[:, 0] == k, 1].mean() for k in esperado_tab]
+    np.testing.assert_array_equal(quadros_tab, esperado_tab)
+    np.testing.assert_array_equal(quadros_audio, esperado_audio)

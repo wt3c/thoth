@@ -93,6 +93,16 @@ def _desvio_ate_os_ataques(ataques: np.ndarray, y: np.ndarray) -> float:
     return desvio
 
 
+def _media_por_quadro(caminho: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
+    """Cada quadro da tab e a média dos quadros de áudio em que o caminho passa nele.
+
+    O caminho pode parar vários quadros de áudio num quadro da tab. Somar por
+    `bincount` é uma passada só; filtrar o caminho inteiro por quadro era quadrático.
+    """
+    quadros_tab, quadro = np.unique(caminho[:, 0], return_inverse=True)
+    return quadros_tab, np.bincount(quadro, weights=caminho[:, 1]) / np.bincount(quadro)
+
+
 def alinhar_ao_stem(referencia: Sequence[NoteEvent], stem: Path) -> list[NoteEvent]:
     """Cada nota da tab no instante do stem em que o DTW a põe — altura intocada."""
     if not referencia:
@@ -106,10 +116,7 @@ def alinhar_ao_stem(referencia: Sequence[NoteEvent], stem: Path) -> list[NoteEve
         global_constraints=True,
         band_rad=BANDA,
     )
-    caminho = caminho[::-1]
-    # O caminho pode parar vários quadros de áudio num quadro da tab: fica a média.
-    quadros_tab = np.unique(caminho[:, 0])
-    quadros_audio = np.array([caminho[caminho[:, 0] == k, 1].mean() for k in quadros_tab])
+    quadros_tab, quadros_audio = _media_por_quadro(caminho[::-1])
     ataques = np.interp(
         [n.onset_s for n in referencia], quadros_tab * HOP / SR, quadros_audio * HOP / SR
     )

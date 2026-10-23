@@ -2,6 +2,56 @@
 
 > Áudio → partitura e tablatura, foco em contrabaixo. Uso pessoal. CPU-only. Decisões em `tasks/decisions.md`.
 
+## Eficiência: revisão conjunta Claude + Codex (2026-10-23)
+
+Revisão somente leitura: Claude (`fable`) e Codex (`gpt-6.1-sol`, `high`). Os achados principais foram conferidos na
+fonte. Linha de base: suíte padrão em 39 s de relógio (487 s de CPU em 20 workers). [M] = medido pelo revisor, [E] =
+estimado. Cada mudança começa por um teste de equivalência com a versão atual (saída idêntica), não só pelo teste
+existente.
+
+### Lote A — risco baixo, sem ADR
+
+1. [x] MusicXML: `makeNotation(inPlace=True)` nos três exportadores (`musicxml.py:114, 439` e piano). [M] 3.000
+   notas: 17,4 s → 11,5 s, saída idêntica. `write(makeNotation=False)` muda a saída: não usar.
+2. [x] `tempo.ajustar`: vetorizar as 120 fases por BPM (mediana em `axis=1`, primeiro mínimo no desempate). [M] 64
+   onsets: 1,9 s → 0,1 s; 3.000: 12,7 s → 4,7 s. A grade do ADR-021 não muda.
+3. [x] Imports leves: `TOLERANCIA_S` sai de `evaluation` (que puxa `mir_eval`/`scipy`/`pretty_midi`) para o
+   domínio; `fastapi`/`uvicorn` importados só no `serve`. [M] ~1,6 s a cada processo da CLI e worker do xdist.
+4. [x] `test_trecho_denso_fecha_beams_e_so_encolhe_duracao`: 60 sementes parametrizadas. É a cauda da suíte (25 s).
+5. [-] Fixtures caras compartilhadas por worker (`tests/conftest.py` novo): MIDI renderizado, MP3 de
+   `test_local_source`, auralização de `test_auralizacao`. Cópia para `tmp_path`, bytes idênticos (a fixture é
+   **copiada**, não reescrita; `lessons/workflow.md`).
+   Medido, não compensa: o setup mais caro dessas fixtures é ≤ 0,33 s; a cauda era o item 4.
+6. [x] Modo `todos`: `fetch` uma vez, o `AudioAsset` passa às partes (hoje são 5 hashes e 5 `ffprobe`).
+7. [x] MuScriptor: o silêncio inicial da bateria (ADR-045) é escrito em blocos, sem duas cópias do stem na memória.
+8. [x] Ganhos pequenos, mesma natureza: eventos do GP5 indexados por compasso (O(c×e) → O(c+e)); média do caminho do
+   DTW por `bincount`; `octave_check` com frequências e índices de banda pré-calculados; `tempo.residuo` sem
+   reconverter a lista de onsets.
+
+### Lote B — ganho grande, pede ADR ou emenda antes
+
+9. [x] Cache em disco da transcrição bruta do MuScriptor, chave = sha256 do stem + identidade dos pesos
+   (`models.lock.toml`) + versão do adapter, escrita atômica (ADR-026). Hoje mudar só `--bpm` ou a digitação
+   retranscreve a música (minutos de CPU); `notas.jsonl` (ADR-020) guarda as notas já processadas e não evita isso.
+   ADR-052. Real: `escala` 5,7 s no modelo, 0,006 s do disco, saída igual.
+10. [-] Modo `todos` roda o Demucs duas vezes (two-stems do baixo + separação completa). Duplicação deliberada na
+    emenda de 2026-09-27 ao ADR-047; só muda se o `bass.wav` das duas for medido idêntico ou equivalente.
+    Medido, não muda: nos 15 pares do cache, nenhum byte a byte igual; SNR de 19,4 a 31,8 dB, pico da diferença até
+    0,31. Trocar a fonte do stem mudaria a entrada medida do baixo — equivalência exigiria remedir F1, não compensa.
+
+### Aberto
+
+- [ ] `test_mede_perfil[piano-acustico-mix]` e `[piano-eletrico-mix]` falham ("mão esquerda regrediu", 1 < 3)
+  desde a corrida `slow` do `6283965`, antes deste lote. Não é o fluidsynth: com 2.6.0 falha igual (2026-10-23).
+  Causa ainda não investigada.
+
+### Fora, por ora
+
+- Segunda passada do MuScriptor só nos buracos: mexe em comportamento medido (F1).
+- DTW em banda sem matriz densa (ADR-042): risco alto, só se a memória virar problema.
+- Espectrograma compartilhado entre os estimadores de andamento (ADR-019), cache da auralização (ADR-037), busca
+  grossa → fina na comparação: ganho incerto para o risco.
+
 ## Revisão conjunta Claude + Codex do código inteiro (2026-10-22)
 
 Revisão somente leitura: Claude (`fable`) e Codex (`gpt-6.1-sol`, `high`). Os achados foram conferidos na fonte antes de

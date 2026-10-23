@@ -152,11 +152,16 @@ def ajustar(
     faixa = _FAIXA if faixa is None else faixa
     passos = _PASSOS_BPM if faixa else 1
     candidatos = np.linspace(bpm_inicial * (1 - faixa), bpm_inicial * (1 + faixa), passos)
+    tempos = np.asarray(onsets)
     melhor = (float("inf"), float(bpm_inicial), 0.0)
     for bpm in candidatos:
+        # Todas as fases de uma vez: a mesma conta do `residuo`, linha a linha.
+        # O `argmin` devolve a primeira, como o `<` estrito do laço que substituiu.
         grade = 60.0 / bpm / 4
-        for fase in np.linspace(0.0, grade, _PASSOS_FASE, endpoint=False):
-            atual = residuo(onsets, bpm, fase)
-            if atual < melhor[0]:
-                melhor = (atual, float(bpm), float(fase))
+        fases = np.linspace(0.0, grade, _PASSOS_FASE, endpoint=False)
+        desvio = (tempos[None, :] - fases[:, None]) / grade
+        residuos = np.median(np.abs(desvio - np.round(desvio)) * grade, axis=1)
+        i = int(np.argmin(residuos))
+        if residuos[i] < melhor[0]:
+            melhor = (float(residuos[i]), float(bpm), float(fases[i]))
     return melhor[1], melhor[2]

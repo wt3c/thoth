@@ -16,6 +16,7 @@ import pytest
 
 from thoth.adapters.transcription.muscriptor import (
     MuscriptorTranscriber,
+    _com_silencio_na_frente,
     _energia_por_segundo,
     parse_jsonl,
     trechos_sem_nota,
@@ -413,3 +414,21 @@ def test_energia_nao_carrega_o_stem_inteiro_na_memoria(tmp_path: Path, monkeypat
     monkeypatch.setattr(sf, "read", recusa)
 
     assert len(_energia_por_segundo(audio)) == 2
+
+
+def test_silencio_na_frente_e_o_audio_original_deslocado(tmp_path: Path) -> None:
+    """Escrito em blocos, sai amostra por amostra o que `zeros + áudio` daria — inclusive
+    com o arquivo maior que um bloco e terminando no meio de outro."""
+    import numpy as np
+    import soundfile as sf
+
+    original = tmp_path / "stem.wav"
+    y = np.random.default_rng(0).uniform(-1, 1, (300_001, 2)).astype("float32")
+    sf.write(original, y, 44_100, subtype="FLOAT")
+
+    _com_silencio_na_frente(original, tmp_path / "entrada.wav", 0.1)
+
+    lido, taxa = sf.read(tmp_path / "entrada.wav", always_2d=True, dtype="float32")
+    assert taxa == 44_100
+    assert sf.info(str(tmp_path / "entrada.wav")).subtype == "FLOAT"
+    np.testing.assert_array_equal(lido, np.concatenate([np.zeros((4_410, 2), "float32"), y]))

@@ -78,7 +78,7 @@ domain/     models.py (dataclasses frozen, slots) · ports.py (Protocol)
 adapters/   ingest · transcription · separation · export — cada um implementa um Protocol
 services/   lógica própria: fretboard (Viterbi), rhythm, tempo, tonalidade, notas,
             octave_check, evaluation, comparacao, tab_referencia, auralizacao,
-            cache_notas, nomes, model_lock, pipeline
+            cache_notas, cache_transcricao, nomes, model_lock, pipeline
 api/        FastAPI: jobs em memória, estado serializado, artefatos e página de estudo
 cli.py      fachada fina sobre services
 ```

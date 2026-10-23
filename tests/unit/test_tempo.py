@@ -7,8 +7,10 @@ andamento é conhecido porque nós o escrevemos no MIDI.
 
 from __future__ import annotations
 
+import random
 from pathlib import Path
 
+import numpy as np
 import pytest
 
 from tests.sintetico import BPM, SOUNDFONT, renderizar
@@ -113,6 +115,33 @@ def test_recusa_material_curto_demais() -> None:
     bpm, fase = ajustar([0.0, 0.5], 120)
 
     assert (bpm, fase) == (120.0, 0.0)
+
+
+def _ajustar_por_laco(onsets: list[float], bpm_inicial: float, faixa: float) -> tuple[float, float]:
+    """O `ajustar` como era antes de vetorizar: cópia, é o oráculo do teste abaixo."""
+    passos = 400 if faixa else 1
+    candidatos = np.linspace(bpm_inicial * (1 - faixa), bpm_inicial * (1 + faixa), passos)
+    melhor = (float("inf"), float(bpm_inicial), 0.0)
+    for bpm in candidatos:
+        grade = 60.0 / bpm / 4
+        for fase in np.linspace(0.0, grade, 120, endpoint=False):
+            atual = residuo(onsets, bpm, fase)
+            if atual < melhor[0]:
+                melhor = (atual, float(bpm), float(fase))
+    return melhor[1], melhor[2]
+
+
+@pytest.mark.parametrize("semente", range(3))
+@pytest.mark.parametrize("faixa", [0.03, 0.0])
+def test_ajustar_escolhe_o_mesmo_que_a_busca_por_laco(semente: int, faixa: float) -> None:
+    """Vetorizar a busca não pode trocar o vencedor, nem no empate (o primeiro ganha)."""
+    sorteio = random.Random(semente)
+    bpm = sorteio.uniform(70, 160)
+    onsets = _onsets(bpm, sorteio.uniform(0, 0.1), sorted(sorteio.sample(range(600), 80)))
+    onsets = [t + sorteio.gauss(0, 0.004) for t in onsets]
+    inicial = round(bpm)
+
+    assert ajustar(onsets, inicial, faixa) == _ajustar_por_laco(onsets, inicial, faixa)
 
 
 # --- Desdobrar: a grade grosseira colapsa notas (ADR-024) ---------------------

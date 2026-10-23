@@ -259,3 +259,34 @@ def test_a_multifaixa_relata_o_que_cada_parte_relatou_e_conta_cada_stem_uma_vez(
     assert {m: len(a) for m, a in resultado.ataques_descartados.items()} == {
         "fora do mapa de percussão": 1
     }
+
+
+@dataclass(slots=True)
+class FonteQueConta:
+    asset: AudioAsset
+    chamadas: int = 0
+
+    def fetch(self, ref: str, cache_dir: Path) -> AudioAsset:
+        self.chamadas += 1
+        return self.asset
+
+
+def test_todos_obtem_o_audio_uma_vez_so(tmp_path: Path) -> None:
+    """Cada parte buscando de novo eram cinco hashes do arquivo e cinco `ffprobe`."""
+    wav = tmp_path / "musica.wav"
+    sf.write(wav, np.zeros(88_200, dtype=np.float32), 44_100)
+    fonte = FonteQueConta(AudioAsset(wav=wav, source_id="uma", title="Música", duration_s=2.0))
+
+    transcrever(
+        str(wav),
+        tmp_path / "out",
+        bpm=120,
+        instrumento="todos",
+        cache_dir=tmp_path / "cache",
+        source=fonte,
+        separator=SeparadorDeTodasAsFamilias(),
+        transcriber=TranscritorPorStem(),
+        _gerar_auralizacao=False,
+    )
+
+    assert fonte.chamadas == 1
