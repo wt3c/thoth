@@ -705,6 +705,7 @@ def test_a_guitarra_relata_rotulo_contaminacao_e_acorde_impossivel(
             erro_de_rotulo={"distorted_electric_guitar": 3},
             contaminacao={"acoustic_piano": 5},
             acordes_impossiveis=[AcordeImpossivel(notas, "2 notas na mesma corda")],
+            cabeca_do_tempo=0,
         ),
     )
 

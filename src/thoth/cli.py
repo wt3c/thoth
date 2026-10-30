@@ -326,6 +326,11 @@ def transcribe(
                 "yellow",
             )
         _diz("confira ouvindo; se soar errado, reexporte com --bpm", "yellow")
+    if r.cabeca_do_tempo is None:
+        _diz(
+            "cabeça do tempo: as batidas do mix não decidiram, ficou a fase da grade (ADR-054)",
+            "yellow",
+        )
 
     if r.tonalidade:
         _diz(_tom(r.tonalidade))
@@ -343,11 +348,6 @@ def transcribe(
         _diz(f"ataque(s) fora da partitura: {_contagem(contagem)}", "yellow")
     if r.acordes_impossiveis:
         _diz(f"{len(r.acordes_impossiveis)} acorde(s) impossível(is):", "yellow")
-    if r.cabeca_do_tempo is None:
-        _diz(
-            "cabeça do tempo: as batidas do mix não decidiram, ficou a fase da grade (ADR-054)",
-            "yellow",
-        )
         for acorde in r.acordes_impossiveis:
             _diz(f"  {_acorde_impossivel(acorde)}", "yellow")
     if r.descartadas:
