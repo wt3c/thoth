@@ -900,6 +900,27 @@ pressupunha.
 A decisão deste ADR não muda: a grade constante segue adequada, e o ADR-034 registra por que o aviso de andamento
 variável não é implementável com um único caso.
 
+### Emenda (2026-10-30) — o MusicXML preserva o andamento fracionário
+
+A comparação solicitada de `samples/catedral-voce_build.gp5` com a saída de
+30/09 revelou duas coisas distintas. As 802 alturas do GP5 gerado são idênticas
+às do cache, na mesma ordem; seus ataques, porém, adiantam 30–420 ms. A relação
+medida entre tempo relido e cache é `0,99882919 × t − 0,08503391`: a taxa bate
+com `119,86 / 120`, além do recuo de fase e da quantização.
+
+A premissa deste ADR de que **MusicXML também exige andamento inteiro estava
+errada**. O atributo `sound@tempo` aceita decimal na
+[especificação MusicXML 4.0](https://www.w3.org/2021/06/musicxml40/musicxml-reference/elements/sound/).
+Os exportadores de cordas, piano e bateria passam a preservar o BPM fracionário,
+inclusive nas marcas recebidas. A seleção das marcas pelo mapa permanece a do
+ADR-053. Não mudar quantização, recuo de fase nem tempo do cache.
+
+Regressão com arquivos reais: 119,86 BPM e um ataque após 480 semínimas,
+cuja posição esperada é 240,280327 s. O arredondamento o levava a 240 s.
+Testes verificam `sound@tempo`, o instante relido pelo music21 e a posição e o
+valor de uma mudança fracionária. O GP5 continua limitado ao inteiro; esta
+correção não promete remover sua deriva nem recuperar notas não transcritas.
+
 ## ADR-022 — A sustentação é escrita com ligadura, decomposta no exportador
 
 **Data:** 2026-09-23 · **Status:** aceito

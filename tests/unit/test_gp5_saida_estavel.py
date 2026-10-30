@@ -3,6 +3,9 @@
 Rede de segurança para mudança de desempenho no exportador: o hash dos bytes
 gravados a partir de entradas fixas, tirado com o código antes da mudança. O GP5
 não tem data nem id sorteado, então nada sai da conta.
+
+Hashes refeitos em 2026-10-30 com a marca de andamento explícita no primeiro
+compasso; sem ela, os bytes reproduzem exatamente os hashes anteriores.
 """
 
 from __future__ import annotations
@@ -33,7 +36,7 @@ def test_baixo_sai_igual(tmp_path: Path) -> None:
 
     arquivo = Gp5Exporter(bpm=90, titulo="Estável").export(tabs, tmp_path / "b.gp5", TUNING_BASS_4)
 
-    assert _hash(arquivo) == "57cebbab7be84036"
+    assert _hash(arquivo) == "b475d709ba84fff2"
 
 
 def test_bateria_sai_igual(tmp_path: Path) -> None:
@@ -45,4 +48,4 @@ def test_bateria_sai_igual(tmp_path: Path) -> None:
 
     arquivo = Gp5PercussaoExporter(bpm=90, titulo="Estável").exportar(ataques, tmp_path / "d.gp5")
 
-    assert _hash(arquivo) == "75c4a562852d7a5c"
+    assert _hash(arquivo) == "0fabdd2f33f3a958"

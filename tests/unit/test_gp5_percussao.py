@@ -168,4 +168,4 @@ def test_marca_de_andamento_tambem_na_bateria(tmp_path: Path) -> None:
         for numero, medida in enumerate(song.tracks[0].measures)
         if medida.voices[0].beats[0].effect.mixTableChange is not None
     ]
-    assert trocas == [(1, 100)]
+    assert trocas == [(0, BPM), (1, 100)]

@@ -294,10 +294,10 @@ def test_marca_de_andamento_vai_no_primeiro_beat_do_compasso(tmp_path: Path) -> 
     song = _exportar(_tabs([36, 38, 40, 41] * 3), tmp_path, bpm=BPM, marcas=((COMPASSO, 80.4),))
 
     assert song.tempo == BPM
-    assert _andamentos(song) == [(1, 80)]
+    assert _andamentos(song) == [(0, BPM), (1, 80)]
 
 
-def test_sem_marca_nenhum_compasso_troca_de_andamento(tmp_path: Path) -> None:
+def test_sem_trocas_so_declara_o_andamento_inicial(tmp_path: Path) -> None:
     song = _exportar(_tabs([36, 38, 40, 41] * 3), tmp_path, bpm=BPM)
 
-    assert _andamentos(song) == []
+    assert _andamentos(song) == [(0, BPM)]

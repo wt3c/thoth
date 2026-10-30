@@ -9,9 +9,10 @@ quando ele foi estimado — o BPM que você informou manda, a âncora ninguém
 informou (ADR-021). Grade precisa ancorada no lugar errado erra mais que grade
 grosseira alinhada por acaso: as duas contas são uma só.
 
-O BPM que chega a `para_ticks` é fracionário de propósito. O arquivo guarda o
-inteiro, porque GP5 e MusicXML só têm campo inteiro; quantizar no inteiro é o bug
-que o ADR-021 corrige — 0,46% de erro vira segundos de deriva no fim da música.
+O BPM que chega a `para_ticks` é fracionário de propósito. O GP5 guarda o inteiro;
+o MusicXML preserva o decimal (emenda de 2026-10-30 ao ADR-021). Quantizar no
+inteiro é o bug que o ADR-021 corrige — 0,46% de erro vira segundos de deriva no
+fim da música.
 """
 
 from __future__ import annotations
@@ -130,8 +131,9 @@ class MapaDeAndamento:
     def marcas(self) -> list[tuple[int, float]]:
         """`(tique, bpm)` de cada troca, para o exportador escrever.
 
-        A partitura escreve BPM inteiro: troca que o arredondamento apaga não vira
-        marca, e a grade a segue do mesmo jeito.
+        A seleção compartilhada usa o limite inteiro do GP5: troca que o
+        arredondamento apaga não vira marca, e a grade a segue do mesmo jeito.
+        O MusicXML preserva os decimais das marcas selecionadas.
         """
         marcas, escrito = [], round(self.bpm)
         for instante, bpm in self.trocas:

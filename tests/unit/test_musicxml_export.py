@@ -538,4 +538,4 @@ def test_marca_de_andamento_vira_metronomo_no_compasso_da_troca(tmp_path: Path) 
         (m.getContextByClass("Measure").number, m.number)
         for m in pauta.recurse().getElementsByClass(tempo.MetronomeMark)
     ]
-    assert marcas == [(1, BPM), (3, 80)]
+    assert marcas == [(1, BPM), (3, 80.4)]

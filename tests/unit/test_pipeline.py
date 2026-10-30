@@ -278,7 +278,7 @@ def test_andamento_estimado_que_muda_vira_mapa_e_o_cache_fica_no_audio(tmp_path:
         for m in musica.tracks[0].measures
         if m.voices[0].beats[0].effect.mixTableChange
     ]
-    assert trocas == [(tique // COMPASSO, round(bpm))]
+    assert trocas == [(0, round(resultado.bpm)), (tique // COMPASSO, round(bpm))]
 
 
 @requer_soundfont

@@ -205,7 +205,9 @@ class Gp5Exporter:
             medida.voices = [voz, *(gp.Voice(medida) for _ in range(3))]
             track.measures.append(medida)
 
-        _marcar_andamentos(track, self.marcas)
+        # Alguns leitores usam 120 BPM em arquivos curtos se só houver o
+        # cabeçalho. A marca inicial explícita é parte do contrato de reprodução.
+        _marcar_andamentos(track, ((0, self.bpm), *self.marcas))
         out.parent.mkdir(parents=True, exist_ok=True)
         gp.write(song, str(out))
         return out
@@ -304,7 +306,7 @@ class Gp5PercussaoExporter:
             medida.voices = [voz, *(gp.Voice(medida) for _ in range(3))]
             track.measures.append(medida)
 
-        _marcar_andamentos(track, self.marcas)
+        _marcar_andamentos(track, ((0, self.bpm), *self.marcas))
         out.parent.mkdir(parents=True, exist_ok=True)
         gp.write(song, str(out))
         return out
