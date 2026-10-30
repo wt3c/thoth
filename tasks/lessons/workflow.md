@@ -1,5 +1,33 @@
 # Lições — workflow
 
+## A candidata precisa ser avaliada no formato que o usuário reproduz (2026-10-30)
+
+O usuário ouviu a candidata e relatou que velocidade e ritmo continuam muito
+distantes da versão humana. Bons resultados nas notas anteriores à exportação
+e um GP5 que passa pelo mesmo parser não demonstram a qualidade de reprodução.
+Os WAVs de auralização existentes vêm do cache de notas, não do próprio GP5.
+
+**Como aplicar:** usar as seis tabs humanas de `samples/` como corpus de
+avaliação, incluir andamento, figuras, pausas e compasso, e verificar GP5 em um
+leitor independente. Separar a taxa de reprodução, o deslocamento inicial e o
+erro rítmico local; não ajustar escala ou aplicar DTW antes de medir velocidade.
+Conferir versões e afinações quando houver várias saídas da mesma música.
+
+## Corrigir o transcritor não é entregar uma cópia da tab humana (2026-10-30)
+
+O usuário pediu que a conversão de *Você* fosse igual à referência humana em
+notas, ritmos e digitação. Extraí a faixa de baixo e entreguei arquivos
+`.referencia`, mas isso não corrigiu o programa. O usuário explicitou que a tab
+humana é o gabarito e que a implementação deve evoluir para reproduzi-lo a partir
+do áudio.
+
+**Como aplicar:** medir a saída autônoma do pipeline, separando altura, ataques,
+durações, pausas e corda/casa. A referência serve para avaliação e regressão;
+extraí-la ou copiá-la não satisfaz a tarefa. Não declarar a tarefa concluída
+porque uma versão derivada do gabarito ficou igual ao próprio gabarito. Igualdade
+de altura MIDI não significa igualdade de digitação ou execução; corda solta e
+nota pisada de mesma altura precisam ser diferenciadas na avaliação.
+
 ## Reprocessar o acervo em multifaixa sem perder trabalho concluído
 
 **2026-09-29.** O lote real de 13 músicas (todas menos _Eyrie_, que já tinha a
@@ -116,3 +144,11 @@ Disparado pela ferramenta Bash, o `codex exec` imprime `Reading additional input
 stdin não é TTY e nunca fecha. Em 2026-10-23 uma consulta ficou mais de 20 min assim sem nem começar, e o `| tail`
 escondia a linha. **Regra:** sempre `< /dev/null` e saída em arquivo, não em pipe — o progresso fica legível enquanto
 roda.
+
+## Partitura é som: não separar "no papel" de "no ouvido"
+
+Em 2026-10-30, com a duração em segundos batendo com a gravação, expliquei a reclamação de "velocidade e ritmo" como
+erro "no papel, não no som". O usuário corrigiu: partitura é som por definição, porque ela é feita para ser tocada.
+**Regra:** a métrica que vale é a da partitura reproduzida (andamento lido pelo player, figuras, pausas). Se a medição
+diz "acerta" e ele ouve "errado", essa divergência é o próximo objeto de investigação, e não se resolve com uma
+distinção. O primeiro passo é reproduzir no mesmo player que ele usou.
