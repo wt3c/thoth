@@ -6,6 +6,7 @@ import shutil
 from collections.abc import Mapping
 from dataclasses import dataclass
 from pathlib import Path
+from typing import Literal
 
 import typer
 from rich.console import Console
@@ -14,12 +15,14 @@ from rich.text import Text
 
 from thoth.adapters.ingest import resolver_fonte
 from thoth.adapters.separation import DemucsSeparator, localizar_stems
+from thoth.adapters.transcription.muscriptor import MuscriptorTranscriber
 from thoth.domain.models import AFINACOES, AcordeImpossivel
 from thoth.services import pipeline
 from thoth.services.acordes import ViterbiAcordes
 from thoth.services.alinhamento_audio import alinhar_ao_stem
 from thoth.services.auralizacao import auralizar as _auralizar
 from thoth.services.cache_notas import ler
+from thoth.services.cache_transcricao import em_cache
 from thoth.services.comparacao import JanelaDeNota, veredito_de_nota
 from thoth.services.comparacao import comparar as _comparar
 from thoth.services.fretboard import DIGITACOES, ViterbiFretAssigner
@@ -267,6 +270,12 @@ def transcribe(
     digitacao: str = typer.Option(
         "iniciante", help=f"Perfil de digitação: {', '.join(DIGITACOES)} (ADR-006)."
     ),
+    alcance_mao: int = typer.Option(
+        0, min=0, help="Alcance da mão no baixo, em casas: 3 abrange quatro casas."
+    ),
+    modelo: Literal["small", "medium"] = typer.Option(
+        "small", help="Modelo de transcrição do baixo; medium custa mais CPU (ADR-009)."
+    ),
     cache: Path = typer.Option(CACHE_PADRAO, help="Diretório de cache."),
 ) -> None:
     """Áudio → tablatura: separa, transcreve, posiciona e exporta."""
@@ -279,6 +288,10 @@ def transcribe(
             raise typer.BadParameter(str(erro), param_hint="--tom") from erro
 
     _escolher(pipeline.INSTRUMENTOS, instrumento, "--instrumento")
+    if modelo != "small" and instrumento != "baixo":
+        raise typer.BadParameter("modelo alternativo só vale para o baixo", param_hint="--modelo")
+    if alcance_mao and instrumento not in ("baixo", "todos"):
+        raise typer.BadParameter("alcance da mão só vale para o baixo", param_hint="--alcance-mao")
     # As afinações do catálogo são de baixo; a guitarra usa a do perfil (ADR-044).
     if instrumento != "baixo" and afinacao is not None:
         raise typer.BadParameter(
@@ -287,6 +300,9 @@ def transcribe(
         )
     cordas = _escolher(AFINACOES, afinacao or "4", "--afinacao") if instrumento == "baixo" else None
     custos = _escolher(DIGITACOES, digitacao, "--digitacao")
+    transcritor = (
+        em_cache(MuscriptorTranscriber(model=modelo), cache) if modelo != "small" else None
+    )
     # O tempo por estágio é o que faltava: a separação e a transcrição levam
     # minutos cada, e uma frase solta antes da chamada não dizia em qual delas se
     # estava — nem se algo havia travado (ADR-037).
@@ -305,7 +321,8 @@ def transcribe(
             tuning=cordas,
             instrumento=instrumento,
             cache_dir=cache,
-            assigner=ViterbiFretAssigner(custos=custos),
+            assigner=ViterbiFretAssigner(custos=custos, alcance_da_mao=alcance_mao),
+            transcriber=transcritor,
             atribuidor_de_acordes=ViterbiAcordes(custos=custos),
             progresso=etapas,
         )

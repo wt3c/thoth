@@ -4,14 +4,16 @@ A mesma altura cabe em até quatro lugares num baixo de quatro cordas, e a
 escolha certa depende das notas vizinhas: nota isolada não tem posição ótima,
 frase tem. O custo se divide em dois:
 
-- **emissão** — quanto custa *estar* naquela posição (traste alto cansa, corda
-  solta é de graça e soa melhor);
+- **emissão** — quanto custa *estar* naquela posição (traste alto e a preferência
+  por corda solta são escolhas do perfil, não prova da execução original);
 - **transição** — quanto custa *chegar* nela vindo da anterior (deslocar a mão,
   atravessar cordas).
 
 A posição da mão faz parte do estado, não da nota (ADR-032): corda solta não
-move a mão nem a apaga, então o deslocamento da nota seguinte é medido contra o
-último traste **pisado**, não contra o traste 0 que acabou de soar.
+move a mão nem a apaga. Com alcance zero, a posição é o último traste pisado;
+com alcance positivo, é o início da janela de casas alcançáveis. Deslocamento
+se mede entre janelas, sem cobrar como movimento da mão a troca de dedo dentro
+delas (emenda de 2026-10-30).
 
 O "modo iniciante" do ADR-006 não é um modo à parte: é outro peso. Ele compra
 tocabilidade (primeira posição, cordas soltas) pagando em deslocamento — o
@@ -26,8 +28,8 @@ from typing import TYPE_CHECKING
 from thoth.domain.models import NoteEvent, TabNote
 from thoth.domain.ports import FretAssigner
 
-#: Estado do Viterbi: corda, traste e a posição da mão — o último traste pisado,
-#: `None` enquanto a mão ainda não foi colocada no braço (ADR-032).
+#: Estado do Viterbi: corda, traste e início da janela da mão. Com alcance zero,
+#: coincide com o último traste pisado (ADR-032); `None` antes de posicioná-la.
 _Estado = tuple[int, int, int | None]
 
 
@@ -113,20 +115,39 @@ class ViterbiFretAssigner:
     """Implementa o `FretAssigner`. Ótimo global sobre a frase, não guloso nota a nota."""
 
     custos: Custos = field(default=INICIANTE)
+    alcance_da_mao: int = 0
+    """Distância entre as casas extremas alcançáveis sem deslocar a mão.
+
+    Zero preserva a aproximação do ADR-032. Três permite quatro casas inclusivas,
+    sem afirmar quais dedos ou qual corda o músico efetivamente usou.
+    """
+
+    def __post_init__(self) -> None:
+        if self.alcance_da_mao < 0:
+            raise ValueError("alcance da mão não pode ser negativo")
 
     def _emissao(self, fret: int) -> float:
         return custo_de_emissao(self.custos, fret)
 
-    def _transicao(self, de: _Estado, para: tuple[int, int]) -> float:
+    def _estados(self, posicao: tuple[int, int], mao: int | None) -> list[_Estado]:
+        corda, traste = posicao
+        if traste == 0:
+            return [(corda, traste, mao)]
+        return [
+            (corda, traste, inicio)
+            for inicio in range(max(1, traste - self.alcance_da_mao), traste + 1)
+        ]
+
+    def _transicao(self, de: _Estado, para: _Estado) -> float:
         corda_a, _, mao = de
-        corda_b, traste_b = para
+        corda_b, _, nova_mao = para
         custo = self.custos.troca_corda * abs(corda_b - corda_a)
         # Corda solta não move a mão: ela fica onde estava, e a nota seguinte
         # parte dali (ADR-032). Mão `None` é mão ainda não posicionada — antes
         # do primeiro traste pisado há o tempo do mundo para colocá-la, e cobrar
         # a distância contra a pestana inventaria um salto que não existe.
-        if traste_b and mao is not None:
-            custo += self.custos.deslocamento * abs(traste_b - mao)
+        if mao is not None and nova_mao is not None:
+            custo += self.custos.deslocamento * abs(nova_mao - mao)
         return custo
 
     def assign(
@@ -156,27 +177,23 @@ class ViterbiFretAssigner:
                 )
             opcoes_por_nota.append(opcoes)
 
-        # Viterbi: melhor custo até cada estado, com ponteiro para a origem. O
-        # estado carrega a posição da mão, e é ela que faz o número de estados
-        # não explodir ao longo da linha: nota pisada colapsa a mão no próprio
-        # traste, então as mãos só ramificam dentro de uma corrida de cordas
-        # soltas consecutivas — no máximo tantas quantas a última nota pisada
-        # tinha opções (ADR-032).
+        # A nota pisada admite cada janela capaz de alcançá-la; a corda solta
+        # mantém a janela anterior. Estados com a mesma posição e janela se
+        # fundem, limitando a busca pelo braço, não pelo histórico da música.
         estados: list[list[_Estado]] = [
-            [(corda, fret, fret or None) for corda, fret in opcoes_por_nota[0]]
+            [estado for posicao in opcoes_por_nota[0] for estado in self._estados(posicao, None)]
         ]
         custo = [self._emissao(f) for _, f, _ in estados[0]]
         origem: list[list[int]] = []
         for opcoes in opcoes_por_nota[1:]:
             melhor: dict[_Estado, tuple[float, int]] = {}
             for posicao in opcoes:
-                corda_b, traste_b = posicao
                 for i, anterior in enumerate(estados[-1]):
-                    chegada = custo[i] + self._transicao(anterior, posicao)
-                    chegada += self._emissao(traste_b)
-                    chave = (corda_b, traste_b, traste_b or anterior[2])
-                    if chave not in melhor or chegada < melhor[chave][0]:
-                        melhor[chave] = (chegada, i)
+                    for chave in self._estados(posicao, anterior[2]):
+                        chegada = custo[i] + self._transicao(anterior, chave)
+                        chegada += self._emissao(chave[1])
+                        if chave not in melhor or chegada < melhor[chave][0]:
+                            melhor[chave] = (chegada, i)
             estados.append(list(melhor))
             custo = [melhor[k][0] for k in estados[-1]]
             origem.append([melhor[k][1] for k in estados[-1]])

@@ -401,6 +401,27 @@ a que falta, precisa de referência humana (Camada 3, ADR-007).
 
 ---
 
+### Emenda (2026-10-30) — comparação em Você e modelo explícito no CLI
+
+A referência humana de *Você* foi assumida correta pelo usuário. No mesmo stem
+`htdemucs_ft/4.1.0-shifts0`, CPU, o `medium` produziu 837 eventos brutos em
+275,9 s; o pipeline manteve 834. O `small` havia produzido 823, mantendo 822.
+Na avaliação de altura e ataque no relógio do áudio, tolerância fixa de 100 ms e
+mesmo alinhamento independente (ADR-042), o F1 processado passou de 0,926 para
+0,950. Não é porcentagem de alturas corretas nem prova de igualdade rítmica.
+
+O CLI ganha `--modelo small|medium`, apenas para o baixo, com `small` como
+padrão e o mesmo cache de transcrição identificado por modelo, pesos, código e
+stem (ADR-052). Os outros instrumentos preservam os defaults, inclusive o
+silêncio inicial da bateria. Não promover `medium` a padrão a partir de uma
+música; as limitações sintéticas registradas neste ADR continuam válidas.
+
+A distância mínima de edição de alturas, ignorando tempo, caiu de 66 operações
+(28 omissões, 5 extras, 33 substituições no small bruto) para 31 (12 omissões,
+3 extras, 16 substituições no medium bruto). Em sequências repetidas pode haver
+vários alinhamentos ótimos. Nenhuma nota humana entrou na inferência e a saída
+permanece diferente do gabarito. A tarefa de igualdade ainda está aberta.
+
 ## ADR-010 — Demucs promovido de condicional a etapa do pipeline
 
 **Data:** 2026-09-22 · **Status:** aceito · **Revoga:** condicional C1
@@ -1694,6 +1715,40 @@ anterior.
 - A leitura ampla do título do item ("digitação otimiza posição, não técnica": articulação, dinâmica, deslizes, pestana)
   **não** entra aqui — é território do B3, e fica registrado para não desaparecer.
 - Nenhum teste de regressão se move: o `COM_SEPARACAO_NOTA_F1 = 0.968` mede detecção de nota, não digitação.
+
+### Emenda (2026-10-30) — alcance da mão opcional, sem confundir altura e execução
+
+O usuário confirmou a tab humana de *Você* como gabarito de notas, ritmos e
+digitação, inclusive a diferença entre Ré solto e Ré na corda Lá, casa 5.
+Nas 141 ocorrências executadas de Ré2, a tab usa Lá/5; os perfis anteriores
+preferem Ré/0. A entrada do posicionador não contém evidência acústica de corda:
+ele apenas propõe uma digitação para alturas conhecidas.
+
+O estado anterior também cobrava deslocamento ao passar da casa 3 para a 5,
+mesmo quando ambas cabem na mesma posição da mão. `ViterbiFretAssigner` ganha
+`alcance_da_mao`, específico do baixo: com 3, a janela tem quatro casas e cada
+nota pisada pode pertencer a várias janelas. Corda solta conserva a janela;
+custo de deslocamento incide sobre seu início. O padrão 0 preserva exatamente
+a aproximação anterior e os custos compartilhados com acordes não mudam.
+O CLI expõe `--alcance-mao`; o ajuste não altera alturas, ataques ou durações.
+
+Comparação com as mesmas alturas humanas, isolando só digitação, perfil experiente:
+
+| Tab | Alcance 0 | Alcance 3 |
+| --- | ---: | ---: |
+| Gesu | 0,582 | 0,564 |
+| Dance of Death | 0,387 | 0,441 |
+| Fear Is the Key | 0,633 | 0,598 |
+| And Plague Flowers | 0,677 | 0,501 |
+| Eyrie | 0,745 | 0,813 |
+| Você | 0,738 | 0,936 |
+| Média por música | 0,627 | 0,642 |
+
+Não promover a padrão: três músicas pioraram. Em *Você*, 114 dos 141 Ré2
+passam a Lá/5, mas 27 continuam Ré/0. A melhora de tocabilidade não prova
+reconstrução da execução. Alcançar igualdade exige avaliar corda/casa, pausas,
+ritmo e altura separadamente; a mera igualdade MIDI não basta. O leitor
+`ler_tab` passa a preservar `tablatura` e `afinacao` para permitir essa avaliação.
 
 ## ADR-033 — dinâmica e articulação não são inferíveis desta entrada (B3)
 

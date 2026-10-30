@@ -167,7 +167,6 @@ def test_serve_aceita_o_host_em_que_foi_aberto(monkeypatch, host: str, pela_rede
     """`--host` abre a página para a rede: o endereço pelo qual ela chega tem de passar."""
     from fastapi.testclient import TestClient
 
-
     recebido: dict[str, object] = {}
     monkeypatch.setattr("uvicorn.run", lambda app, **kw: recebido.update(kw, app=app))
 
@@ -421,6 +420,73 @@ def test_afinacao_e_digitacao_escolhidas_chegam_ao_pipeline(
 
     assert recebido["tuning"] == TUNING_BASS_DROP_D
     assert recebido["assigner"].custos is PADRAO
+
+
+def test_alcance_da_mao_chega_ao_posicionador_do_baixo(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    recebido: dict[str, object] = {}
+
+    def espiao(ref: str, out: Path, **kw: object):
+        recebido.update(kw)
+        raise typer.Exit(code=0)
+
+    monkeypatch.setattr(pipeline, "transcrever", espiao)
+    resultado = runner.invoke(
+        app, ["transcribe", "x.mp3", "--digitacao", "experiente", "--alcance-mao", "3"]
+    )
+
+    assert resultado.exit_code == 0, resultado.output
+    assert recebido["assigner"].alcance_da_mao == 3
+    assert recebido["assigner"].custos is PADRAO
+
+
+def test_alcance_da_mao_negativo_e_recusado() -> None:
+    resultado = runner.invoke(app, ["transcribe", "x.mp3", "--alcance-mao", "-1"])
+
+    assert resultado.exit_code != 0
+    assert "-1" in resultado.output
+
+
+def test_modelo_medium_e_encaminhado_com_cache(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    from thoth.services.cache_transcricao import TranscritorEmCache
+
+    recebido: dict[str, object] = {}
+
+    def espiao(ref: str, out: Path, **kw: object):
+        recebido.update(kw)
+        raise typer.Exit(code=0)
+
+    monkeypatch.setattr(pipeline, "transcrever", espiao)
+    resultado = runner.invoke(
+        app, ["transcribe", "x.mp3", "--modelo", "medium", "--cache", str(tmp_path)]
+    )
+
+    assert resultado.exit_code == 0, resultado.output
+    transcritor = recebido["transcriber"]
+    assert isinstance(transcritor, TranscritorEmCache)
+    assert transcritor.base.model == "medium"
+    assert transcritor.pasta == tmp_path / "transcricoes"
+
+
+def test_modelo_desconhecido_e_recusado() -> None:
+    resultado = runner.invoke(app, ["transcribe", "x.mp3", "--modelo", "gigante"])
+
+    assert resultado.exit_code != 0
+    assert "small" in resultado.output and "medium" in resultado.output
+
+
+@pytest.mark.parametrize(("opcao", "valor"), [("--modelo", "medium"), ("--alcance-mao", "3")])
+def test_ajustes_do_baixo_nao_sao_aplicados_a_bateria(opcao: str, valor: str) -> None:
+    resultado = runner.invoke(
+        app, ["transcribe", "x.mp3", "--instrumento", "bateria", opcao, valor]
+    )
+
+    assert resultado.exit_code != 0
+    assert "baixo" in resultado.output
 
 
 def test_o_tom_informado_chega_ao_pipeline(monkeypatch: pytest.MonkeyPatch) -> None:
