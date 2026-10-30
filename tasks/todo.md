@@ -130,6 +130,54 @@ tempo, empata ou melhora Você, Fear e Dance. Com λ alto Dance perde todas as
 trocas, e com λ baixo aparecem trocas falsas. **Híbrido não adotado**: sem plano
 e sem ADR de integração, e o Beat This! continua fora do projeto.
 
+Custo de troca proporcional ao salto (aprovado: "pode seguir"; só medição,
+programa intacto). Hipótese: hoje toda troca custa 2000 ms·nota, então o passo
+pequeno da aceleração de Você custa o mesmo que o salto espúrio de Arde Outra
+Vez (124 → 135). Variante no scratchpad: trocar de b para b' custa
+`fixo + k·|b' − b|/bpm·100` (k em ms·nota por 1% de salto), varrendo `fixo` e
+`k`; `fixo = 2000, k = 0` é o atual. Régua congelada **antes** de rodar:
+
+1. Nenhuma das fontes do cache sem troca na régua atual ganha troca (aproximação
+   `proxy2`, notas do stem antigo + `_medir_grade` real), e Gesu fica sem troca.
+2. Nenhuma das 4 músicas com tab humana perde mais de 0,02 na fração de
+   intervalos certos.
+3. Você, Fear e Plague melhoram nessa fração.
+4. O par (`fixo`, `k`) é escolhido deixando uma música de fora, entre os que
+   passam em 1; a de fora não pode piorar mais de 0,02.
+
+Se nenhum par passar, fica registrado como descartado. Se passar, plano de
+mudança com TDD, emenda ao ADR-053 e revisão do plano antes da aprovação.
+
+Resultado (2026-10-30): **descartado, nenhum par passa**. A variante com
+`fixo = 2000, k = 0` reproduz o mapa original em todas as 18 fontes, conferido
+com `assert`, e as rodadas reais de 20 s/2000 da varredura anterior. A grade
+varreu `fixo` ∈ {250, 500, 1000, 2000} e `k` ∈ {100, 250, 500, 1000, 2000}.
+
+- Critério 1: com `fixo` de 250 ou 500, Thalles, Sou Eu e Gesu ganham troca.
+  Com `fixo` 1000, Is It A Crime ganha 1–2 trocas e Smooth Operator 1–2.
+  Só `fixo` 2000 passa.
+- As trocas falsas são **passos pequenos**: Is It A Crime 107,7 → 111,8 → 111,0
+  e Smooth Operator 119,1 → 118,8. São do mesmo tamanho que os passos reais de
+  Você (113,7 → 116,1 → 118,7 → …). O tamanho do salto não separa uma coisa
+  da outra, e a hipótese cai.
+- Critérios 2 e 3 no pipeline real (fração de intervalos certos, trocas):
+
+| par | Você | Gesu | Fear | Plague |
+| --- | --- | --- | --- | --- |
+| 2000 / 0 (atual) | 0,949, 2 | 0,910, 0 | 0,835, 2 | 0,962, 6 |
+| 2000 / 100 | igual ao atual | igual | igual | igual |
+| 2000 / 250–500 | 0,921, 0 | 0,910, 0 | 0,835, 2 | 0,962, 6 |
+| 2000 / 1000 | 0,921, 0 | 0,910, 0 | 0,849, 2 | 0,963, 5 |
+| 1000 / 100 (falha em 1) | 0,968, 6 | 0,910, 0 | 0,853, 3 | 0,961, 8 |
+
+Entre os pares de `fixo` 2000, 100 não muda nada e os demais tiram as trocas de
+Você, que perde 0,028. Isso passa do limite de 0,02. O único par que melhora Você
+e Fear (1000/100) é o mesmo ganho de λ 1000, com as mesmas trocas falsas nas
+estáveis. Conclusão: o custo da troca, fixo ou proporcional, não separa
+aceleração real de troca espúria. A informação que falta não está no custo, e
+sim em outro sinal. Scripts (`prop.py`, `proxy_prop.py`, `rodar_prop.py`,
+`prop.sh`) no scratchpad, não versionados.
+
 ### Boletim em 5 dimensões (aprovado: "pode", 2026-10-30)
 
 Objetivo: para cada música com tab humana, uma fração em [0, 1] por dimensão,
