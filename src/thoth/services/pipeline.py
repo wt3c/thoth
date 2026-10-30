@@ -52,6 +52,7 @@ from __future__ import annotations
 
 import shutil
 from collections import Counter
+from collections.abc import Sequence
 from dataclasses import dataclass, field, replace
 from pathlib import Path
 
@@ -83,6 +84,7 @@ from thoth.domain.ports import (
 )
 from thoth.services.acordes import ViterbiAcordes, inicios_de_acorde
 from thoth.services.auralizacao import AuralizacaoError, auralizar
+from thoth.services.cabeca_do_tempo import deslocamento, recuo_na_cabeca
 from thoth.services.cache_notas import gravar
 from thoth.services.cache_transcricao import em_cache
 from thoth.services.fretboard import ViterbiFretAssigner, cabe_no_braco
@@ -102,6 +104,7 @@ from thoth.services.tempo import (
     BPM_MINIMO,
     Andamento,
     ajustar,
+    batidas_do_mix,
     desdobrar,
     estimar_andamento,
     mapa_de_andamento,
@@ -199,6 +202,9 @@ class Resultado:
     #: (ADR-053). As outras partes da multifaixa usam o mapa do baixo, e não o
     #: próprio, para cair nos mesmos tiques.
     mapa: MapaDeAndamento = field(default_factory=lambda: MapaDeAndamento(0.0))
+    #: Semicolcheias que as batidas do mix andaram com a cabeça do tempo (ADR-054);
+    #: `None` quando os votos empataram e a fase da grade ficou como estava.
+    cabeca_do_tempo: int | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -246,6 +252,7 @@ class _Parte:
     bpm: float
     base: float
     mapa: MapaDeAndamento
+    cabeca: int | None = None
     descartadas: list[NoteEvent] = field(default_factory=list)
     fora: list[NoteEvent] = field(default_factory=list)
     avisos: list[OctaveWarning] = field(default_factory=list)
@@ -263,6 +270,7 @@ class _Grade:
     base: float
     bpm: float
     mapa: MapaDeAndamento
+    cabeca: int | None = None
 
 
 def _medir_grade(
@@ -271,6 +279,7 @@ def _medir_grade(
     bpm: float,
     andamento: Andamento | None,
     comum: MapaDeAndamento | None,
+    batidas: Sequence[float] = (),
 ) -> _Grade:
     """Andamento, fase e recuo da parte — ou os da multifaixa, que são um só.
 
@@ -287,6 +296,10 @@ def _medir_grade(
     `comum` é o mapa do baixo, que as outras partes da multifaixa herdam em vez de
     medir: cada uma com a própria fase e o próprio recuo, o mesmo instante do áudio
     caía uma semicolcheia adiante numa faixa que na outra.
+
+    A grade acerta as notas só dentro de uma semicolcheia; `batidas` do mix decidem
+    em qual das quatro o pulso começa (ADR-054). Com troca, o deslocamento entra
+    antes de as trocas irem para a barra.
     """
     if comum is not None:
         return _Grade(comum.bpm, comum.bpm, comum)
@@ -295,9 +308,16 @@ def _medir_grade(
     if andamento:
         mapa = mapa_de_andamento(onsets, andamento_fino)
         if mapa.trocas:
-            return _Grade(base, mapa.bpm, mapa)
+            cabeca = deslocamento(batidas, mapa)
+            if cabeca:
+                mapa = mapa_de_andamento(onsets, andamento_fino, cabeca=cabeca)
+            return _Grade(base, mapa.bpm, mapa, cabeca)
     recuo = recuo_de_fase(notas, andamento_fino, fase)
-    return _Grade(base, andamento_fino, MapaDeAndamento(andamento_fino, recuo))
+    cabeca = deslocamento(batidas, MapaDeAndamento(andamento_fino, recuo))
+    if cabeca and notas:
+        primeiro = min(n.onset_s for n in notas)
+        recuo = recuo_na_cabeca(recuo, cabeca, 15.0 / andamento_fino, primeiro)
+    return _Grade(base, andamento_fino, MapaDeAndamento(andamento_fino, recuo), cabeca)
 
 
 def transcritor_padrao(perfil: PerfilInstrumento) -> MuscriptorTranscriber:
@@ -407,6 +427,9 @@ def transcrever(
         relator.inicia("estimando o andamento", "do mix, onde está a bateria")
         andamento = estimar_andamento(asset.wav)
         bpm = andamento.bpm
+    # A cabeça do tempo vem das batidas do mix, também com o BPM informado; quem herda
+    # o mapa do baixo herda a cabeça junto (ADR-054).
+    batidas = () if _grade else andamento.batidas if andamento else batidas_do_mix(asset.wav)
     relator.inicia(
         "separando o baixo" if perfil.familia == "baixo" else f"separando o stem {perfil.stem}",
         "Demucs, ~3x a duração do áudio em CPU",
@@ -432,7 +455,7 @@ def transcrever(
     cache_de_notas = cache_dir / asset.source_id / f"notas{sufixo}.jsonl"
     if bateria:
         parte = _parte_de_bateria(
-            todas, perfil, asset, bpm, andamento, relator, cache_de_notas, _grade
+            todas, perfil, asset, bpm, andamento, relator, cache_de_notas, _grade, batidas
         )
     elif guitarra:
         parte = _parte_de_guitarra(
@@ -446,6 +469,7 @@ def transcrever(
             relator,
             cache_de_notas,
             _grade,
+            batidas,
         )
     else:
         parte = _parte_de_baixo(
@@ -458,6 +482,7 @@ def transcrever(
             assigner or ViterbiFretAssigner(),
             relator,
             cache_de_notas,
+            batidas,
         )
 
     # O tom vem das notas que vão para a partitura, e a armadura só é escrita
@@ -579,6 +604,7 @@ def transcrever(
         acordes_impossiveis=parte.impossiveis,
         ataques_descartados=parte.ataques_descartados,
         mapa=parte.mapa,
+        cabeca_do_tempo=parte.cabeca,
     )
 
 
@@ -704,6 +730,7 @@ def _parte_de_baixo(
     assigner: FretAssigner,
     relator: Progresso,
     cache_de_notas: Path,
+    batidas: Sequence[float] = (),
 ) -> _Parte:
     """Linha monofônica: filtro de rótulos com readmissão, uma nota por tique."""
     rotulos = Counter(n.instrument for n in todas)
@@ -728,7 +755,9 @@ def _parte_de_baixo(
         )
     relator.inicia("ajustando a grade rítmica")
     # O `--bpm` que você informou não é desdobrado: ele manda (ADR-019).
-    grade = _medir_grade([n.onset_s for n in no_braco], no_braco, bpm, andamento, None)
+    grade = _medir_grade(
+        [n.onset_s for n in no_braco], no_braco, bpm, andamento, None, batidas
+    )
     andamento_fino, mapa = grade.bpm, grade.mapa
     # Deslocar ANTES de monofonizar: `monofonizar` deduplica ticks e `eventos`
     # recusa ticks repetidos, e as duas contas precisam ser a mesma grade. Feitas
@@ -754,6 +783,7 @@ def _parte_de_baixo(
         bpm=andamento_fino,
         base=grade.base,
         mapa=mapa,
+        cabeca=grade.cabeca,
         descartadas=descartadas,
         fora=fora,
         avisos=avisos,
@@ -772,6 +802,7 @@ def _parte_de_guitarra(
     relator: Progresso,
     cache_de_notas: Path,
     comum: MapaDeAndamento | None = None,
+    batidas: Sequence[float] = (),
 ) -> _Parte:
     """Acordes do perfil: nada de readmissão, monofonização nem conferência de oitava.
 
@@ -798,7 +829,9 @@ def _parte_de_guitarra(
     relator.inicia("ajustando a grade rítmica")
     # Um ataque por acorde: seis notas simultâneas contadas uma a uma parecem cinco
     # colisões, e o desdobramento dobraria o andamento à toa (ADR-024).
-    grade = _medir_grade(inicios_de_acorde(do_perfil), do_perfil, bpm, andamento, comum)
+    grade = _medir_grade(
+        inicios_de_acorde(do_perfil), do_perfil, bpm, andamento, comum, batidas
+    )
     andamento_fino, mapa = grade.bpm, grade.mapa
     # Unir pelo tique ANTES de posicionar, pela mesma razão de deslocar antes de
     # monofonizar no baixo: a janela do posicionador e a grade do exportador têm
@@ -819,6 +852,7 @@ def _parte_de_guitarra(
         bpm=andamento_fino,
         base=grade.base,
         mapa=mapa,
+        cabeca=grade.cabeca,
         erro_de_rotulo=dict(erro_de_rotulo),
         contaminacao=dict(contaminacao),
         impossiveis=[
@@ -837,6 +871,7 @@ def _parte_de_bateria(
     relator: Progresso,
     cache_de_notas: Path,
     comum: MapaDeAndamento | None = None,
+    batidas: Sequence[float] = (),
 ) -> _Parte:
     """Ataques do stem `drums`: grade como a da guitarra, descartes por motivo.
 
@@ -853,7 +888,9 @@ def _parte_de_bateria(
     contaminacao = Counter(n.instrument for n in todas if n.instrument not in perfil.rotulos)
 
     relator.inicia("ajustando a grade rítmica")
-    grade = _medir_grade(inicios_de_acorde(do_perfil), do_perfil, bpm, andamento, comum)
+    grade = _medir_grade(
+        inicios_de_acorde(do_perfil), do_perfil, bpm, andamento, comum, batidas
+    )
     andamento_fino, mapa = grade.bpm, grade.mapa
 
     na_grade = a_partir_do_zero(mapa.na_partitura(do_perfil))
@@ -894,6 +931,7 @@ def _parte_de_bateria(
         bpm=andamento_fino,
         base=grade.base,
         mapa=mapa,
+        cabeca=grade.cabeca,
         contaminacao=dict(contaminacao),
         ataques=mantidos,
         ataques_descartados=descartados,

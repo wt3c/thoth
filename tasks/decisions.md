@@ -4051,3 +4051,63 @@ troca; e a troca na barra não perde para a troca bruta na mediana. Em *Dance of
   isso barato.
 - Mudança de andamento acima de ±10% entre janelas continua sem troca. Ampliar a faixa exige uma medição que não piore
   as músicas planas.
+
+## ADR-054 — a cabeça do tempo é escolhida pelas batidas do mix
+
+**Data:** 2026-10-30 · **Status:** aceito · **Complementa:** ADR-021, ADR-053
+
+### Contexto
+
+O boletim em 5 dimensões (`services/avaliacao_ritmica.boletim`) mostrou que o maior erro contra as tabs humanas é a
+**posição da nota dentro do pulso**: as figuras estão certas e a semicolcheia da cabeça do tempo está errada. Em *Gesu*,
+580 de 668 pares ficam exatamente uma semicolcheia antes. A causa é estrutural. `ajustar` só busca a fase dentro de
+uma semicolcheia, e `recuo_de_fase` escolhe entre `fase` e `fase − grade`: nada decide **qual** das quatro
+semicolcheias do pulso é a cabeça.
+
+### Medição
+
+Régua congelada antes da rodada (`tasks/todo.md`, "Cabeça do tempo"). O gabarito de cada janela de 15 s é a moda de
+`(pulsos Thoth − pulsos humana) mod 1` nos pares casados por altura, e a régua usa o mapa exato de cada rodada.
+Candidatas sem parâmetro ajustado, contadas nas janelas dominantes (versão anterior da régua, janelas de 30 s):
+
+| regra | acertos (de 32) |
+|---|---:|
+| fase atual | 8 |
+| densidade de notas | 8 |
+| acentos do mix | 15 |
+| batidas do Beat This! | 19 |
+| **batidas do `librosa.beat.beat_track`** | **26** |
+
+Com a regra final (uma fase por música, abstenção), a posição no pulso prevista vai de 0,043 a 0,868 em *Gesu* e não
+muda em *Você*, *Fear*, *Plague* e *Dance*, que se abstêm. Somadas as cinco músicas, a posição sobe de 1801 para 2352
+pares, de 6577.
+
+### Decisão
+
+- **As batidas são as do `beat_track` que `estimar_andamento` já rodava e descartava.** Sem dependência nova, sem rede
+  e sem peso a versionar. O Beat This! foi medido e perdeu para elas; só volta se as superar fora da amostra.
+- **`services/cabeca_do_tempo`** recebe as batidas e o mapa e devolve o deslocamento em semicolcheias (0 a 3). É a
+  moda da fração do pulso, na partitura, onde as batidas caem. Batida em tempo negativo cai no mesmo resto.
+- **Abstenção:** quando a segunda fração mais votada tem pelo menos 80% dos votos da primeira, a fase atual fica. São
+  batidas em dobro sem paridade decidida, ou um mapa que deriva entre elas. O limiar foi fixado antes da medição, e é ele
+  que segura *Você* (86%), que sem abstenção escolheria a fração errada.
+- **O deslocamento entra no recuo antes de escolher as barras.** Em `mapa_de_andamento`, ele é aplicado antes de
+  `_nas_barras`; somado depois, tiraria as trocas da barra (`marcas()`). Se a primeira nota cair antes do zero, o recuo
+  volta um pulso inteiro, e a música começa com pausa (anacruse).
+- **Vale também para o `--bpm` informado.** O número manda no andamento (ADR-019), não em onde o pulso começa.
+- **Multifaixa:** as batidas vêm do mix, e as outras partes herdam o mapa do baixo como antes (ADR-047).
+- **`Resultado.cabeca_do_tempo`** guarda o deslocamento aplicado, ou `None` na abstenção, para a decisão ser
+  auditável sem reler a partitura.
+
+### Consequências
+
+- Músicas de andamento estável cuja cabeça do tempo estava deslocada mudam de saída; os hashes de saída estável se
+  atualizam com esta justificativa.
+- O ganho medido vem de uma música. Nas músicas com troca de andamento, o mapa deriva entre as batidas e a regra se
+  abstém; o ganho restante depende de corrigir essa deriva e escolher a fase por trecho, que fica para outra etapa.
+- O compasso continua 4/4 e o primeiro tempo do compasso não é escolhido aqui.
+- Com troca de andamento, a cabeça deslocada muda a barra em que a primeira troca cai, e o `ajustar` do primeiro
+  trecho mede sobre outras notas: o andamento desse trecho muda centésimos. Nas 18 fontes do cache (notas do stem
+  antigo), só Plague decidiu com troca: 104,88 → 104,94 BPM, primeira troca de 16,1 s para 18,6 s; as 6 trocas e os
+  andamentos delas ficaram iguais. Na rodada real, com o stem atual, Plague se abstém.
+- Abstenção sai no relatório da CLI e em `Resultado.cabeca_do_tempo` (`None`).

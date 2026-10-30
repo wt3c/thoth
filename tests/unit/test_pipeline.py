@@ -8,6 +8,7 @@ caminho completo com os dois de verdade está marcado `slow` no fim do arquivo.
 
 from __future__ import annotations
 
+import copy
 from dataclasses import dataclass, field
 from pathlib import Path
 
@@ -16,7 +17,7 @@ import numpy as np
 import pytest
 import soundfile as sf
 
-from tests.sintetico import SOUNDFONT, execucao_em_andamentos, renderizar
+from tests.sintetico import FIXTURES, SOUNDFONT, execucao_em_andamentos, renderizar, renderizar_midi
 from thoth.domain.models import TUNING_BASS_5, AudioAsset, NoteEvent, Transcricao
 from thoth.services.cache_notas import ler
 from thoth.services.pipeline import ROTULOS_DE_BAIXO, ParteVazia, transcrever
@@ -286,6 +287,42 @@ def test_bpm_informado_nao_ganha_mapa(tmp_path: Path) -> None:
     resultado = _rodar(tmp_path, _em_dois_andamentos(), bpm=90)
 
     assert resultado.mapa.trocas == ()
+
+
+@requer_soundfont
+@pytest.mark.parametrize("bpm", [90, None])
+def test_as_batidas_do_mix_escolhem_a_cabeca_do_tempo(tmp_path: Path, bpm: int | None) -> None:
+    """ADR-054: a grade acerta as notas, mas só as batidas dizem onde o pulso começa.
+
+    O `walking` começa 0,5 s depois do zero: três semicolcheias a 90. As notas
+    sozinhas deixam a grade com fase zero e a primeira nota no ¾ do primeiro pulso;
+    as batidas do mix a trazem para a cabeça do tempo. Vale também com o BPM
+    informado, que manda no andamento e não em onde o pulso começa.
+    """
+    midi = copy.deepcopy(FIXTURES["walking"])
+    for nota in midi.instruments[0].notes:
+        nota.start, nota.end = nota.start + 0.5, nota.end + 0.5
+    wav = renderizar_midi(midi, "atrasado", tmp_path)
+    notas = tuple(
+        NoteEvent(n.pitch, n.start, n.end, "electric_bass") for n in midi.instruments[0].notes
+    )
+
+    resultado = transcrever(
+        str(wav),
+        tmp_path / "out",
+        bpm=bpm,
+        cache_dir=tmp_path / "cache",
+        separator=SeparadorFalso(),
+        transcriber=TranscritorFalso(notas),
+    )
+
+    assert resultado.cabeca_do_tempo == 3
+    assert resultado.mapa.recuo == pytest.approx(0.5, abs=0.02)
+    musica = gp.parse(str(resultado.artefatos["gp5"]))
+    # A primeira nota abre o compasso, em vez de três semicolcheias de pausa antes.
+    assert musica.tracks[0].measures[0].voices[0].beats[0].status == gp.BeatStatus.normal
+    gravadas = ler(tmp_path / "cache" / resultado.asset.source_id / "notas.jsonl")
+    assert gravadas[0].onset_s == pytest.approx(0.5)
 
 
 # --- BPM fora de faixa não chega à grade (ADR-025) ---------------------------

@@ -344,9 +344,10 @@ Principais opções:
 | `--out` | `out` | Diretório raiz dos artefatos finais. |
 | `--cache` | `cache` | Diretório dos áudios, stems e notas reutilizáveis. |
 
-Sem `--bpm`, o andamento estimado é exibido com sua confiança. Confira a auralização; se o ritmo estiver errado,
-repita o comando com `--bpm`. Sem `--tom`, a CLI também informa o tom estimado e evita escrever uma armadura quando a
-margem é pequena.
+Sem `--bpm`, o andamento estimado é exibido com sua confiança. Confira a auralização; se o ritmo estiver errado, repita
+o comando com `--bpm`. As batidas do mix decidem onde cai a cabeça de cada tempo na grade; quando elas não decidem, a
+CLI avisa e a fase da grade fica como estava (ADR-054). Sem `--tom`, a CLI também informa o tom estimado e evita
+escrever uma armadura quando a margem é pequena.
 
 Cada música recebe uma pasta `out/<título>/`. Os arquivos específicos dependem do instrumento:
 

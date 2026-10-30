@@ -15,9 +15,11 @@ import pytest
 
 from tests.sintetico import BPM, SOUNDFONT, execucao_em_andamentos, renderizar
 from thoth.domain.models import NoteEvent
-from thoth.services.rhythm import COMPASSO, monofonizar
+from thoth.services.cabeca_do_tempo import deslocamento
+from thoth.services.rhythm import COMPASSO, MapaDeAndamento, monofonizar
 from thoth.services.tempo import (
     ajustar,
+    batidas_do_mix,
     desdobrar,
     dobrar_para_faixa,
     estimar_andamento,
@@ -69,6 +71,23 @@ def test_concorda_quando_o_pulso_e_claro(tmp_path: Path) -> None:
     wav, _ = renderizar("walking", tmp_path)
 
     assert estimar_andamento(wav).confiavel
+
+
+@requer_soundfont
+def test_as_batidas_do_mix_caem_na_cabeca_do_tempo(tmp_path: Path) -> None:
+    """ADR-054: as batidas que a estimativa já calculava saem junto, no pulso da música.
+
+    `walking` toca semínimas a 90 a partir do zero: a cabeça do tempo é o zero da grade.
+    """
+    wav, _ = renderizar("walking", tmp_path)
+
+    andamento = estimar_andamento(wav)
+
+    intervalo = float(np.median(np.diff(andamento.batidas)))
+    print(f"{len(andamento.batidas)} batidas, intervalo mediano {intervalo:.3f} s")
+    assert intervalo == pytest.approx(60 / BPM, rel=0.05)
+    assert deslocamento(andamento.batidas, MapaDeAndamento(BPM)) == 0
+    assert batidas_do_mix(wav) == andamento.batidas
 
 
 # --- Ajuste conjunto de andamento e fase (ADR-021) ---------------------------
@@ -224,6 +243,23 @@ def test_o_primeiro_trecho_nao_herda_o_vies_da_janela() -> None:
     assert mapa.bpm == pytest.approx(90, abs=0.05)
     ((tique, _),) = mapa.marcas()
     assert tique == 20 * COMPASSO
+
+def test_a_cabeca_do_tempo_entra_antes_da_barra() -> None:
+    """ADR-054: o deslocamento entra no recuo antes de escolher as barras.
+
+    Somado depois, a troca escolhida na grade antiga sairia três semicolcheias fora
+    da barra da partitura nova.
+    """
+    onsets = execucao_em_andamentos([(35, 120), (30, 110)])
+    antes = mapa_de_andamento(onsets, 116)
+
+    mapa = mapa_de_andamento(onsets, 116, cabeca=3)
+
+    print(f"recuo {antes.recuo:.4f} -> {mapa.recuo:.4f}; marcas {mapa.marcas()}")
+    assert mapa.recuo == pytest.approx(antes.recuo + 3 * 15 / antes.bpm - 60 / antes.bpm, abs=1e-3)
+    ((tique, _),) = mapa.marcas()
+    assert tique % COMPASSO == 0
+
 
 def test_material_curto_nao_tem_mapa() -> None:
     """Menos de duas janelas não tem onde trocar: fica o andamento de entrada."""

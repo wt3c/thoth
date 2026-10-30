@@ -78,8 +78,8 @@ domain/     models.py (dataclasses frozen, slots) · ports.py (Protocol) ·
             sem I/O, sem torch, sem dependência de ML
 adapters/   ingest · transcription · separation · export (inclui multifaixa) ·
             playback (MPRIS, ADR-046) — cada um implementa um Protocol
-services/   lógica própria: fretboard (Viterbi), acordes, rhythm, tempo, tonalidade,
-            notas, rotulos, vocais, octave_check, evaluation, comparacao,
+services/   lógica própria: fretboard (Viterbi), acordes, rhythm, tempo, cabeca_do_tempo,
+            tonalidade, notas, rotulos, vocais, octave_check, evaluation, comparacao,
             alinhamento_audio, tab_referencia, auralizacao, guia_estudo,
             cache_notas, cache_transcricao, nomes, model_lock, pipeline
 api/        FastAPI: jobs em memória, estado serializado, artefatos e página de estudo

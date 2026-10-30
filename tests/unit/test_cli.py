@@ -764,3 +764,35 @@ def test_a_bateria_relata_cada_causa_de_ataque_fora(
     assert "ataque(s) fora da partitura: 1 fora do mapa de percussão, 2 repetida no tique" in (
         resultado.output
     )
+
+
+@pytest.mark.parametrize(("cabeca", "avisa"), [(None, True), (0, False), (3, False)])
+def test_a_cabeca_do_tempo_sem_decisao_e_relatada(
+    tmp_path: Path, monkeypatch, cabeca: int | None, avisa: bool
+) -> None:
+    """ADR-054: quando as batidas do mix empatam, a fase fica a da grade — e isso se diz."""
+    from thoth.services import pipeline as modulo
+    from thoth.services.pipeline import Resultado
+
+    asset = AudioAsset(wav=tmp_path / "mix.wav", source_id="abc123", title="t", duration_s=1.0)
+    monkeypatch.setattr(
+        modulo,
+        "transcrever",
+        lambda *a, **k: Resultado(
+            asset=asset,
+            stem=tmp_path / "bass.wav",
+            artefatos={"gp5": tmp_path / "abc123.gp5"},
+            notas=1,
+            rotulos={"electric_bass": 1},
+            descartadas=[],
+            fora_do_braco=[],
+            bpm=90,
+            avisos_de_oitava=[],
+            cabeca_do_tempo=cabeca,
+        ),
+    )
+
+    resultado = runner.invoke(app, ["transcribe", "x.mp3", "--out", str(tmp_path), "--bpm", "90"])
+
+    assert resultado.exit_code == 0, resultado.output
+    assert ("cabeça do tempo" in resultado.output) is avisa

@@ -18,6 +18,7 @@ import librosa
 import numpy as np
 import numpy.typing as npt
 
+from thoth.services.cabeca_do_tempo import recuo_na_cabeca
 from thoth.services.rhythm import MapaDeAndamento, para_ticks
 
 # Faixa musical usual. Serve para desfazer o erro de dobro/metade, que é o modo
@@ -39,6 +40,8 @@ class Andamento:
     bpm: int
     conferencia: int
     confiavel: bool
+    #: Instantes do `beat_track` no mix, que escolhem a cabeça do tempo (ADR-054).
+    batidas: tuple[float, ...] = ()
 
 
 def dobrar_para_faixa(bpm: float) -> float:
@@ -103,7 +106,8 @@ def _primeiro(valor: npt.ArrayLike) -> float:
 def estimar_andamento(wav: Path) -> Andamento:
     """Andamento do áudio inteiro, pelo mix: é onde a bateria dá o pulso."""
     y, sr = librosa.load(wav, sr=22050, mono=True)
-    principal = _primeiro(librosa.beat.beat_track(y=y, sr=sr)[0])
+    bruto, quadros = librosa.beat.beat_track(y=y, sr=sr)
+    principal = _primeiro(bruto)
     envelope = librosa.onset.onset_strength(y=y, sr=sr)
     segundo = _primeiro(librosa.feature.tempo(onset_envelope=envelope, sr=sr))
 
@@ -113,7 +117,18 @@ def estimar_andamento(wav: Path) -> Andamento:
         bpm=round(bpm),
         conferencia=round(conferencia),
         confiavel=abs(bpm - conferencia) <= _TOLERANCIA * bpm,
+        batidas=_instantes(quadros, sr),
     )
+
+
+def batidas_do_mix(wav: Path) -> tuple[float, ...]:
+    """As batidas de `estimar_andamento`, para quando o BPM veio de você (ADR-054)."""
+    y, sr = librosa.load(wav, sr=22050, mono=True)
+    return _instantes(librosa.beat.beat_track(y=y, sr=sr)[1], sr)
+
+
+def _instantes(quadros: npt.NDArray[np.intp], sr: float) -> tuple[float, ...]:
+    return tuple(float(t) for t in librosa.frames_to_time(quadros, sr=sr))
 
 
 # Quanto o ajuste pode se afastar da estimativa do áudio. O mix é a âncora: as
@@ -289,7 +304,7 @@ def _na_barra(
 
 
 def mapa_de_andamento(
-    onsets: Sequence[float], bpm: float, penalidade: float = _PENALIDADE
+    onsets: Sequence[float], bpm: float, penalidade: float = _PENALIDADE, cabeca: int = 0
 ) -> MapaDeAndamento:
     """O andamento de cada trecho da música, com as trocas na barra de compasso.
 
@@ -297,6 +312,9 @@ def mapa_de_andamento(
     música estável sai com um trecho só — e aí quem chamou fica com o `ajustar` de
     sempre, que mede mais fino. Trecho a mais de 10% do global é escrito no
     andamento mais próximo dentro da faixa: é o limite conhecido (ADR-034).
+
+    `cabeca` é a semicolcheia da cabeça do tempo (ADR-054). Ela entra no recuo antes
+    de as trocas irem para a barra, porque a barra é contada a partir dele.
     """
     on = np.sort(np.asarray(onsets, dtype=float))
     if len(on) < _MINIMO_DE_NOTAS or on.max() < 2 * _JANELA_S:
@@ -307,6 +325,7 @@ def mapa_de_andamento(
     # nenhum formato de partitura representa.
     em_segundos = ((-fase) % 1.0) * grade
     recuo = em_segundos if on[0] >= em_segundos else em_segundos - grade
+    recuo = recuo_na_cabeca(recuo, cabeca, grade, float(on[0]))
     brutas = [
         ((k + 1) * _JANELA_S, depois)
         for k, (antes, depois) in enumerate(pairwise(serie))
@@ -324,6 +343,7 @@ def mapa_de_andamento(
     andamento, fase = ajustar(primeiro.tolist(), mapa.bpm)
     grade = 15.0 / andamento
     recuo = fase if not fase or on[0] >= fase else fase - grade
+    recuo = recuo_na_cabeca(recuo, cabeca, grade, float(on[0]))
     return _nas_barras(on, MapaDeAndamento(andamento, recuo), brutas)
 
 
