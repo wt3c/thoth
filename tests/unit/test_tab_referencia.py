@@ -27,6 +27,7 @@ class B:
     casa: int | None = None
     tipo: gp.NoteType = gp.NoteType.normal
     tempo: int | None = None
+    corda: int | None = None
 
 
 @dataclass(slots=True)
@@ -79,7 +80,9 @@ def _gravar(
                     else:
                         beat.status = gp.BeatStatus.normal
                         beat.notes.append(
-                            gp.Note(beat, value=b.casa, string=len(f.cordas), type=b.tipo)
+                            gp.Note(
+                                beat, value=b.casa, string=b.corda or len(f.cordas), type=b.tipo
+                            )
                         )
                     if b.tempo is not None:
                         beat.effect.mixTableChange = gp.MixTableChange(
@@ -101,6 +104,33 @@ def _baixo(compassos: list[list[B]]) -> Faixa:
 
 def _ataques(caminho: Path) -> list[tuple[float, int]]:
     return [(round(n.onset_s, 4), n.pitch) for n in ler_tab(caminho).notas]
+
+
+def test_leitura_distingue_re_solto_de_re_na_corda_la(tmp_path: Path) -> None:
+    """Mesma altura não é a mesma execução: preservar corda e casa no gabarito."""
+    caminho = _gravar(tmp_path, [_baixo([[B(2, 5, corda=3), B(2, 0, corda=2)]])])
+
+    referencia = ler_tab(caminho)
+
+    assert [n.pitch for n in referencia.notas] == [38, 38]
+    assert referencia.afinacao == (28, 33, 38, 43)
+    assert [(t.string, t.fret) for t in referencia.tablatura] == [(1, 5), (2, 0)]
+    assert [t.event for t in referencia.tablatura] == referencia.notas
+
+
+def test_ligadura_preserva_a_posicao_da_nota_atacada(tmp_path: Path) -> None:
+    caminho = _gravar(
+        tmp_path,
+        [_baixo([[B(2, 5, corda=3), B(2, 5, tipo=gp.NoteType.tie, corda=3)]])],
+    )
+
+    referencia = ler_tab(caminho)
+
+    assert len(referencia.tablatura) == 1
+    tab = referencia.tablatura[0]
+    assert (tab.string, tab.fret) == (1, 5)
+    assert (tab.event.onset_s, tab.event.offset_s) == (0.0, 2.0)
+    assert [tab.event] == referencia.notas
 
 
 def test_notas_em_segundos_no_andamento_da_musica(tmp_path: Path) -> None:
