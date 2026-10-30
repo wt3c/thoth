@@ -8,7 +8,6 @@
       "Bash(uv run ruff:*)",
       "Bash(uv run mypy:*)",
       "Bash(uv run thoth:*)",
-      "Bash(uv run python:*)",
       "Bash(git status:*)",
       "Bash(git diff:*)",
       "Bash(git log:*)",
