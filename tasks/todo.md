@@ -1167,6 +1167,13 @@ sintético é métrica de regressão, não de qualidade real.
   músicas, diferença pequena entre candidatos não se distingue de acaso: esperar mais tabs. _Eyrie_ acrescentou só 2
   (quarta emenda do ADR-030): linha repetitiva demais para as janelas serem conclusivas. _Você_ e _Gesu_, mais 5
   (emenda de 2026-10-23): falta tab de música com **mais erro de oitava**, não só mais tabs
+  - Tentativa de escolher a próxima tab pelo próprio aviso (2026-10-30, só medição, script `oitava/ranking.py` no
+    scratchpad): `verificar_oitavas` no stem em cache de cada uma das 18 fontes. **Não serve para escolher.** O
+    aviso não acompanha o erro real que as tabs confirmam. Gesu alarma 41,9% das notas, com poucos casos reais;
+    Fear, 26,7% com 13; Plague, 10,9% com 26, o maior número; Dance, 24,3% sem nenhum caso conclusivo. A
+    sugestão `pitch + 12` sai em quase todos os avisos e não filtra nada. O topo da lista (Hallowed Be Thy
+    Name 36%, Feel Like Makin' Love 20%) não indica mais erro de oitava. A próxima tab continua dependendo de
+    escolha externa
 - [x] MuScriptor silencioso no fim de _Eyrie_ (`_RMax1LS3pM`): o _prelude forcing_ trava o modelo em vazio de 557 a 671
   s. Segunda passada sem ele, só quando há buraco, só dentro do buraco (emenda do ADR-008). 0 → 382 notas no trecho,
   travado em `tests/integration/test_prelude_eyrie.py`
