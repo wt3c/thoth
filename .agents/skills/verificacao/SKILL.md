@@ -27,5 +27,7 @@ de estudo, a verificação acima não a cobre — diga isso explicitamente e rod
 seleção correspondente: `uv run pytest -m "slow and not network"` (modelos locais),
 `-m network` (canário do yt-dlp) ou `-m navegador`. Atenção: `-m slow` sozinho inclui
 o teste de rede.
+Na seleção pesada, no máximo `-n 2`: com `-n auto` os modelos disputam a memória e
+o teste do caminho real até o arquivo baixado falha.
 
 Se algum dos três falhar: pare e não proponha correção sem causa raiz confirmada.

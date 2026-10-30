@@ -47,6 +47,9 @@ O MuScriptor exige Python 3.10–3.12 (ADR-004). O teto é deliberado. **Não "a
 
 `-m slow` sozinho **inclui** o teste de rede. Para exercitar só os modelos locais, use
 `-m "slow and not network"`.
+Paralelizar essa seleção com `-n auto` põe vários Demucs e MuScriptor na memória ao
+mesmo tempo: `test_caminho_real_ate_o_arquivo_baixado` falhou duas vezes assim e passou
+com `-n 2`. Use no máximo `-n 2`, ou rode em série.
 
 **Suíte verde não prova que o modelo, a rede ou o navegador rodaram.** Antes de afirmar
 que algo funciona nessas camadas, rode a seleção correspondente e cite a saída.
