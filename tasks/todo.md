@@ -633,6 +633,25 @@ relógio do relatório de `out/Você/analise-algoritmo-2026-10-30`. As fontes se
    aprendida sem erro: no máximo 0,14 s, e até 62,8% das posições mudam (`yt_g81jzIwyDjg`). As etapas 3 e 4 não
    mudaram código. O que separa _Você_ da tab humana é a revocação e a altura do transcritor (67 notas faltam,
    33 com altura errada) e as posições restantes (161).
+6. [x] Andamento absurdo do `medium` corrigido e escolha `small` × `medium` refeita (2026-10-30, emenda do ADR-024).
+
+   **Causa.** O `medium` dá notas simultâneas (748 pares a menos de 5 ms no treino), que colidem em qualquer grade, e
+   `desdobrar` dobrava até o teto: _Dance_ 528, _Eyrie_ 400, _FITK_ 187 BPM. O baixo passou a medir o andamento
+   com um ataque por grupo simultâneo, numa janela de 10 ms (`_SIMULTANEAS_NO_BAIXO_S`). A janela de acorde (50 ms)
+   fundiria semicolcheias a 360 BPM. A correção tem teste das duas pontas, visto falhar sem ela. Suíte padrão 809
+   passaram, `slow and not network` 55 passaram e 1 pulado; ruff e mypy limpos.
+
+   **Nova escolha, regra congelada** (média de `f1_total` nas 5 músicas de treino, script `gerar_fix.sh` e
+   `decompor.py` no scratchpad `etapa3/`; resultado anterior em `antes-fix/`; cache restaurado e conferido):
+
+   | modelo   | BPM _Dance_ / _FITK_ / _Eyrie_ | média `f1_total` antes | depois     |
+   | -------- | ------------------------------ | ---------------------: | ---------: |
+   | `small`  | 144,6 / 93,4 / 103,7 (iguais)  |                 0,6233 | **0,6235** |
+   | `medium` | 528 → 142 / 187 → 93 / 400 → 98 |                0,6178 |     0,6142 |
+
+   O `small` continua escolhido. O andamento absurdo não era o que fazia o `medium` perder: corrigido, ele perde
+   um pouco mais (_FITK_ 0,743 → 0,727). Por isso _Você_ não foi medida com `medium`, como previa o plano. No
+   `small`, a correção só mexeu em 2 notas de _Dance_ e 2 de _Plague_, sem mudar o BPM.
 
 ## Transcrição de Você igual à referência humana — objetivo corrigido (2026-10-30)
 
