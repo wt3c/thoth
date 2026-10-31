@@ -1,0 +1,38 @@
+{
+  "adr": "ADR-055",
+  "hiperparametros": {
+    "epocas": 10,
+    "frase": 32,
+    "frases_por_musica": 40,
+    "curto_s": 0.25,
+    "semente": 0
+  },
+  "treino": {
+    "Gesu No Kiwami Otome - Watashi Igai Watashi Ja Nai No.gp5": "c9910b9b79789b0cb211035adeea3db76d1ad893faa740806bc4d99f4469965f",
+    "Iron Maiden - Dance Of Death (ver 4 by Mirko88).gp5": "b9e2640f4e21cacb7e8a6cb96920c6598bbc8942e10c94a5eaa1e65874ed3d23",
+    "Iron Maiden - Fear Is The Key (ver 2 by BaptizedinFire).gp5": "fd653ca12bf995e1dc68c5a4c5fdbbc0b10834f18b7dc250b977668cf15427d5",
+    "Ne Obliviscaris - And Plague Flowers The Kaleidoscope.gp5": "2d2cd33597cce984ee92ce70362eeae3707089ea5cdebf18df758b8824d6f2dd",
+    "Ne Obliviscaris - Eyrie.gp5": "6d71e071df5057fb3d3d48f4b26f3957a419101b31ef0a07095bb4b10faf7df8"
+  },
+  "pesos": {
+    "casa": -7.550666666666159,
+    "dcorda": -115.09599999999651,
+    "dcorda_f0": -23.9195,
+    "dcorda_f1": 67.0855,
+    "dcorda_f2": 45.089,
+    "dcorda_f3": -88.255,
+    "dmao": -37.5305,
+    "dmao_curto": -34.46,
+    "dmao_f0": -51.381,
+    "dmao_f1": 85.289,
+    "dmao_f2": 92.1405,
+    "dmao_f3": -25.959,
+    "dmao_f4": -64.115,
+    "regiao0": 38.6595,
+    "regiao1": 41.369,
+    "regiao2": 17.0355,
+    "regiao3": -10.903,
+    "solta": -86.161,
+    "solta_solta": 109.9755
+  }
+}

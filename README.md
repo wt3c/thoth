@@ -337,7 +337,7 @@ Principais opções:
 |-----------------|-------------|------------------------------------------------------------------------------------------------------|
 | `--instrumento` | `baixo`     | Escolhe `todos`, `baixo`, `bateria`, `guitarra-acustica`, `guitarra-limpa` ou `guitarra-distorcida`. |
 | `--afinacao`    | `4`         | Afinação do baixo: `4`, `5`, `6` ou `drop-d`; é recusada para outros instrumentos.                   |
-| `--digitacao`   | `iniciante` | Define o custo de posicionamento no braço: `iniciante` ou `experiente`.                              |
+| `--digitacao`   | `iniciante` | Define o custo de posicionamento no braço: `iniciante`, `experiente` ou `aprendida`.                            |
 | `--alcance-mao` | `0` | Janela opcional de casas alcançáveis no baixo: `3` abrange quatro casas; `0` desativa a janela. Não identifica a corda pelo timbre. |
 | `--modelo` | `small` | Modelo para o baixo: `small` ou `medium`. O `medium` usa mais recursos e precisa dos pesos e do acesso correspondentes no HuggingFace. |
 | `--bpm`         | estimado    | Fixa o andamento entre 20 e 300 BPM; informado, ele prevalece sobre a estimativa.                    |
@@ -492,7 +492,7 @@ de 512 MiB; acima disso o servidor responde `413`.
 | **Tom**                       | vazio, o tom é estimado das notas; aceita `Bb maior`, `f menor` etc.                                |
 | **Instrumento**               | `baixo` (padrão), `todos` (partitura multifaixa), guitarra limpa, distorcida ou acústica, `bateria` |
 | **Afinação**                  | só vale para o baixo: 4 cordas, 5 cordas ou drop D; a guitarra usa a afinação do perfil             |
-| **Digitação**                 | `iniciante` prefere casas baixas e cordas soltas; `experiente` fica numa posição do braço (ADR-050) |
+| **Digitação**                 | `iniciante` prefere casas baixas e cordas soltas; `experiente` fica numa posição do braço (ADR-050); `aprendida` aprendeu com tabs humanas, só 4 cordas (ADR-055) |
 
 Clique em **Transcrever**. A área de estado mostra o job passando por `na fila`, `rodando` e `pronto` (ou `erro`). Em
 CPU, a transcrição leva minutos. Os jobs rodam um por vez, pois compartilham caches e caminhos de saída; um pedido novo

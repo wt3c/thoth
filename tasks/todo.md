@@ -524,6 +524,11 @@ relógio do relatório de `out/Você/analise-algoritmo-2026-10-30`. As fontes se
    SVM: 745 contra 728 em _Você_, regressão em Plague) fica para depois, como custo de emissão atrás de um `Protocol`
    e com a mesma régua.
 
+   **2b feita (2026-10-30, ADR-055):** `services/digitacao_aprendida.py` + `digitacao_aprendida.json` (pesos, sha256
+   das 5 tabs, hiperparâmetros), `--digitacao aprendida` na CLI. O treino pelo código de produção reproduz os pesos da
+   régua bit a bit. `-m slow` do módulo: 4 passaram (hashes, retreino, _Fear of the Dark_ 0,800, _Você_ 0,858). A CLI
+   real gera o mesmo GP5 do script (633 posições, 597 completas). 18 fontes sem tab: nenhuma falha, ≤ 0,14 s. Suíte
+   padrão 807 passaram; ruff e mypy limpos. Falta a API oferecer `aprendida`.
 3. [ ] Notas que faltam e sobram: filtro aprendido nas tabs de treino.
 4. [ ] Duração: figura escrita aprendida nas tabs de treino.
 5. [ ] Em cada etapa, conferir as fontes sem tab e gerar a nova _Você_ para abrir no Guitar Pro.

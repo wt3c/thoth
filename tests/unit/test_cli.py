@@ -12,6 +12,7 @@ from typer.testing import CliRunner
 from thoth.cli import app
 from thoth.domain.models import TUNING_BASS_6, TUNING_BASS_DROP_D, AudioAsset
 from thoth.services import pipeline
+from thoth.services.digitacao_aprendida import DigitacaoAprendida
 from thoth.services.fretboard import PADRAO
 from thoth.services.vocais import ResultadoVocais
 
@@ -863,3 +864,36 @@ def test_a_cabeca_do_tempo_sem_decisao_e_relatada(
 
     assert resultado.exit_code == 0, resultado.output
     assert ("cabeça do tempo" in resultado.output) is avisa
+
+
+def test_digitacao_aprendida_chega_ao_pipeline(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Aprendida nas tabs humanas (ADR-055); fora de 4 cordas, o `experiente`."""
+    recebido: dict[str, object] = {}
+
+    def espiao(ref: str, out: Path, **kw: object):
+        recebido.update(kw)
+        raise typer.Exit(code=0)
+
+    monkeypatch.setattr(pipeline, "transcrever", espiao)
+    resultado = runner.invoke(app, ["transcribe", "x.mp3", "--digitacao", "aprendida"])
+
+    assert resultado.exit_code == 0, resultado.output
+    assert isinstance(recebido["assigner"], DigitacaoAprendida)
+    assert recebido["assigner"].reserva.custos is PADRAO
+    assert recebido["atribuidor_de_acordes"].custos is PADRAO
+
+
+def test_digitacao_aprendida_nao_tem_alcance_da_mao() -> None:
+    """Foi treinada com alcance zero (ADR-032); outro alcance seria outro modelo."""
+    resultado = runner.invoke(
+        app, ["transcribe", "x.mp3", "--digitacao", "aprendida", "--alcance-mao", "3"]
+    )
+
+    assert resultado.exit_code != 0
+    assert "aprendida" in resultado.output
+
+
+def test_digitacao_fora_do_catalogo_lista_a_aprendida() -> None:
+    resultado = runner.invoke(app, ["transcribe", "x.mp3", "--digitacao", "virtuose"])
+
+    assert "aprendida" in resultado.output

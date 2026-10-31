@@ -4205,3 +4205,46 @@ pares, de 6577.
   antigo), só Plague decidiu com troca: 104,88 → 104,94 BPM, primeira troca de 16,1 s para 18,6 s; as 6 trocas e os
   andamentos delas ficaram iguais. Na rodada real, com o stem atual, Plague se abstém.
 - Abstenção sai no relatório da CLI e em `Resultado.cabeca_do_tempo` (`None`).
+
+## ADR-055 — digitação aprendida nas tabs humanas, só para baixo de 4 cordas
+
+**Data:** 2026-10-30 · **Status:** aceito · **Complementa:** ADR-032 e ADR-050
+
+### Contexto
+
+O `experiente` (ADR-050) concorda com o baixista em ~63% das notas, e os pesos dele foram escolhidos olhando seis tabs,
+_Você_ entre elas. Ajustar os quatro pesos à mão não generalizava. O objetivo é que _Você_ saia igual à tab humana
+**aprendendo com as outras tabs**, sem _Você_ em treino, calibração ou escolha de opção.
+
+### Medição
+
+Treino: _Gesu_, _Dance of Death_, _Fear Is the Key_, _Plague_ e _Eyrie_. Testes, nunca no treino: _Fear of the Dark_
+(faixa 4) e _Você_. Perceptron estruturado com média sobre o mesmo Viterbi, partindo dos pesos do `experiente`; features
+independentes da afinação (casa e região, corda solta, cordas atravessadas, deslocamento da mão em faixas, deslocamento
+rápido); 10 épocas, 40 frases de 32 notas por música a cada época, semente 0. Réguas congeladas antes de cada medição.
+
+- **Validação deixando uma tab de fora (reprovada como régua geral):** as três de 4 cordas ganham de 0,079 a 0,100; as
+  de 5 e 6 cordas, do mesmo baixista, perdem 0,059 e 0,093.
+- **Régua nova, só para 4 cordas, aprovada:** _Fear of the Dark_ 0,395 → 0,800 (piso 0,415); _Você_ 0,738 → 0,858;
+  no placar completo de _Você_, notas na corda/casa certa 549 → 618 (`small`) e 585 → 633 (`medium`), completas
+  557 → 597. Ataques, alturas, durações, faltas e sobras não mudam.
+- **Fontes sem tab (18 no cache):** nenhuma falha, até 0,14 s por música. A aprendida usa bem menos corda solta
+  (por exemplo, 41% → 0,6%), na direção das tabs humanas; ali não há verdade para medir.
+
+### Decisão
+
+- `services/digitacao_aprendida.py`: `DigitacaoAprendida` implementa o `FretAssigner`. Com 4 cordas, usa os pesos
+  aprendidos; com outra afinação, delega à `reserva`, o `experiente`.
+- Os pesos ficam em `services/digitacao_aprendida.json`, com o sha256 de cada tab de treino e os hiperparâmetros. As
+  tabs não entram no repositório (ADR-005). `treinar` recusa _Você_ e _Fear of the Dark_.
+- CLI: `--digitacao aprendida`. Acordes usam os custos do `experiente`. O modelo foi treinado com alcance zero, então
+  `--alcance-mao` diferente de zero é recusado com ele.
+- **O default continua `iniciante`** (ADR-006). Trocar exige ADR próprio.
+
+### Consequências
+
+- Teste `slow` confere os hashes das tabs, treina de novo e exige os mesmos pesos, bit a bit, e os pisos de _Fear of the
+  Dark_ e _Você_. Sem `samples/`, `skip`.
+- Mais tabs de 4 cordas devem melhorar o modelo; retreinar muda o arquivo de pesos e exige nova medição nos testes.
+- A API (`POST /jobs`) ainda não oferece `aprendida`.
+- _Você_ ainda não sai igual à tab humana: 597 de 846 notas completas. Faltam notas que faltam/sobram e durações.
