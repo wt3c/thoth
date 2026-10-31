@@ -529,9 +529,110 @@ relógio do relatório de `out/Você/analise-algoritmo-2026-10-30`. As fontes se
    régua bit a bit. `-m slow` do módulo: 4 passaram (hashes, retreino, _Fear of the Dark_ 0,800, _Você_ 0,858). A CLI
    real gera o mesmo GP5 do script (633 posições, 597 completas). 18 fontes sem tab: nenhuma falha, ≤ 0,14 s. Suíte
    padrão 807 passaram; ruff e mypy limpos. Falta a API oferecer `aprendida`.
-3. [ ] Notas que faltam e sobram: filtro aprendido nas tabs de treino.
+3. [ ] Notas que faltam e sobram: filtro aprendido nas tabs de treino. Plano revisado pelo Fable e pelo Codex
+   (2026-10-30), aguardando aprovação:
+
+   Treino nas 5 tabs. _Fear of the Dark_ (faixa 4) é o teste reservado deste filtro — não é um teste intocado,
+   porque já foi olhada nos ADRs 030 e 055. _Você_ é aceitação conhecida e não sustenta generalização.
+   O transcritor (`small` ou `medium`) é escolhido pelo F1 de nota nas 5 de treino, não por _Você_. Gerar o
+   `medium` das músicas de treino custa minutos de CPU por música; o `notas.jsonl` de _Você_ é restaurado
+   depois de cada rodada.
+
+   **Pareamento.** O `avaliar_tablatura` casa só pelo instante, e por isso os 39 que faltam e os 27 que sobram
+   em _Você_ não são erros de ataque e altura. Para rotular as candidatas e medir o F1, o casamento é um a um
+   por instante (0,1 s) e altura. O placar completo continua separado, com relógio e formato fixos. Antes de
+   comparar, as linhas de base de _Você_ (66 / 597) são reproduzidas.
+
+   3.0. **Decomposição, sem código de produção**, só nas tabs de treino.
+   - A tab humana vai ao tempo do stem pelo ADR-042. Rótulos de treino só nas janelas conclusivas
+     (`veredito_de_nota`); a fração de faltas e sobras em janela inconclusiva é relatada.
+   - Cada evento da transcrição bruta em cache é rastreado por estágio, inclusive a rejeição por rótulo que
+     não entra em `descartadas`.
+   - Classes de sobra, com precedência nesta ordem: par de tempo (ataque deslocado de 0,1 a 0,3 s), par de
+     altura, duplicata (mesma classe de altura a menos de 50 ms), oitava de nota vizinha do Thoth, curta
+     (abaixo de uma fusa), rótulo devolvido pelo `rotulos`, outra.
+   - Classes de falta, na mesma lógica: presente na bruta e descartada (por qual estágio), presente com outra
+     altura, re-ataque engolido por nota sustentada, ausente da bruta.
+   - Intocáveis por filtro, contados à parte: fora do braço, simultâneas do `monofonizar`, nota da tab sem som.
+   - Resultados por número de cordas.
+   - **Corte por ganho máximo recuperável:** um seletor perfeito escolhe entre as candidatas, e a saída passa
+     de novo por monofonização e exportação. Segue só se esse teto der pelo menos +0,02 de F1 médio no treino
+     (o dobro do ganho exigido abaixo). Senão, registra e vai para a etapa 4.
+
+   3a. **Viabilidade no scratchpad.** O filtro entra logo depois do filtro de rótulos, antes da grade; toda
+   medida é da saída final. Candidatas = notas mantidas + descartadas da bruta.
+   - **Primeiro, uma regra simples**, se a 3.0 mostrar uma classe dominante: um parâmetro, escolhido no treino.
+   - **Regressão logística só se várias classes somarem.** Features congeladas agora, antes da 3.0: duração,
+     rótulo, distância e altura relativa às vizinhas do Thoth, duplicata, oitava de vizinha, intervalo até a
+     anterior. L2 fixa, normalização só no treino de cada divisão, peso igual por música, limiar 0,5. Sem busca.
+   - Régua, congelada antes de medir:
+     1. validação deixando uma de fora: F1 de nota médio pelo menos +0,01; nenhuma música perde mais que 0,005;
+        pelo menos 3 de 5 melhoram. Publicar os cinco deltas, precisão e revocação, sem alegar significância.
+     2. _Fear of the Dark_, medida uma vez: F1 acima da linha de base + 0,01.
+     3. _Você_ (digitação aprendida): faltam + sobram até 61 (−5) e completas pelo menos 597 (não piora; um
+        filtro que tira nota não cria completas).
+   - Se um item falhar: registra, sem nova tentativa olhando os testes.
+
+   3b. **Integração, só se a 3a passar:** ADR-056, TDD, filtro atrás de um `Protocol`, opção na CLI, default
+   inalterado; conferir as fontes sem tab (quantas notas o filtro tira ou devolve, nada quebra).
+
+   **Resultado da 3.0 (2026-10-30), medido uma vez.** Script `decompor.py` no scratchpad, conferido por
+   subagente.
+   - **Transcritor:** fica o `small`. F1 de nota médio nas 5 de treino: 0,623 contra 0,618 do `medium`. O
+     `medium` vence 3 de 5, mas a régua é a média. O `medium` também estimou andamentos absurdos
+     (527 BPM em _Dance of Death_, 400 em _Eyrie_), um defeito separado, a investigar.
+   - **Alinhamento:** _Dance of Death_ não tem nenhuma janela conclusiva, e _Eyrie_ tem 1 de 10. Os rótulos de
+     treino vêm, na prática, de _Gesu_, _Fear Is the Key_ e _Plague_.
+   - **Sobras** (820, `small`): par de altura 40%, par de tempo 30%, outra 26%, oitava de vizinha 5%, curta 0%.
+   - **Faltas** (1436): ausente da bruta 35%, par de altura 26%, par de tempo 19%, descartada por simultânea
+     11%, re-ataque engolido 10%.
+   - **Corte:** o teto do seletor perfeito dá +0,094 de F1 médio, e por isso o corte congelado passa. Mas quase
+     todo esse ganho vem de apagar sobras que são pares de altura ou de tempo, e apagá-las piora o placar (a
+     falta de ataque sobe). Tirando só as sobras puras (outra, oitava, curta), o teto cai para +0,017 a
+     +0,023 nas três músicas com rótulo; Eyrie dá +0,091, mas com 61 notas.
+   - **Leitura:** um filtro de sobras e faltas tem pouco a ganhar. O erro dominante é altura e tempo errados
+     sobre um ataque certo, e nota que nem chega à transcrição bruta.
+
+   **Perfil dos pares (3.1, 2026-10-30)**, script `pares.py` no scratchpad, pareando um a um pela nota mais
+   próxima.
+   - **Pares de tempo** (228): mediana de −0,11 a −0,13 s, 75% adiantados, ou seja, logo depois da
+     tolerância de 0,1 s. Os acertos também saem levemente adiantados (mediana −0,016 s). Não dá para separar
+     erro do Thoth de erro do alinhamento. Na partitura, a nota vai para a grade de qualquer forma.
+   - **Pares de altura** (332): sem classe dominante. Oitava ±12 dá 23%, quarta e quinta ±5/±7 dão 24%, ±2 dá
+     15%, e o resto se espalha. A correção de oitava, mesmo perfeita, mexe em cerca de 76 notas nas três
+     músicas, perto de +0,01 de F1.
+   - **Decisão proposta:** encerrar a etapa 3 sem filtro e sem correção. Nenhuma classe tem teto que pague a
+     régua de +0,01. A maior alavanca restante é a revocação do transcritor (35% das faltas), e ela não se
+     aprende com as tabs sem retreinar o modelo.
 4. [ ] Duração: figura escrita aprendida nas tabs de treino.
+
+   **Medição 4.0 (2026-10-30)**, script `duracoes.py` no scratchpad. Só treino, `small`, janelas conclusivas,
+   notas pareadas por ataque e altura. A duração do Thoth foi aproximada sem a grade, como `rhythm.eventos`
+   (`min(fim, próximo ataque)`), com tolerância de 0,05 s, a mesma do placar.
+   - **Hoje acerta 3406 de 4087 (83%).** As tabs humanas escrevem legato: de 81% em _Gesu_ a 99% em _Eyrie_ das
+     notas vão até o ataque seguinte.
+   - **Regras simples não ajudam.** Preencher até o próximo ataque do Thoth dá 3246, menos que hoje. Mesmo
+     sabendo o próximo ataque humano (oráculo), o resultado é 3437, só +31.
+   - **O erro de duração vem do ataque vizinho errado.** Das 681 durações erradas, 507 (74%) têm o próximo ataque
+     do Thoth diferente do humano, ou seja, é nota faltando ou sobrando ao lado. Sobram cerca de 174 (4%) de
+     duração própria.
+   - Em _Você_, a linha de base `small` já acerta 732 de 779 durações pareadas.
+   - **Decisão proposta:** encerrar a etapa 4 sem mudança. A duração segue os ataques e não tem alavanca
+     própria que se aprenda das tabs.
 5. [ ] Em cada etapa, conferir as fontes sem tab e gerar a nova _Você_ para abrir no Guitar Pro.
+
+   **Resultado (2026-10-30).** _Você_ foi regerada pela CLI do commit `fbb9c7c` com `--modelo small --digitacao
+   aprendida`, em `out/Você (aprendida)/Você/`. O cache de notas não mudou.
+
+   | versão (846 notas humanas) | ataques | alturas | posições | durações | completas | faltam | sobram |
+   | -------------------------- | ------: | ------: | -------: | -------: | --------: | -----: | -----: |
+   | `small`, experiente        |     779 |     746 |      549 |      732 |       519 |     67 |     43 |
+   | `small`, aprendida (CLI)   |     779 |     746 |  **618** |      732 |   **581** |     67 |     43 |
+
+   O resultado é idêntico ao da geração pelo script provisório da etapa 2. As 18 fontes sem tab rodam com a
+   aprendida sem erro: no máximo 0,14 s, e até 62,8% das posições mudam (`yt_g81jzIwyDjg`). As etapas 3 e 4 não
+   mudaram código. O que separa _Você_ da tab humana é a revocação e a altura do transcritor (67 notas faltam,
+   33 com altura errada) e as posições restantes (161).
 
 ## Transcrição de Você igual à referência humana — objetivo corrigido (2026-10-30)
 
