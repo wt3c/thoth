@@ -410,6 +410,124 @@ Revisão de exploração: `diagnosticar_ritmo_notas` (corpus) e
 `explorar_comparacao` (reprodução independente). Não há revisor específico de
 áudio no harness; decisões de arquitetura, se necessárias, terão ADR próprio.
 
+## Você igual à tab humana por aprendizado, com Você fora (aprovado: "pode seguir", 2026-10-30)
+
+Meta: a saída de _Você_ igual à tab humana em nota, corda/casa e duração, das 846 notas. O caminho é só aprender com
+as outras tabs: Gesu, Dance of Death, Fear Is the Key, Plague, Eyrie e Fear of the Dark. _Você_ fica fora de todo
+ajuste, calibração e escolha de opção. O placar é `avaliar_tablatura` (ataque 0,1 s, duração 0,05 s), com o mesmo
+relógio do relatório de `out/Você/analise-algoritmo-2026-10-30`. As fontes sem tab humana não podem piorar.
+
+1. [ ] **Linha de base honesta.** Toda opção (modelo, digitação, alcance) é escolhida só pelas seis tabs de treino.
+   A régua, congelada antes de medir:
+   - na digitação isolada, cada perfil e alcance (0 a 4) é medido nas seis tabs de treino;
+   - vence a maior média por música, e só então _Você_ é medida com o vencedor;
+   - o `medium` não foi validado fora de _Você_ (ADR-009 o mediu só em fixtures), então a linha de base informa
+     `small` e `medium` lado a lado, sem escolher entre eles;
+   - a candidata de 687 notas fica registrada como contaminada, porque o alcance 3 foi escolhido olhando _Você_.
+
+   **Resultado: feito.** As seis tabs de treino escolhem `experiente` com alcance 0, média de 0,570 na digitação
+   isolada. _Você_, medida só depois, fica em **0,738**. O alcance 3 tem média de treino de 0,537 e só subia _Você_
+   para 0,936: foi escolha olhando a música de teste. O placar completo usa os GP5 regenerados do áudio, em
+   `small` e `medium`, com `experiente` e alcance 0. O relógio é o recuo que maximiza os ataques pareados, na grade
+   de 2 ms. Esse é um método novo, que dá à candidata 696 completas em vez das 687 do relatório; os números abaixo
+   usam todos o mesmo método.
+
+   | versão (846 notas humanas)                 | ataques | alturas | posições | durações | completas | faltam | sobram |
+   | ------------------------------------------ | ------: | ------: | -------: | -------: | --------: | -----: | -----: |
+   | `small`, experiente, alcance 0             |     779 |     746 |      549 |      732 |   **519** |     67 |     43 |
+   | `medium`, experiente, alcance 0            |     807 |     789 |      585 |      761 |   **557** |     39 |     27 |
+   | candidata `medium`, alcance 3 (contaminada) |     807 |     789 |      735 |      761 |       696 |     39 |     27 |
+
+   A diferença entre `medium` e a candidata é só a digitação: 150 posições. A escolha do `medium` continua validada
+   só em _Você_, porque não há inferência `medium` das seis tabs de treino.
+2. [ ] Corda/casa aprendida das tabs de treino (plano detalhado e revisão Fable + Codex antes do código).
+
+   **Plano detalhado, revisado por Fable e Codex (2026-10-30), aguardando confirmação.**
+
+   As revisões apontaram quatro problemas no rascunho anterior:
+   - logit local com Viterbi é um MEMM, com viés de rótulo, e foi treinado só com o contexto humano;
+   - a regularização era escolhida na mesma validação que aprova o modelo;
+   - _Você_ já está contaminada pelo ADR-050 e pelo alcance 3, então não serve como teste independente;
+   - a régua aceitava ganho mínimo com perda grande.
+
+   Desenho revisado:
+   - **Conjuntos.** O treino são cinco tabs: Gesu, Dance of Death, Fear Is the Key, Plague e Eyrie. O teste limpo é
+     _Fear of the Dark_, que nunca orientou decisão de digitação. A aceitação é _Você_, conhecida e contaminada.
+     A base `experiente` com alcance 0 fica em 0,605 de média no treino, 0,395 em _Fear of the Dark_ e 0,738 em
+     _Você_.
+   - **Modelo.** Perceptron estruturado com média, treinado sobre o próprio Viterbi, com normalização global e
+     decodificação igual à da inferência. As features são os termos do custo atual (casa, corda solta, Δmão,
+     Δcorda), mais |Δcasa| em faixas, região da casa e Δmão × intervalo curto/longo, com corte em 0,25 s. Esse
+     conjunto fica congelado agora. Ele nasceu em parte do diagnóstico de _Você_, o que fica registrado, e não muda
+     depois de medir.
+   - **Hiperparâmetros fixos antes de medir.** São 10 épocas, sem busca. Cada época tem o mesmo número de frases
+     por música, para a música longa não pesar mais.
+   - **Passo 0, barato.** Decompor os erros do `experiente` nas cinco tabs de treino: corda solta contra pisada,
+     salto de região, troca de corda. Se a classe dominante não couber nas features, a 2a para aqui.
+
+   Régua 2a, congelada:
+   1. Na validação deixando uma de fora entre as cinco de treino, a média por música sobe pelo menos 0,02 sobre
+      0,605. Nenhuma música perde mais de 0,03. Pelo menos 3 das 5 melhoram, e diferença menor que 0,005 conta como
+      empate. Os resultados saem também por número de cordas.
+   2. Com o modelo treinado nas cinco, _Fear of the Dark_ sobe acima de 0,395 + 0,02, medida uma vez.
+   3. Aceitação em _Você_: a digitação isolada fica acima de 0,738, e o placar completo melhora as posições em
+      `small` (acima de 549) e em `medium` (acima de 585), com o relógio e o cache da etapa 1.
+
+   **Resultado 2a (2026-10-30): reprovado no item 1.** O passo 0 passou: 84% dos erros do `experiente` são "Thoth
+   mais grave no braço, uma corda" (42,5%) e "Thoth solta, humano pisada" (41,3%). O Viterbi do script com os pesos
+   iniciais reproduz o `experiente` nas cinco tabs. Na validação deixando uma de fora:
+
+   | tab fora do treino | cordas | `experiente` | aprendida |      Δ |
+   | ------------------ | -----: | -----------: | --------: | -----: |
+   | Gesu               |      4 |        0,582 |     0,661 | +0,079 |
+   | Dance of Death     |      4 |        0,387 |     0,479 | +0,092 |
+   | Fear Is the Key    |      4 |        0,633 |     0,734 | +0,100 |
+   | Plague             |      5 |        0,677 |     0,618 | −0,059 |
+   | Eyrie              |      6 |        0,745 |     0,652 | −0,093 |
+   | média              |        |        0,605 |     0,629 | +0,024 |
+
+   A média sobe 0,024 e 3 de 5 melhoram, mas Plague e Eyrie perdem mais que 0,03. As três de 4 cordas ganham
+   de 0,08 a 0,10; as duas de 5 e 6 cordas, do mesmo baixista, perdem. _Fear of the Dark_ e _Você_ não foram
+   medidas. Scripts: `scratchpad/aprender/perceptron.py`, `loo.json`.
+
+   **2a′ — só para baixo de 4 cordas (aprovado: "pode seguir", 2026-10-30).** A ideia nasceu de olhar a validação
+   acima, não os testes; por isso a régua é nova e congelada antes de medir. O modelo é o mesmo `pesos.json`,
+   treinado nas cinco tabs, sem novo treino nem ajuste. Ele vale só com afinação de 4 cordas; com 5 ou 6, a
+   digitação continua `experiente`, igual por construção.
+   1. Validação: cada tab de 4 cordas melhora pelo menos 0,02 fora do treino. Já cumprido pela tabela acima
+      (+0,079, +0,092, +0,100) — não é evidência nova.
+   2. _Fear of the Dark_ (4 cordas, faixa 4), medida uma vez: digitação isolada acima de 0,395 + 0,02 = 0,415.
+   3. _Você_, só depois do item 2: digitação isolada acima de 0,738 e posições no placar completo acima de 549
+      (`small`) e de 585 (`medium`).
+   Falhou um item: registra e encerra a linha de digitação, sem nova tentativa.
+
+   **Resultado 2a′ (2026-10-30): aprovado nos três itens**, cada teste medido uma vez.
+
+   | medida                                   | `experiente` | aprendida |   piso |
+   | ---------------------------------------- | -----------: | --------: | -----: |
+   | _Fear of the Dark_, isolada (2297 notas) |        0,395 |     0,800 |  0,415 |
+   | _Você_, isolada (846 notas)              |        0,738 |     0,858 |  0,738 |
+   | _Você_ `small`, posições no placar       |          549 |       618 |    549 |
+   | _Você_ `medium`, posições no placar      |          585 |       633 |    585 |
+
+   No placar, só posições e completas mudam (`small` 519 → 581, `medium` 557 → 597); ataques, alturas, durações,
+   faltam e sobram são idênticos, como devem ser. A candidata contaminada tinha 735 posições: a diferença para 633
+   é o que a digitação aprendida ainda não alcança. Scripts: `item2.py`, `item3.py`, `gerar.py` (troca o assigner
+   da CLI) no scratchpad; GP5 em `scratchpad/aprender/aprendida-{small,medium}/Você/`.
+
+   Se qualquer item falhar, o resultado é registrado sem nova tentativa olhando os testes. Passar na régua não
+   entrega as 846 notas: a digitação não corrige notas que faltam, alturas ou durações.
+
+   2b, só se a 2a passar: ADR-055, TDD e um `FretAssigner` novo atrás do `Protocol` (`--digitacao aprendida`).
+   Os pesos ficam versionados com os hashes do corpus, as features e os hiperparâmetros. O treino é reproduzível por
+   script e conferido por teste `slow`; o default só muda com ADR próprio. A evidência acústica de corda (piloto
+   SVM: 745 contra 728 em _Você_, regressão em Plague) fica para depois, como custo de emissão atrás de um `Protocol`
+   e com a mesma régua.
+
+3. [ ] Notas que faltam e sobram: filtro aprendido nas tabs de treino.
+4. [ ] Duração: figura escrita aprendida nas tabs de treino.
+5. [ ] Em cada etapa, conferir as fontes sem tab e gerar a nova _Você_ para abrir no Guitar Pro.
+
 ## Transcrição de Você igual à referência humana — objetivo corrigido (2026-10-30)
 
 O usuário esclareceu que a tarefa exige modificar o programa para obter o
@@ -1174,6 +1292,17 @@ sintético é métrica de regressão, não de qualidade real.
     sugestão `pitch + 12` sai em quase todos os avisos e não filtra nada. O topo da lista (Hallowed Be Thy
     Name 36%, Feel Like Makin' Love 20%) não indica mais erro de oitava. A próxima tab continua dependendo de
     escolha externa
+  - Tab nova: _Fear of the Dark_ (`samples/Iron Maiden - Fear Of The Dark.gp5`, faixa 4 "Steve Harris", 4 cordas;
+    cache `yt_bePCRKGUwAY`). Método da emenda de 2026-10-23 do ADR-030: `alinhar_ao_stem`, `veredito_de_nota`, e
+    `verificar_oitavas(limiar=1e300)` sobre o `bass.wav`, só em janelas conclusivas. O script é conferido antes
+    reproduzindo os 13 casos de _Fear Is the Key_ e os 26 de _Plague_. Régua congelada antes de medir: a tab
+    **amplia a amostra** se render pelo menos 10 casos "abaixo" em janelas conclusivas, porque aí _Plague_ deixa
+    de ter metade dos positivos. Nesse caso, os candidatos a discriminador são comparados num plano próprio. Se
+    render menos, entra como a quinta tab que não amplia
+  - Resultado (2026-10-30): **não amplia**. Foram 3 casos "abaixo" contra 786 notas concordantes, em 4 janelas
+    conclusivas. A conferência reproduziu _Fear Is the Key_ (13 casos, AUC 0,70) e _Plague_ (27 casos, AUC 0,76).
+    O agregado passa a 47 casos, 27 deles em _Plague_. Registrado na emenda de 2026-10-30 do ADR-030. A próxima
+    tab continua dependendo de escolha externa
 - [x] MuScriptor silencioso no fim de _Eyrie_ (`_RMax1LS3pM`): o _prelude forcing_ trava o modelo em vazio de 557 a 671
   s. Segunda passada sem ele, só quando há buraco, só dentro do buraco (emenda do ADR-008). 0 → 382 notas no trecho,
   travado em `tests/integration/test_prelude_eyrie.py`

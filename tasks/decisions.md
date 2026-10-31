@@ -1606,6 +1606,24 @@ limiar de 0,40 alarma em 43,8% das notas corretas (em *Você*, 0,4%), provavelme
 
 **Decisão:** nada muda. O discriminador espera tab de música com mais erro de oitava para baixo, não só mais tabs.
 
+### Emenda (2026-10-30) — _Fear of the Dark_ não amplia a amostra
+
+A tab de _Fear of the Dark_ (`yt_bePCRKGUwAY`, faixa 4 "Steve Harris") foi medida pelo método da emenda anterior,
+com o stem `htdemucs_ft/4.1.0`. A régua foi congelada antes da medição: a tab ampliaria a amostra com pelo menos
+10 casos "abaixo" em janelas conclusivas. O script ficou fora do repositório. Ele foi conferido antes de medir
+a tab nova, refazendo as duas músicas que concentram os casos:
+
+| música               | concordam | casos "abaixo" | AUC "abaixo" (IC 95%, bootstrap) |
+| -------------------- | --------- | -------------- | -------------------------------- |
+| *Fear Is the Key*    | 763       | 13             | 0,70 (0,53–0,84)                 |
+| *And Plague Flowers* | 2686      | 27             | 0,76 (0,66–0,85)                 |
+| *Fear of the Dark*   | 786       | 3              | sem significado                  |
+
+Só 4 das janelas de _Fear of the Dark_ são conclusivas. Com 3 casos, o AUC (0,11) não tem significado. O agregado
+passa a **47 casos**, 27 deles em _And Plague Flowers_.
+
+**Decisão:** nada muda. Mais uma tab não amplia a amostra, e a escolha da próxima continua externa.
+
 ## ADR-031 — a grafia do acidente segue o tom, com margem (B9)
 
 **Data:** 2026-09-23 · **Status:** aceito
