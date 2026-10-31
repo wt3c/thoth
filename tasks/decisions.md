@@ -1117,6 +1117,27 @@ estimado: dobra o BPM enquanto a colisão passar de 10%, no máximo duas vezes.
 - `services/tempo.py` passou a importar `services/rhythm.py` (por `para_ticks`). Mesma camada, sem ciclo — `rhythm` só
   conhece `domain`.
 
+### Emenda (2026-10-30) — no baixo, notas simultâneas contam como um ataque
+
+O transcritor `medium` dá duas notas no mesmo instante (em geral a fundamental e outra altura), e elas colidem em
+**qualquer** grade. Contadas uma a uma, a colisão passava do limiar no andamento certo e `desdobrar` ia ao teto:
+
+| música (treino) | colisão `medium` | sem as simultâneas | `desdobrar` antes → depois |
+|-----------------|------------------|--------------------|----------------------------|
+| Dance of Death  | 13,0%            | 0,9%               | 516 → 129                  |
+| FITK            | 12,2%            | 5,5%               | 192 → 96                   |
+| Eyrie           | 16,4%            | 5,0%               | 396 → 99                   |
+
+Gesu, Plague e todas as execuções do `small` não mudam (≤ 6,8% antes, ≤ 5,3% depois).
+
+**Decisão.** O baixo passa a `_medir_grade` um ataque por grupo simultâneo, como a guitarra e a bateria já fazem com
+`inicios_de_acorde`, mas com janela própria de **10 ms** (`_SIMULTANEAS_NO_BAIXO_S`), não a de acorde (50 ms). A
+distância entre ataques consecutivos de baixo no treino justifica o número: `medium` tem 748 pares a menos de 5 ms e
+nenhum entre 5 e 15 ms; `small`, 136 a menos de 5 ms, 1 entre 5 e 10 ms e nenhum abaixo de 60 ms. A janela de 50 ms
+fundiria semicolcheias a 360 BPM (41,7 ms), justamente o caso que motivou este ADR — há teste das duas pontas.
+
+Só a medição do andamento muda; as notas que seguem para a grade são as mesmas.
+
 ## ADR-025 — Pedido inválido é recusado na entrada, não interpretado
 
 **Data:** 2026-09-23 · **Status:** aceito

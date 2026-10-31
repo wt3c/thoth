@@ -115,6 +115,12 @@ from thoth.services.tonalidade import Tonalidade, estimar_tom, tom_de_texto
 #: perfil: duas cópias do mesmo conjunto divergiriam em silêncio.
 ROTULOS_DE_BAIXO = PERFIS["baixo"].rotulos
 
+#: O que conta como o mesmo instante no baixo, para medir o andamento (emenda do
+#: ADR-024). No treino, as notas simultâneas do `medium` ficam a menos de 5 ms uma da
+#: outra, e nenhum ataque distinto fica a menos de 15 ms; a janela de acorde (50 ms)
+#: fundiria semicolcheias rápidas.
+_SIMULTANEAS_NO_BAIXO_S = 0.01
+
 #: Os perfis que chegam à partitura, com a afinação padrão de cada um — a bateria, sem
 #: nenhuma. O piano tem exportador MusicXML (M3 do ADR-044), mas ainda não passa pelo
 #: pipeline: recusá-lo antes do download é o que evita minutos de CPU sem arquivo.
@@ -539,9 +545,7 @@ def transcrever(
         relator.inicia("exportando a partitura", "gp5, musicxml")
         percussao: dict[str, ExportadorDePercussao] = {
             "gp5": Gp5PercussaoExporter(bpm=parte.bpm, titulo=asset.title, marcas=marcas),
-            "musicxml": MusicXmlPercussaoExporter(
-                bpm=parte.bpm, titulo=asset.title, marcas=marcas
-            ),
+            "musicxml": MusicXmlPercussaoExporter(bpm=parte.bpm, titulo=asset.title, marcas=marcas),
         }
         artefatos = {
             formato: exportador.exportar(parte.ataques, pasta / f"{nome}{sufixo}.{formato}")
@@ -754,9 +758,16 @@ def _parte_de_baixo(
             f"afinação {list(tuning)}: confira `--afinacao`"
         )
     relator.inicia("ajustando a grade rítmica")
-    # O `--bpm` que você informou não é desdobrado: ele manda (ADR-019).
+    # O `--bpm` que você informou não é desdobrado: ele manda (ADR-019). Um ataque
+    # por grupo simultâneo, como na guitarra: o `medium` dá duas notas no mesmo
+    # instante, que colidem em qualquer grade e dobravam o andamento à toa (ADR-024).
     grade = _medir_grade(
-        [n.onset_s for n in no_braco], no_braco, bpm, andamento, None, batidas
+        inicios_de_acorde(no_braco, _SIMULTANEAS_NO_BAIXO_S),
+        no_braco,
+        bpm,
+        andamento,
+        None,
+        batidas,
     )
     andamento_fino, mapa = grade.bpm, grade.mapa
     # Deslocar ANTES de monofonizar: `monofonizar` deduplica ticks e `eventos`
@@ -829,9 +840,7 @@ def _parte_de_guitarra(
     relator.inicia("ajustando a grade rítmica")
     # Um ataque por acorde: seis notas simultâneas contadas uma a uma parecem cinco
     # colisões, e o desdobramento dobraria o andamento à toa (ADR-024).
-    grade = _medir_grade(
-        inicios_de_acorde(do_perfil), do_perfil, bpm, andamento, comum, batidas
-    )
+    grade = _medir_grade(inicios_de_acorde(do_perfil), do_perfil, bpm, andamento, comum, batidas)
     andamento_fino, mapa = grade.bpm, grade.mapa
     # Unir pelo tique ANTES de posicionar, pela mesma razão de deslocar antes de
     # monofonizar no baixo: a janela do posicionador e a grade do exportador têm
@@ -888,9 +897,7 @@ def _parte_de_bateria(
     contaminacao = Counter(n.instrument for n in todas if n.instrument not in perfil.rotulos)
 
     relator.inicia("ajustando a grade rítmica")
-    grade = _medir_grade(
-        inicios_de_acorde(do_perfil), do_perfil, bpm, andamento, comum, batidas
-    )
+    grade = _medir_grade(inicios_de_acorde(do_perfil), do_perfil, bpm, andamento, comum, batidas)
     andamento_fino, mapa = grade.bpm, grade.mapa
 
     na_grade = a_partir_do_zero(mapa.na_partitura(do_perfil))

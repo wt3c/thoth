@@ -253,6 +253,33 @@ def test_andamento_estimado_e_desdobrado_quando_as_notas_colidem(tmp_path: Path)
     assert resultado.notas == 16
 
 
+@requer_soundfont
+def test_notas_simultaneas_no_baixo_nao_enganam_o_desdobramento(tmp_path: Path) -> None:
+    """Emenda do ADR-024: o `medium` dá duas notas no mesmo instante, e elas colidem em
+    qualquer grade. Contadas uma a uma, dobravam _Dance of Death_ de 129 para 516 BPM.
+
+    Colcheias a 90 com uma oitava junto de cada ataque: metade das notas colide, nenhum
+    ataque distinto.
+    """
+    wav, _ = renderizar("escala", tmp_path)
+    passo = 60.0 / 90 / 2
+    notas = tuple(
+        n for i in range(16) for n in (_nota(36, i * passo), _nota(48, i * passo + 0.003))
+    )
+    resultado = transcrever(
+        str(wav),
+        tmp_path / "out",
+        bpm=None,
+        cache_dir=tmp_path / "cache",
+        separator=SeparadorFalso(),
+        transcriber=TranscritorFalso(notas),
+    )
+
+    assert resultado.desdobrado is False
+    assert resultado.andamento is not None
+    assert resultado.andamento.bpm == pytest.approx(90, abs=2)
+
+
 def _em_dois_andamentos() -> tuple[NoteEvent, ...]:
     """20 compassos a 90 e 20 a 84: 107 s, a troca na barra do compasso 20."""
     return tuple(
