@@ -240,10 +240,18 @@ def test_notas_acesas_soam_no_metronomo_da_grave_a_aguda(servidor: str) -> None:
             (0.75, SOANDO),
             (0.5, SOANDO),
             (0.5, SOANDO),
+            (0.0, "document.querySelector('[data-acao=\"tocar-notas\"]').click()"),
+            (0.3, SOANDO),
+            (1.0, SOANDO),
         ],
         script_inicial=INSTRUMENTACAO,
     )
-    estados = [json.loads(v) for v in leituras[1:]]
+    *tocando, _, parado, depois = (json.loads(v) if isinstance(v, str) else v for v in leituras[1:])
+    # "Parar notas" para também o metrônomo: nada mais é agendado e nada acende.
+    print("sons agendados ao parar e 1 s depois:", len(parado["inicios"]), len(depois["inicios"]))
+    assert len(depois["inicios"]) == len(parado["inicios"]), "o metrônomo continuou tocando"
+    assert depois["lugares"] == []
+    estados = tocando
     acesas = [e["lugares"] for e in estados]
     print("acesas por leitura:", acesas)
     assert estados[0]["botao"] == "Parar notas"

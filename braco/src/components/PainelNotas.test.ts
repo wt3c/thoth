@@ -38,7 +38,7 @@ describe('PainelNotas: tocar as notas acesas no metrônomo', () => {
     expect([tocadas.length, lugares]).toEqual([1, ['0-0', '0-5', '1-0', '2-2', '3-2']])
   })
 
-  it('com a sequência ativa, o mesmo botão para', async () => {
+  it('com a sequência ativa, o mesmo botão para as notas e o metrônomo', async () => {
     const painel = montar()
     const metro = useMetronomoStore()
     metro.sequenciaAtiva = true
@@ -47,6 +47,6 @@ describe('PainelNotas: tocar as notas acesas no metrônomo', () => {
     const chamadas: string[] = []
     metro.$onAction(({ name }) => chamadas.push(name))
     await botao(painel).trigger('click')
-    expect(chamadas).toContain('pararSequencia')
+    expect(chamadas).toContain('parar')
   })
 })

@@ -33,6 +33,11 @@ function tocarAcesas() {
   metro.tocarSequencia(acesas.value).catch((erro: unknown) => console.error('falha ao tocar as notas', erro))
 }
 
+/** "Parar notas" desliga tudo: o metrônomo para e leva a sequência junto. */
+function pararNotas() {
+  metro.parar().catch((erro: unknown) => console.error('falha ao parar as notas', erro))
+}
+
 function tocarSequencia() {
   if (config.tonica === null) return
   const alturas = alturasDaSequencia(config.afinacao, config.casas, config.tonica, config.escolhas.padrao)
@@ -103,7 +108,7 @@ function tocarSequencia() {
           type="button"
           data-acao="tocar-notas"
           :disabled="!metro.sequenciaAtiva && acesas.length === 0"
-          @click="metro.sequenciaAtiva ? metro.pararSequencia() : tocarAcesas()"
+          @click="metro.sequenciaAtiva ? pararNotas() : tocarAcesas()"
         >
           {{ metro.sequenciaAtiva ? 'Parar notas' : 'Tocar notas do braço no metrônomo' }}
         </button>
