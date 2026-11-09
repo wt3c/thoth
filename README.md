@@ -576,6 +576,29 @@ curl -s -X POST http://127.0.0.1:8000/jobs -H 'Content-Type: application/json' \
   -d "{\"ref\": \"$ref\", \"instrumento\": \"baixo\"}"
 ```
 
+### Mapa de notas do braço
+
+Uma página à parte, em `braco/` (Vue 3 + TypeScript + Vite), para estudar o braço do baixo (4 a 7 cordas) ou da
+guitarra. Ela roda inteira no navegador, sem API: as notas são mostradas por cor e filtradas, e a teoria funciona assim:
+a nota clicada vira a tônica, e escalas, modos e acordes aparecem por grau. A página traz também metrônomo, sequência no
+pulso e tema claro ou escuro. As escolhas ficam na URL e no navegador, então um link reabre a mesma tela.
+
+```bash
+cd braco
+npm ci
+npm run dev          # desenvolvimento em http://127.0.0.1:5173
+npm run verificar    # tipos, lint, Vitest e build
+npm run build        # gera braco/dist/
+```
+
+Com o build feito, `uv run thoth serve` também serve a página em <http://127.0.0.1:8000/braco/>. O build usa caminhos
+relativos e funciona em qualquer hospedagem estática. O workflow `.github/workflows/braco-pages.yml` publica no GitHub
+Pages, mas só quando é disparado à mão (`workflow_dispatch`), depois de habilitar o Pages com a fonte "GitHub Actions"
+nas configurações do repositório.
+
+O som (cliques e notas) é sintetizado por osciladores Web Audio e só começa depois do primeiro toque na página, como
+exigem os navegadores. As decisões estão nos ADRs 056 a 062 de `tasks/decisions.md`.
+
 ## Desenvolvimento
 
 ```bash
@@ -583,6 +606,7 @@ uv run pytest -n auto          # suíte padrão
 uv run pytest -m "slow and not network"   # modelos de verdade — minutos em CPU
 uv run pytest -m network       # canário: avisa quando o YouTube quebrar o yt-dlp
 uv run pytest -m navegador     # abre um Chromium e inspeciona a página renderizada
+npm --prefix braco ci && npm --prefix braco run verificar   # mapa do braço
 uv run ruff check src/ tests/
 uv run mypy src/
 ```

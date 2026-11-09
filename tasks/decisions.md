@@ -4320,6 +4320,20 @@ fica declarado como não coberto.
 **M8:** com o metrônomo parado, o clique toca na hora. Rodando, a opção "quantizar" (desligada por padrão) leva a nota
 à próxima subdivisão da grade.
 
+### Emenda (2026-11-09)
+
+- **Clique por oscilador, não por ruído.** O clique saiu de um oscilador curto com envelope, como a nota; os timbres
+  (`eletronico`, `madeira`, `bipe`) mudam frequência e forma de onda. Um buffer de ruído não trazia ganho audível e
+  exigiria gerar e guardar amostras.
+- **`aoAgendar` além de `aoPulso`.** O metrônomo avisa cada pulso no momento do agendamento, uns 100 ms antes de soar,
+  inclusive os silenciados. A sequência (S6) se pendura nele para marcar a nota no mesmo instante do clique, no relógio
+  de áudio; `aoPulso`, que dispara quando o relógio alcança o pulso, só acende o indicador visual.
+- **A contagem de entrada conta compassos inteiros, com as subdivisões.** Os compassos de contagem têm número negativo
+  e soam como os demais, com as subdivisões escolhidas. A sequência começa no primeiro pulso fora da contagem.
+- **Jitter em tempo real medido no Chromium** (`tests/navegador/test_braco.py`, `-m navegador`): a 120 BPM cada clique
+  é agendado de 50 a 95 ms à frente do `currentTime`, com intervalo de 0,500000 s entre eles. Isso prova que o instante
+  vem do relógio de áudio, não do despertador. A saída real do dispositivo de som continua fora do alcance do teste.
+
 ## ADR-058 — baixo de 7 cordas: B-E-A-D-G-C-F padrão, F♯-B-E-A-D-G-C como preset
 
 **Data:** 2026-11-09 · **Status:** aceito

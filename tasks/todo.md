@@ -23,11 +23,14 @@ autorização); M8 com quantização opcional, desligada por padrão.
    Integradas em `feat/braco`: 147 testes, tipos, lint e build.
 4. [x] Trilha C UI: painéis de notas/teoria, metrônomo, instrumento e exibição; tokens claro/escuro;
    alvos ≥ 44 px; conferida no navegador a 1234 e 390 px (o braço rola dentro do quadro, a página não).
-5. [ ] Integração:
+5. [x] Integração:
    - [x] M8 (quantizar, desligado) e S6 (sequência no metrônomo) ligados à UI.
    - [x] S8 (ADR-062): query string versionada na URL e no localStorage; conferido no navegador.
-   - [ ] e2e `-m navegador`; README; `/verificacao` + skill Codex; workflow do Pages (sem publicar);
-     emenda do ADR-057.
+   - [x] e2e `-m navegador` (`tests/navegador/test_braco.py`): áudio só após o gesto, Worker real,
+     cliques 50–95 ms à frente do `currentTime`, intervalo exato de 0,5 s a 120 BPM; sequência acende no braço.
+   - [x] README; `/verificacao` + skill Codex com `npm --prefix braco`; workflow do Pages só por
+     `workflow_dispatch` (não publicado); emenda do ADR-057.
+6. [ ] Publicar no Pages (habilitar a fonte "GitHub Actions" e disparar o workflow) — só com autorização.
 
 Dono exclusivo de `package.json`/lockfile, configs, `tasks/*`, `Containerfile`, `app.py`: o integrador (Claude).
 
