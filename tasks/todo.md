@@ -12,8 +12,15 @@ autorização); M8 com quantização opcional, desligada por padrão.
    contratos de `dominio/`, `som/` (não `audio/`: a regra de deny dos áudios casa com qualquer
    `audio/`, `tasks/lessons/workflow.md`), `stores/`; braço de 4 cordas com clique tocando;
    `/braco/` no FastAPI com 503 sem build; Containerfile; teste offline do Web Audio.
-2. [ ] Trilha A `dominio/` (Codex, worktree): afinações, braço, teoria grafada, frequência, paleta e contraste.
-3. [ ] Trilha B `som/` (Claude, worktree): agendador, metrônomo completo (inventário Musicca), reprodução.
+2. [x] Trilha A `dominio/` (Codex, worktree): 14 afinações (baixo 4–7, guitarra), cifra/solfejo,
+   42 padrões com grafia por grau, 3 paletas (mínimo medido: marcador 4,36/4,45/3,22 ≥ 3; texto
+   6,82/9,57/4,68 ≥ 4,5). O sandbox do Codex não grava no `.git` compartilhado: commit pelo integrador.
+   Para a UI: tônica em classe preta precisa da escolha ♯/♭ (A♯ maior grafa B♯, C𝄪); id
+   `acorde-°7` exige codificar na URL; paleta daltônica tem graus 2–7 todos azuis (o rótulo é que distingue).
+3. [x] Trilha B `som/` (Claude, worktree): agendador puro, metrônomo com janela de 100 ms e Worker,
+   contagem, silêncio por compassos, tap tempo, `momentoDaNota` (M8) e `SequenciaNoMetronomo` (S6)
+   via `aoAgendar`. Real offline: cliques a ±0,02 ms do esperado. Jitter em tempo real fica para o e2e.
+   Integradas em `feat/braco`: 147 testes, tipos, lint e build.
 4. [ ] Trilha C UI: controles, teoria, tema, acessibilidade, responsivo — depois do merge da A.
 5. [ ] Integração: M8, S6, S8 (URL > localStorage > padrão, esquema versionado), e2e `-m navegador`,
    README, `/verificacao` + skill Codex, workflow do Pages (sem publicar).
