@@ -50,7 +50,8 @@ autorização); M8 com quantização opcional, desligada por padrão.
     publicado traz o anel de referência.
 13. [x] Braço abre limpo e "Nenhuma" vira "Limpar" (`feat/braco-limpar`); emenda do ADR-062.
 14. [x] Legenda das oitavas abaixo do braço, só no modo Notas (`feat/braco-limpar`); emenda do ADR-061.
-15. [ ] Republicar no Pages com o braço limpo e a legenda, depois do merge na `main`.
+15. [x] Guia "Como usar" no fim da página, com link no cabeçalho (`feat/braco-limpar`); ADR-064.
+16. [ ] Republicar no Pages com o braço limpo, a legenda e o guia, depois do merge na `main`.
 
 Dono exclusivo de `package.json`/lockfile, configs, `tasks/*`, `Containerfile`, `app.py`: o integrador (Claude).
 

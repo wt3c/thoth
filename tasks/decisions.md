@@ -4482,3 +4482,23 @@ indicador de tempos. Ela usa o mesmo store do painel completo.
   - 844 × 390: horizontal, com barra;
   - 1280 × 800: horizontal, sem barra.
 - Pendência anterior a este ADR: com número ímpar de cordas, o ponto de marcação fica sob a corda do meio.
+
+## ADR-064 — guia "Como usar" dentro do site
+
+**Data:** 2026-11-09 · **Status:** aceito
+
+O site é usado por quem não lê música e não tinha nenhuma explicação dos controles. O guia fica **na própria
+página**, no fim, depois dos painéis, e um link "Como usar" no cabeçalho leva a ele (`#como-usar`). Um arquivo
+separado ou o README ficariam fora de onde a dúvida aparece.
+
+- Cada assunto é um `<details>` fechado (começar, notas, oitavas, teoria, metrônomo, instrumento, exibição, link e
+  escolhas salvas, teclado). Fechado, o guia ocupa poucas linhas e não empurra os painéis, e funciona sem JavaScript
+  próprio, com teclado e leitor de tela.
+- Os títulos dos blocos dos painéis são os títulos dos painéis ("Notas", "Metrônomo", "Instrumento", "Exibição"),
+  e os botões são citados pelo rótulo da tela. Os dois casos têm teste (`GuiaDeUso.test.ts`): renomear um painel
+  sem atualizar o guia quebra o teste.
+- O texto descreve só o que foi conferido no código: limites de BPM (30–244), o Tap (2 toques, esquece após 3 s),
+  as casas (12–24), a ordem URL > navegador > padrão e o que não é salvo. Não há atalho de Espaço no braço, apesar
+  do comentário em `BracoSvg.vue`; o guia cita só Tab, setas e Enter.
+- Medido no Chromium (`tests/navegador/test_braco.py`), com todos os blocos abertos, em 390 × 844 e 1280 × 800:
+  link no cabeçalho, 9 blocos, guia abaixo dos painéis e sem rolagem horizontal.

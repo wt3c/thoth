@@ -306,6 +306,32 @@ def test_legenda_das_oitavas_fica_logo_abaixo_do_braco(
     assert not estado["transborda"]
 
 
+GUIA = """(() => {
+  for (const d of document.querySelectorAll('#como-usar details')) d.open = true
+  return JSON.stringify({
+    link: document.querySelector('header a[href="#como-usar"]')?.textContent.trim() ?? null,
+    blocos: document.querySelectorAll('#como-usar details').length,
+    abaixoDosPaineis: document.querySelector('#como-usar')?.getBoundingClientRect().top
+      >= document.querySelector('.paineis').getBoundingClientRect().bottom,
+    transborda: document.documentElement.scrollWidth > innerWidth,
+  })
+})()"""
+
+
+@pytest.mark.parametrize("tela", [(390, 844), (1280, 800)])
+def test_guia_de_uso_abre_pelo_link_do_cabecalho_sem_transbordar(
+    servidor: str, tela: tuple[int, int]
+) -> None:
+    estado = json.loads(sessao(f"{servidor}/braco/", [(1.5, GUIA)], tela=tela)[0])
+    print(tela, "guia:", estado)
+    assert estado == {
+        "link": "Como usar",
+        "blocos": 9,
+        "abaixoDosPaineis": True,
+        "transborda": False,
+    }
+
+
 OITAVAS = """JSON.stringify({
   referencia: [...document.querySelectorAll('[data-referencia="true"]')]
     .map((n) => `${n.dataset.corda}-${n.dataset.casa}`),
