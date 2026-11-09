@@ -266,6 +266,26 @@ def test_notas_acesas_soam_no_metronomo_da_grave_a_aguda(servidor: str) -> None:
     assert statistics.fmean(intervalos) == pytest.approx(0.5, abs=1e-6)
 
 
+def test_o_site_abre_com_o_braco_limpo(servidor: str) -> None:
+    estado = json.loads(
+        sessao(
+            f"{servidor}/braco/",
+            [
+                (
+                    1.5,
+                    """JSON.stringify({
+  posicoes: document.querySelectorAll('svg .nota').length,
+  marcadores: document.querySelectorAll('svg .marcador').length,
+  limpar: document.querySelector('[data-acao="limpar"]')?.textContent.trim() ?? null,
+})""",
+                )
+            ],
+        )[0]
+    )
+    print("braço ao abrir:", estado)
+    assert estado == {"posicoes": 4 * 13, "marcadores": 0, "limpar": "Limpar"}
+
+
 OITAVAS = """JSON.stringify({
   referencia: [...document.querySelectorAll('[data-referencia="true"]')]
     .map((n) => `${n.dataset.corda}-${n.dataset.casa}`),

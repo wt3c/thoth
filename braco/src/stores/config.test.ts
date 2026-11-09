@@ -17,12 +17,12 @@ const lugar = (corda: number, casa: number) => {
 describe('useConfigStore', () => {
   beforeEach(() => setActivePinia(createPinia()))
 
-  it('começa no baixo de 4 cordas em E A D G, 12 casas, modo notas com tudo visível', () => {
+  it('começa no baixo de 4 cordas em E A D G, 12 casas, modo notas com o braço limpo', () => {
     const config = useConfigStore()
     expect(config.afinacao.cordas).toEqual([28, 33, 38, 43])
     expect(config.casas).toBe(12)
     expect(config.escolhas).toMatchObject({ modo: 'notas', selecionada: null, tonica: null, padrao: null })
-    expect(config.escolhas.filtro).toHaveLength(12)
+    expect(config.escolhas.filtro).toEqual([])
   })
 
   it('id desconhecido é erro, não volta silenciosamente ao padrão', () => {
@@ -68,7 +68,7 @@ describe('useConfigStore', () => {
     expect(config.escolhas.padrao?.graus).toHaveLength(7)
   })
 
-  it('esconder a classe da nota selecionada solta a seleção; "Nenhuma" limpa tudo', () => {
+  it('esconder a classe da nota selecionada solta a seleção; "Limpar" limpa tudo', () => {
     const config = useConfigStore()
     config.aoTocar(posicao(45))
     config.mostrarClasses([9, 0])
@@ -89,7 +89,7 @@ describe('useConfigStore', () => {
     expect([config.selecionada, config.escolhas.referencia]).toEqual([null, null])
   })
 
-  it('"Nenhuma" solta a referência; trocar a afinação a ponto de mudar a nota do lugar também', () => {
+  it('"Limpar" solta a referência; trocar a afinação a ponto de mudar a nota do lugar também', () => {
     const config = useConfigStore()
     config.aoTocar(lugar(1, 3))
     config.mostrarClasses([])

@@ -40,12 +40,14 @@ describe('PainelNotas', () => {
     const botoes = painel.findAll('[data-classe]')
     expect(botoes).toHaveLength(12)
     await botoes[1]!.trigger('click')
-    expect(config.filtro).not.toContain(1)
-    expect(botoes[1]!.attributes('aria-pressed')).toBe('false')
-    await painel.get('[data-acao="nenhuma"]').trigger('click')
-    expect(config.filtro).toEqual([])
+    expect(config.filtro).toEqual([1])
+    expect(botoes[1]!.attributes('aria-pressed')).toBe('true')
     await painel.get('[data-acao="todas"]').trigger('click')
     expect(config.filtro).toHaveLength(12)
+    const limpar = painel.get('[data-acao="limpar"]')
+    expect(limpar.text()).toBe('Limpar')
+    await limpar.trigger('click')
+    expect(config.filtro).toEqual([])
   })
 
   it('no modo teoria, escolhe padrão e rótulo; sem tônica, pede um clique no braço', async () => {

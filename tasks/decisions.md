@@ -4431,6 +4431,20 @@ localStorage (`thoth-braco:preferencias`). Na abertura, a URL vence o armazenado
 - localStorage indisponível (aba privada, cota) não impede a página; ela só não lembra.
 - O padrão do store de configuração vem de `PREFERENCIAS_PADRAO`, para não haver dois padrões.
 
+### Emenda (2026-11-09) — o braço abre limpo; "Nenhuma" vira "Limpar"
+
+A pedido do usuário, o filtro padrão passou a ser vazio: quem abre o site vê o braço sem nenhuma nota acesa e
+acende as notas tocando nelas. Antes, o padrão eram as 12 notas. O botão que esconde todas as notas passou de
+"Nenhuma" para "Limpar" (`data-acao="limpar"`) e faz o mesmo de antes.
+
+Como a URL e o armazenado só guardam o que difere do padrão, a troca muda a leitura do que já existe:
+- link ou estado sem `filtro`, que antes valia as 12 notas, agora abre limpo;
+- "todas" passou a ser uma escolha escrita (`filtro=0123456789ab`);
+- quem guardou uma escolha própria, inclusive o filtro vazio, segue com ela.
+
+A ordem URL > armazenado > padrão não mudou. Medido no Chromium, `/braco/` abre com as 52 posições tocáveis, nenhum
+marcador e o botão "Limpar".
+
 ## ADR-063 — braço vertical no celular em pé e metrônomo rápido fixo
 
 **Data:** 2026-11-09 · **Status:** aceito
