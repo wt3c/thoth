@@ -8,6 +8,11 @@ import { useConfigStore } from './config'
 const { metronomo: _m, ...PREFERENCIAS_PADRAO_SEM_METRONOMO } = PREFERENCIAS_PADRAO
 
 const posicao = (altura: number) => ({ corda: 0, casa: 0, altura, classe: altura % 12 })
+/** Lugar no baixo de 4 cordas E A D G. */
+const lugar = (corda: number, casa: number) => {
+  const altura = ([28, 33, 38, 43][corda] ?? 0) + casa
+  return { corda, casa, altura, classe: altura % 12 }
+}
 
 describe('useConfigStore', () => {
   beforeEach(() => setActivePinia(createPinia()))
@@ -71,6 +76,29 @@ describe('useConfigStore', () => {
     config.mostrarClasses([])
     expect(config.selecionada).toBeNull()
     expect(config.escolhas.filtro).toEqual([])
+  })
+
+  it('a posição tocada vira a referência das oitavas; outra com o mesmo nome muda a referência; a mesma desmarca', () => {
+    const config = useConfigStore()
+    config.aoTocar(lugar(1, 3))
+    expect(config.selecionada).toBe(0)
+    expect(config.escolhas.referencia).toMatchObject({ corda: 1, casa: 3, altura: 36 })
+    config.aoTocar(lugar(3, 5))
+    expect([config.selecionada, config.escolhas.referencia?.corda]).toEqual([0, 3])
+    config.aoTocar(lugar(3, 5))
+    expect([config.selecionada, config.escolhas.referencia]).toEqual([null, null])
+  })
+
+  it('"Nenhuma" solta a referência; trocar a afinação a ponto de mudar a nota do lugar também', () => {
+    const config = useConfigStore()
+    config.aoTocar(lugar(1, 3))
+    config.mostrarClasses([])
+    expect(config.escolhas.referencia).toBeNull()
+    config.mostrarClasses([0])
+    config.aoTocar(lugar(1, 3))
+    // Baixo de 5 cordas: a corda 1 vira E, e a casa 3 dela é G, não mais o C selecionado.
+    config.escolherNumCordas(5)
+    expect(config.escolhas.referencia).toBeNull()
   })
 
   it('o filtro alterna uma classe e mantém a ordem cromática', () => {

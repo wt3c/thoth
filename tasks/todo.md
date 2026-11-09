@@ -42,7 +42,11 @@ autorização); M8 com quantização opcional, desligada por padrão.
    que soa acende; o mesmo som em dois lugares tem dois tempos. `posicoesVisiveis`, `soando` altura ou posição,
    e2e exigindo uma posição por leitura; emenda do ADR-057.
 9. [x] "Parar notas" para também o metrônomo (`fix/braco-parar-notas`); e2e confere que nada mais é agendado.
-10. [ ] Publicar no Pages (habilitar a fonte "GitHub Actions" e disparar o workflow) — só com autorização.
+10. [x] Publicado no Pages com autorização (2026-11-09): fonte "GitHub Actions" habilitada, workflow disparado
+    da `main` (`cceae87`); https://wt3c.github.io/thoth/ respondeu 200 com o braço.
+11. [x] Oitavas a partir da nota tocada (`feat/braco-oitavas`): referência com anel, etiquetas `+1`/`−1`/`=` nas
+    outras posições da mesma nota, nome acessível com a oitava; emenda do ADR-061.
+12. [ ] Republicar no Pages com as oitavas, depois do merge na `main`.
 
 Dono exclusivo de `package.json`/lockfile, configs, `tasks/*`, `Containerfile`, `app.py`: o integrador (Claude).
 

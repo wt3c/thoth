@@ -4397,6 +4397,22 @@ por grau do padrão (escala, acorde ou intervalo), nunca com a cor da tônica. O
 tema × modo: marcador ≥ 3:1 contra madeira, traste e corda (WCAG 1.4.11); texto do marcador ≥ 4,5:1 contra o marcador.
 A paleta daltônica garante contraste e rótulo, não 12 matizes distinguíveis.
 
+### Emenda (2026-11-09) — oitavas a partir da nota tocada
+
+No modo Notas, a posição tocada no braço vira a **referência**, desenhada com um anel. As outras posições da mesma
+nota ganham uma etiqueta com a oitava em relação a ela: `+1`, `−1`, `+2`, ou `=` para o mesmo som em outro lugar.
+O nome acessível também diz isso ("uma oitava acima da selecionada"). A conta é `(altura − altura da referência) / 12`,
+em `vistaDaNota`, que continua sendo a única regra do que aparece em cada casa.
+
+O store guarda o lugar tocado (corda, casa), e a referência é **derivada**. Ela só vale enquanto esse lugar existe
+no braço e ainda dá a nota selecionada. Assim, trocar a afinação ou o número de cordas não deixa etiqueta errada.
+Tocar outra posição com o mesmo nome muda a referência; tocar a mesma posição desmarca (antes, qualquer posição com
+o mesmo nome desmarcava). A referência não vai para a URL: ao recarregar, a nota segue marcada e as etiquetas voltam
+no próximo toque.
+
+Medido no Chromium, tocando o C da corda A, casa 3 (C2): anel em `1-3`, `=` na corda E casa 8, `+1` na corda D
+casa 10 e na corda G casa 5. Contra o build anterior, o mesmo teste não encontra referência nem etiqueta.
+
 ## ADR-062 — preferências do braço num único texto de query string, na URL e no localStorage
 
 **Data:** 2026-11-09 · **Status:** aceito

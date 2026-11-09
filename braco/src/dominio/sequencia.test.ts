@@ -37,6 +37,7 @@ describe('posicoesVisiveis', () => {
     modo: 'notas',
     filtro: [],
     selecionada: null,
+    referencia: null,
     tonica: null,
     padrao: null,
     rotulo: 'nome',
