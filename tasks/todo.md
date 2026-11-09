@@ -54,7 +54,8 @@ autorização); M8 com quantização opcional, desligada por padrão.
 16. [x] Republicado no Pages com o braço limpo, a legenda e o guia (2026-11-09): run 42718737888 a partir de
     `12eed6e`; o bundle publicado traz `#como-usar`, a legenda e "Limpar".
 17. [x] Ícone na aba e no link "Como usar", link na cor de destaque (`feat/braco-icones`); emenda do ADR-064.
-18. [ ] Republicar no Pages com os ícones, depois do merge na `main`.
+18. [x] Republicado no Pages com os ícones (2026-11-09): run 42721033483 a partir de `e724995`; `favicon.svg`
+    responde 200 como `image/svg+xml` e o bundle traz o ícone do link.
 
 Dono exclusivo de `package.json`/lockfile, configs, `tasks/*`, `Containerfile`, `app.py`: o integrador (Claude).
 
