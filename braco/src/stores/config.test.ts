@@ -1,7 +1,11 @@
 import { createPinia, setActivePinia } from 'pinia'
 import { beforeEach, describe, expect, it } from 'vitest'
 import { PALETAS } from '@/dominio/cores'
+import { PREFERENCIAS_PADRAO } from '@/persistencia/preferencias'
 import { useConfigStore } from './config'
+
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+const { metronomo: _m, ...PREFERENCIAS_PADRAO_SEM_METRONOMO } = PREFERENCIAS_PADRAO
 
 const posicao = (altura: number) => ({ corda: 0, casa: 0, altura, classe: altura % 12 })
 
@@ -79,4 +83,13 @@ describe('useConfigStore', () => {
     config.tema = 'claro'
     expect(config.temaEfetivo).toBe('claro')
   })
+
+  it('S8: preferências saem e entram pelo store, sem o metrônomo', () => {
+    const config = useConfigStore()
+    expect(config.preferencias).toEqual(PREFERENCIAS_PADRAO_SEM_METRONOMO)
+    config.aplicar({ ...PREFERENCIAS_PADRAO_SEM_METRONOMO, instrumento: 'guitarra', numCordas: 6, afinacaoId: 'guitarra-dadgad', tonica: 2 })
+    expect([config.afinacao.nome, config.tonica]).toEqual(['DADGAD', 2])
+    expect(config.preferencias).toMatchObject({ instrumento: 'guitarra', afinacaoId: 'guitarra-dadgad', tonica: 2 })
+  })
 })
+

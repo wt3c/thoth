@@ -21,9 +21,13 @@ autorização); M8 com quantização opcional, desligada por padrão.
    contagem, silêncio por compassos, tap tempo, `momentoDaNota` (M8) e `SequenciaNoMetronomo` (S6)
    via `aoAgendar`. Real offline: cliques a ±0,02 ms do esperado. Jitter em tempo real fica para o e2e.
    Integradas em `feat/braco`: 147 testes, tipos, lint e build.
-4. [ ] Trilha C UI: controles, teoria, tema, acessibilidade, responsivo — depois do merge da A.
-5. [ ] Integração: M8, S6, S8 (URL > localStorage > padrão, esquema versionado), e2e `-m navegador`,
-   README, `/verificacao` + skill Codex, workflow do Pages (sem publicar).
+4. [x] Trilha C UI: painéis de notas/teoria, metrônomo, instrumento e exibição; tokens claro/escuro;
+   alvos ≥ 44 px; conferida no navegador a 1234 e 390 px (o braço rola dentro do quadro, a página não).
+5. [ ] Integração:
+   - [x] M8 (quantizar, desligado) e S6 (sequência no metrônomo) ligados à UI.
+   - [x] S8 (ADR-062): query string versionada na URL e no localStorage; conferido no navegador.
+   - [ ] e2e `-m navegador`; README; `/verificacao` + skill Codex; workflow do Pages (sem publicar);
+     emenda do ADR-057.
 
 Dono exclusivo de `package.json`/lockfile, configs, `tasks/*`, `Containerfile`, `app.py`: o integrador (Claude).
 

@@ -4353,3 +4353,21 @@ por grau do padrão (escala, acorde ou intervalo), nunca com a cor da tônica. O
 (`1 2 b3 4 5 b6 b7`), não só semitons — ré♯ e mi♭ são graus diferentes. Contraste calculado por teste em cada paleta ×
 tema × modo: marcador ≥ 3:1 contra madeira, traste e corda (WCAG 1.4.11); texto do marcador ≥ 4,5:1 contra o marcador.
 A paleta daltônica garante contraste e rótulo, não 12 matizes distinguíveis.
+
+## ADR-062 — preferências do braço num único texto de query string, na URL e no localStorage
+
+**Data:** 2026-11-09 · **Status:** aceito
+
+As escolhas do usuário (instrumento, afinação, casas, modo, filtro, tônica, padrão, exibição, metrônomo) são
+serializadas por `persistencia/preferencias.ts` num texto de query string com versão (`v=1`), contendo só os campos
+diferentes do padrão. O mesmo texto vai para a URL (`history.replaceState`, sem nova entrada no histórico) e para o
+localStorage (`thoth-braco:preferencias`). Na abertura, a URL vence o armazenado, que vence o padrão.
+
+- Um formato só, em vez de JSON no armazenamento e query na URL: um codec por campo, uma tabela de validação.
+- Valor de fora é entrada não confiável: campo inválido é recusado e os demais valem; cada recusa vai para
+  `console.warn`. Armazenado de outra versão é descartado inteiro; na URL, a versão ausente vale como atual
+  (link digitado à mão).
+- Instrumento, cordas e afinação chegam em campos separados e podem divergir entre URL e armazenado; o carregamento
+  os põe de acordo, voltando à afinação padrão do instrumento com aviso.
+- localStorage indisponível (aba privada, cota) não impede a página; ela só não lembra.
+- O padrão do store de configuração vem de `PREFERENCIAS_PADRAO`, para não haver dois padrões.

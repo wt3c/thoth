@@ -6,30 +6,31 @@ import { PALETAS } from '@/dominio/cores'
 import { PADROES } from '@/dominio/teoria'
 import type { Acidente, ClasseAltura, Instrumento, Nomenclatura, Posicao } from '@/dominio/tipos'
 import { TODAS_AS_CLASSES, type EscolhasDaVista, type Modo, type Rotulo } from '@/dominio/vista'
+import { CASAS_MAX, CASAS_MIN, CORDAS, PREFERENCIAS_PADRAO, type Preferencias, type Tema } from '@/persistencia/preferencias'
 
-export type Tema = 'sistema' | 'claro' | 'escuro'
+export { CASAS_MAX, CASAS_MIN, CORDAS, type Tema }
 
-export const CORDAS: Readonly<Record<Instrumento, readonly number[]>> = { baixo: [4, 5, 6, 7], guitarra: [6] }
-export const CASAS_MIN = 12
-export const CASAS_MAX = 24
+export type PreferenciasDaVista = Omit<Preferencias, 'metronomo'>
 
-/** Escolhas serializáveis do usuário. Persistência em URL e localStorage: etapa 5 (S8). */
+const P = PREFERENCIAS_PADRAO
+
+/** Escolhas serializáveis do usuário; o padrão e a persistência (S8) vêm de `persistencia/preferencias`. */
 export const useConfigStore = defineStore('config', () => {
-  const instrumento = ref<Instrumento>('baixo')
-  const numCordas = ref(4)
-  const afinacaoId = ref('baixo-4')
-  const casas = ref(CASAS_MIN)
-  const modo = ref<Modo>('notas')
-  const filtro = ref<ClasseAltura[]>([...TODAS_AS_CLASSES])
-  const selecionada = ref<ClasseAltura | null>(null)
-  const tonica = ref<ClasseAltura | null>(null)
-  const padraoId = ref<string | null>(null)
-  const rotulo = ref<Rotulo>('nome')
-  const nomenclatura = ref<Nomenclatura>('cifra')
-  const acidente = ref<Acidente>('sustenido')
-  const tema = ref<Tema>('sistema')
-  const daltonico = ref(false)
-  const quantizar = ref(false)
+  const instrumento = ref<Instrumento>(P.instrumento)
+  const numCordas = ref(P.numCordas)
+  const afinacaoId = ref(P.afinacaoId)
+  const casas = ref(P.casas)
+  const modo = ref<Modo>(P.modo)
+  const filtro = ref<ClasseAltura[]>([...P.filtro])
+  const selecionada = ref<ClasseAltura | null>(P.selecionada)
+  const tonica = ref<ClasseAltura | null>(P.tonica)
+  const padraoId = ref<string | null>(P.padraoId)
+  const rotulo = ref<Rotulo>(P.rotulo)
+  const nomenclatura = ref<Nomenclatura>(P.nomenclatura)
+  const acidente = ref<Acidente>(P.acidente)
+  const tema = ref<Tema>(P.tema)
+  const daltonico = ref(P.daltonico)
+  const quantizar = ref(P.quantizar)
 
   const prefereEscuro = usePreferredDark()
   const temaEfetivo = computed(() => (tema.value === 'sistema' ? (prefereEscuro.value ? 'escuro' : 'claro') : tema.value))
@@ -53,6 +54,43 @@ export const useConfigStore = defineStore('config', () => {
     nome: { nomenclatura: nomenclatura.value, acidente: acidente.value },
     paleta: PALETAS[daltonico.value ? 'daltonico' : temaEfetivo.value],
   }))
+
+  const preferencias = computed<PreferenciasDaVista>(() => ({
+    instrumento: instrumento.value,
+    numCordas: numCordas.value,
+    afinacaoId: afinacaoId.value,
+    casas: casas.value,
+    modo: modo.value,
+    filtro: filtro.value,
+    selecionada: selecionada.value,
+    tonica: tonica.value,
+    padraoId: padraoId.value,
+    rotulo: rotulo.value,
+    nomenclatura: nomenclatura.value,
+    acidente: acidente.value,
+    tema: tema.value,
+    daltonico: daltonico.value,
+    quantizar: quantizar.value,
+  }))
+
+  /** Recebe preferências já validadas e coerentes (`carregar`). */
+  function aplicar(p: PreferenciasDaVista) {
+    instrumento.value = p.instrumento
+    numCordas.value = p.numCordas
+    afinacaoId.value = p.afinacaoId
+    casas.value = p.casas
+    modo.value = p.modo
+    filtro.value = [...p.filtro]
+    selecionada.value = p.selecionada
+    tonica.value = p.tonica
+    padraoId.value = p.padraoId
+    rotulo.value = p.rotulo
+    nomenclatura.value = p.nomenclatura
+    acidente.value = p.acidente
+    tema.value = p.tema
+    daltonico.value = p.daltonico
+    quantizar.value = p.quantizar
+  }
 
   function escolherNumCordas(n: number) {
     if (!CORDAS[instrumento.value].includes(n)) throw new RangeError(`${instrumento.value} não tem ${n} cordas`)
@@ -85,7 +123,7 @@ export const useConfigStore = defineStore('config', () => {
 
   return {
     instrumento, numCordas, afinacaoId, casas, modo, filtro, selecionada, tonica, padraoId, rotulo,
-    nomenclatura, acidente, tema, daltonico, quantizar, temaEfetivo, afinacao, afinacoesDisponiveis, escolhas,
-    escolherNumCordas, escolherInstrumento, escolherCasas, aoTocar, mostrarClasses, alternarClasse,
+    nomenclatura, acidente, tema, daltonico, quantizar, temaEfetivo, afinacao, afinacoesDisponiveis, escolhas, preferencias,
+    escolherNumCordas, escolherInstrumento, escolherCasas, aoTocar, mostrarClasses, alternarClasse, aplicar,
   }
 })

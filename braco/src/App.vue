@@ -7,12 +7,14 @@ import PainelMetronomo from '@/components/PainelMetronomo.vue'
 import PainelNotas from '@/components/PainelNotas.vue'
 import { useSom } from '@/composables/useSom'
 import type { Posicao } from '@/dominio/tipos'
+import { ligarPersistencia } from '@/persistencia/usePersistencia'
 import { useConfigStore } from '@/stores/config'
 import { useMetronomoStore } from '@/stores/metronomo'
 
 const config = useConfigStore()
 const metro = useMetronomoStore()
 const { tocarNota } = useSom()
+ligarPersistencia()
 
 // "sistema" fica a cargo do prefers-color-scheme do CSS; os outros fixam o tema.
 watchEffect(() => {
