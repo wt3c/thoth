@@ -189,8 +189,11 @@ LAYOUT = """JSON.stringify({
 
 @pytest.mark.parametrize(
     ("tela", "orientacao", "barra"),
-    [((390, 844), "vertical", True), ((844, 390), "horizontal", True),
-     ((1280, 800), "horizontal", False)],
+    [
+        ((390, 844), "vertical", True),
+        ((844, 390), "horizontal", True),
+        ((1280, 800), "horizontal", False),
+    ],
 )
 def test_layout_responsivo(
     servidor: str, tela: tuple[int, int], orientacao: str, barra: bool
@@ -199,8 +202,14 @@ def test_layout_responsivo(
     url = f"{servidor}/braco/?casas=24&cordas=7&afinacao=baixo-7"
     estado = json.loads(sessao(url, [(1.5, LAYOUT)], tela=tela)[0])
     menor = min(min(w, h) for w, h in estado["alvos"])
-    print(tela, estado["orientacao"], f"braço {estado['larguraBraco']:.0f} px;",
-          f"menor alvo {menor:.0f} px;", "barra", estado["barra"])
+    print(
+        tela,
+        estado["orientacao"],
+        f"braço {estado['larguraBraco']:.0f} px;",
+        f"menor alvo {menor:.0f} px;",
+        "barra",
+        estado["barra"],
+    )
     assert estado["orientacao"] == orientacao
     assert len(estado["alvos"]) == 7 * 25
     assert menor >= 44 - 0.01, "alvo de toque abaixo de 44 px"  # 43,9997: sub-pixel do layout
@@ -210,3 +219,38 @@ def test_layout_responsivo(
         assert estado["larguraBraco"] <= tela[0]
     if barra:
         assert estado["barra"]["fundo"] == pytest.approx(estado["altura"], abs=1)
+
+
+SOANDO = """JSON.stringify({
+  notas: [...new Set([...document.querySelectorAll('[data-soando="true"]')]
+    .map((n) => n.dataset.nota))],
+  inicios: window.__registro.inicios,
+  botao: document.querySelector('[data-acao="tocar-notas"]').textContent.trim(),
+})"""
+
+
+def test_notas_acesas_soam_no_metronomo_da_grave_a_aguda(servidor: str) -> None:
+    # E e A acesas em 5 casas do baixo de 4 cordas: E1, A1, E2, A2, uma por tempo a 120 BPM.
+    url = f"{servidor}/braco/?filtro=49&casas=5&bpm=120"
+    leituras = sessao(
+        url,
+        [
+            (1.5, "document.querySelector('[data-acao=\"tocar-notas\"]').click()"),
+            (0.75, SOANDO),
+            (0.5, SOANDO),
+            (0.5, SOANDO),
+        ],
+        script_inicial=INSTRUMENTACAO,
+    )
+    estados = [json.loads(v) for v in leituras[1:]]
+    acesas = [e["notas"] for e in estados]
+    print("acesas por leitura:", acesas)
+    assert estados[0]["botao"] == "Parar notas"
+    assert all(len(n) == 1 and n[0] in {"E", "A"} for n in acesas), "só E ou A acendem, uma por vez"
+    assert acesas[0] != acesas[1], "a nota do tempo seguinte é outra"
+
+    quandos = sorted({round(i["quando"], 6) for i in estados[-1]["inicios"]})
+    intervalos = [b - a for a, b in pairwise(quandos)]
+    print("instantes:", quandos)
+    assert len(quandos) >= 3
+    assert statistics.fmean(intervalos) == pytest.approx(0.5, abs=1e-6)

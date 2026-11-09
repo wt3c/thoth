@@ -33,7 +33,12 @@ autorização); M8 com quantização opcional, desligada por padrão.
 6. [x] Responsivo (ADR-063, `feat/braco-responsivo`): braço vertical no celular em pé, geometria pura em
    `dominio/geometria.ts`, setas por orientação, números das casas, barra do metrônomo rápido fixa;
    e2e a 390 × 844, 844 × 390 e 1280 × 800 (`tela` em `tests/navegador/cdp.py`).
-7. [ ] Publicar no Pages (habilitar a fonte "GitHub Actions" e disparar o workflow) — só com autorização.
+7. [x] Tocar as notas acesas no metrônomo, no modo Notas (`feat/braco-tocar-notas`):
+   - [x] `alturasVisiveis` em `dominio/sequencia.ts`: alturas acesas, sem repetir, da grave à aguda.
+   - [x] Botão no painel Notas (desligado sem nota acesa), reaproveitando a sequência S6.
+   - [x] e2e no Chromium: duas classes, soam nos tempos e acendem no braço.
+   - [x] Verificação completa, emenda do ADR-057, commit.
+8. [ ] Publicar no Pages (habilitar a fonte "GitHub Actions" e disparar o workflow) — só com autorização.
 
 Dono exclusivo de `package.json`/lockfile, configs, `tasks/*`, `Containerfile`, `app.py`: o integrador (Claude).
 
