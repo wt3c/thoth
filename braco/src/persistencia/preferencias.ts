@@ -21,6 +21,8 @@ export type Tema = 'sistema' | 'claro' | 'escuro'
 export const CORDAS: Readonly<Record<Instrumento, readonly number[]>> = { baixo: [4, 5, 6, 7], guitarra: [6] }
 export const CASAS_MIN = 12
 export const CASAS_MAX = 24
+/** O braço abre com 21 casas, a pedido do usuário (emenda do ADR-062). */
+export const CASAS_PADRAO = 21
 
 export interface Preferencias {
   readonly instrumento: Instrumento
@@ -45,7 +47,7 @@ export const PREFERENCIAS_PADRAO: Preferencias = {
   instrumento: 'baixo',
   numCordas: 4,
   afinacaoId: 'baixo-4',
-  casas: CASAS_MIN,
+  casas: CASAS_PADRAO,
   modo: 'notas',
   filtro: [],
   selecionada: null,

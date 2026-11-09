@@ -100,7 +100,7 @@ def test_metronomo_agenda_no_relogio_de_audio_a_partir_do_clique(servidor: str) 
     antes, tocando = (
         json.loads(v)
         for v in sessao(
-            f"{servidor}/braco/?bpm=120",
+            f"{servidor}/braco/?casas=12&bpm=120",
             [(2.0, ESTADO), (0.0, _clicar(".tocar"))],
             script_inicial=INSTRUMENTACAO,
         )[:2]
@@ -113,7 +113,7 @@ def test_metronomo_agenda_no_relogio_de_audio_a_partir_do_clique(servidor: str) 
     # então outra sessão mede o que soou em 3 s.
     depois = json.loads(
         sessao(
-            f"{servidor}/braco/?bpm=120",
+            f"{servidor}/braco/?casas=12&bpm=120",
             [(1.5, "document.querySelector('.tocar').click()"), (3.0, ESTADO)],
             script_inicial=INSTRUMENTACAO,
         )[1]
@@ -141,7 +141,7 @@ def test_metronomo_agenda_no_relogio_de_audio_a_partir_do_clique(servidor: str) 
 
 def test_sequencia_soa_nos_pulsos_e_acende_no_braco(servidor: str) -> None:
     # Lá maior a 120 BPM, tônica pela URL (S8): oito notas, uma por tempo.
-    url = f"{servidor}/braco/?modo=teoria&tonica=9&padrao=escala-maior&bpm=120"
+    url = f"{servidor}/braco/?casas=12&modo=teoria&tonica=9&padrao=escala-maior&bpm=120"
     leituras = sessao(
         url,
         [
@@ -232,7 +232,7 @@ SOANDO = """JSON.stringify({
 def test_notas_acesas_soam_no_metronomo_da_grave_a_aguda(servidor: str) -> None:
     # E e A acesas nas 12 casas do baixo de 4 cordas: dez posições, uma por tempo a 120 BPM.
     # A1 aparece em duas (corda E casa 5, corda A solta) e cada uma tem o seu tempo.
-    url = f"{servidor}/braco/?filtro=49&bpm=120"
+    url = f"{servidor}/braco/?casas=12&filtro=49&bpm=120"
     leituras = sessao(
         url,
         [
@@ -283,7 +283,8 @@ def test_o_site_abre_com_o_braco_limpo(servidor: str) -> None:
         )[0]
     )
     print("braço ao abrir:", estado)
-    assert estado == {"posicoes": 4 * 13, "marcadores": 0, "limpar": "Limpar"}
+    # Padrão de 21 casas: 22 posições por corda, contando a corda solta.
+    assert estado == {"posicoes": 4 * 22, "marcadores": 0, "limpar": "Limpar"}
 
 
 LEGENDA = """JSON.stringify({
@@ -378,7 +379,7 @@ OITAVAS = """JSON.stringify({
 
 def test_nota_tocada_sinaliza_as_oitavas_das_outras(servidor: str) -> None:
     # Baixo E A D G, 12 casas: o C da corda A, casa 3 (C2) é tocado e vira a referência.
-    url = f"{servidor}/braco/"
+    url = f"{servidor}/braco/?casas=12"
     leituras = sessao(
         url,
         [
