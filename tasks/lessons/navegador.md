@@ -48,3 +48,13 @@ porque a vista mostra a selecionada mesmo fora do filtro. Na URL isso aparecia c
 
 **Regra:** quando dois estados decidem o que aparece na tela, a ação que esconde precisa limpar os dois. O teste
 afirma o resultado visível ("nada aceso"), não só o campo que a ação altera.
+
+## "Acender a nota" precisa dizer se é o som ou o lugar
+
+No braço (2026-11-09), tocar as notas acesas no metrônomo acendia pela altura. O mesmo som em dois lugares
+acendia junto, e o usuário viu "um conjunto", não nota a nota. O e2e afirmava o **nome** da nota ("só E ou A"),
+o que não distingue um lugar de dois. A URL de teste ainda pedia `casas=5`, recusada em silêncio (mínimo 12),
+e o ADR registrou "5 casas" sem conferir.
+
+**Regra:** ao destacar algo no braço, o teste afirma **quantas posições** acendem (`corda-casa`), não só qual nome
+aparece. Parâmetro de URL usado em teste tem o efeito conferido na leitura antes de ir para o ADR.

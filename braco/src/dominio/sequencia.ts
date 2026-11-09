@@ -1,6 +1,6 @@
 import { gerarBraco } from './braco'
 import { notasDoPadrao } from './teoria'
-import type { Afinacao, Altura, ClasseAltura, Padrao } from './tipos'
+import type { Afinacao, Altura, ClasseAltura, Padrao, Posicao } from './tipos'
 import { vistaDaNota, type EscolhasDaVista } from './vista'
 
 const CROMATICA = Array.from({ length: 12 }, (_, i) => i)
@@ -26,10 +26,12 @@ export function alturasDaSequencia(afinacao: Afinacao, casas: number, tonica: Cl
 }
 
 /**
- * As alturas acesas no braço, para tocar no metrônomo: a mesma regra de visibilidade do
- * desenho (`vistaDaNota`), cada altura uma vez, da mais grave à mais aguda.
+ * As posições acesas no braço, para tocar no metrônomo nota a nota: a mesma regra de
+ * visibilidade do desenho (`vistaDaNota`). Da mais grave à mais aguda; o mesmo som em mais de
+ * um lugar toca uma vez em cada, da corda mais grave para a mais aguda.
  */
-export function alturasVisiveis(afinacao: Afinacao, casas: number, escolhas: EscolhasDaVista): Altura[] {
-  const acesas = gerarBraco(afinacao, casas).filter((p) => vistaDaNota(p, escolhas).visivel)
-  return [...new Set(acesas.map((p) => p.altura))].sort((a, b) => a - b)
+export function posicoesVisiveis(afinacao: Afinacao, casas: number, escolhas: EscolhasDaVista): Posicao[] {
+  return gerarBraco(afinacao, casas)
+    .filter((p) => vistaDaNota(p, escolhas).visivel)
+    .sort((a, b) => a.altura - b.altura || a.corda - b.corda)
 }

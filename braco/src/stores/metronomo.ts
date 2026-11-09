@@ -1,7 +1,7 @@
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
 import { obterMotor, type Motor } from '@/composables/motor'
-import type { Altura } from '@/dominio/tipos'
+import type { Altura, Posicao } from '@/dominio/tipos'
 import { CONFIG_PADRAO } from '@/som/agendador'
 import { validarConfig } from '@/som/config-metronomo'
 import { TapTempo } from '@/som/tap-tempo'
@@ -16,9 +16,10 @@ export const useMetronomoStore = defineStore('metronomo', () => {
   const tocando = ref(false)
   const pulso = ref<Pulso | null>(null)
   const sequenciaAtiva = ref(false)
-  const soando = ref<Altura | null>(null)
+  /** Uma altura acende todas as posições dela (S6); uma posição acende só aquele lugar. */
+  const soando = ref<Altura | Posicao | null>(null)
   const tapTempo = new TapTempo()
-  let alturas: readonly Altura[] = []
+  let notas: readonly (Altura | Posicao)[] = []
   let inscrito: Motor | null = null
 
   async function motor(): Promise<Motor> {
@@ -29,7 +30,7 @@ export const useMetronomoStore = defineStore('metronomo', () => {
       m.metronomo.aoPulso((p) => {
         pulso.value = p
         const indice = m.sequencia.indiceDoPulso(p)
-        soando.value = indice === null ? null : (alturas[indice] ?? null)
+        soando.value = indice === null ? null : (notas[indice] ?? null)
       })
     }
     return m
@@ -65,10 +66,11 @@ export const useMetronomoStore = defineStore('metronomo', () => {
   }
 
   /** S6: as notas soam nos pulsos, agendadas junto com os cliques. */
-  async function tocarSequencia(novas: readonly Altura[]) {
+  async function tocarSequencia(novas: readonly (Altura | Posicao)[]) {
     const m = await motor()
-    alturas = novas
-    m.sequencia.iniciar(novas, (60 / config.value.bpm / config.value.subdivisao) * LEGATO)
+    notas = novas
+    const alturas = novas.map((n) => (typeof n === 'number' ? n : n.altura))
+    m.sequencia.iniciar(alturas, (60 / config.value.bpm / config.value.subdivisao) * LEGATO)
     sequenciaAtiva.value = true
     if (!tocando.value) await iniciar()
   }

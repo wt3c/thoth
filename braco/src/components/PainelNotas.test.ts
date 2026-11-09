@@ -22,7 +22,7 @@ describe('PainelNotas: tocar as notas acesas no metrônomo', () => {
     expect(botao(painel).attributes('disabled')).toBeDefined()
   })
 
-  it('toca as alturas acesas, da grave à aguda, na sequência do metrônomo', async () => {
+  it('toca cada posição acesa, da grave à aguda, na sequência do metrônomo', async () => {
     const painel = montar()
     const config = useConfigStore()
     const metro = useMetronomoStore()
@@ -34,7 +34,8 @@ describe('PainelNotas: tocar as notas acesas no metrônomo', () => {
     config.mostrarClasses([4, 9])
     await painel.vm.$nextTick()
     await botao(painel).trigger('click')
-    expect(tocadas).toEqual([[28, 33, 40, 45]])
+    const lugares = (tocadas[0] as { corda: number; casa: number }[]).map((p) => `${p.corda}-${p.casa}`)
+    expect([tocadas.length, lugares]).toEqual([1, ['0-0', '0-5', '1-0', '2-2', '3-2']])
   })
 
   it('com a sequência ativa, o mesmo botão para', async () => {

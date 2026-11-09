@@ -18,7 +18,7 @@ const props = withDefaults(
     afinacao: Afinacao
     casas: number
     escolhas: EscolhasDaVista
-    soando?: Altura | null
+    soando?: Altura | Posicao | null
     orientacao?: Orientacao
   }>(),
   { soando: null, orientacao: 'horizontal' },
@@ -40,6 +40,13 @@ const coresDoBraco = computed(() => {
   const b = props.escolhas.paleta.braco
   return { '--braco-madeira': b.madeira, '--braco-traste': b.traste, '--braco-corda': b.corda, '--braco-marcacao': b.marcacao }
 })
+
+/** Uma altura soando acende todas as posições dela; uma posição, só aquele lugar. */
+function soa(p: Posicao): boolean {
+  const s = props.soando
+  if (s === null) return false
+  return typeof s === 'number' ? p.altura === s : p.corda === s.corda && p.casa === s.casa
+}
 
 const focada = ref({ corda: 0, casa: 0 })
 const notas = ref<Record<string, SVGGElement>>({})
@@ -135,8 +142,8 @@ function aoTeclar(evento: KeyboardEvent, p: Posicao) {
         :data-x="centro(p).x"
         :data-y="centro(p).y"
         :data-destaque="vistaDe(p).destaque"
-        :data-soando="p.altura === soando"
-        :class="{ soando: p.altura === soando }"
+        :data-soando="soa(p)"
+        :class="{ soando: soa(p) }"
         @click="emit('tocar', p); focada = { corda: p.corda, casa: p.casa }"
         @keydown="aoTeclar($event, p)"
       >

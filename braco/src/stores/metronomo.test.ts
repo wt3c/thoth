@@ -107,6 +107,20 @@ describe('useMetronomoStore', () => {
     expect(metro.soando).toBeNull()
   })
 
+  it('a sequência de posições soa pelas alturas delas e diz qual posição está soando', async () => {
+    const { sintetizador, andar } = montarMotor()
+    const metro = useMetronomoStore()
+    await metro.atualizar({ bpm: 120, subdivisao: 2 })
+    const lugares = [
+      { corda: 0, casa: 5, altura: 33, classe: 9 },
+      { corda: 1, casa: 0, altura: 33, classe: 9 },
+    ]
+    await metro.tocarSequencia(lugares)
+    andar(0.325)
+    expect(sintetizador.notas.map((n) => n.altura)).toEqual([33, 33])
+    expect(metro.soando).toEqual(lugares[1])
+  })
+
   it('parar o metrônomo para a sequência', async () => {
     montarMotor()
     const metro = useMetronomoStore()
