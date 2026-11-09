@@ -582,6 +582,8 @@ Uma página à parte, em `braco/` (Vue 3 + TypeScript + Vite), para estudar o br
 guitarra. Ela roda inteira no navegador, sem API: as notas são mostradas por cor e filtradas, e a teoria funciona assim:
 a nota clicada vira a tônica, e escalas, modos e acordes aparecem por grau. A página traz também metrônomo, sequência no
 pulso e tema claro ou escuro. As escolhas ficam na URL e no navegador, então um link reabre a mesma tela.
+No celular em pé, o braço aparece na vertical, com a pestana em cima, e a página rola só para baixo. Em tela estreita
+ou baixa, uma barra fixa no pé da tela deixa Tocar, o andamento e os tempos sempre à mão (ADR-063).
 
 ```bash
 cd braco

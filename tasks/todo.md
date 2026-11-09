@@ -30,7 +30,10 @@ autorização); M8 com quantização opcional, desligada por padrão.
      cliques 50–95 ms à frente do `currentTime`, intervalo exato de 0,5 s a 120 BPM; sequência acende no braço.
    - [x] README; `/verificacao` + skill Codex com `npm --prefix braco`; workflow do Pages só por
      `workflow_dispatch` (não publicado); emenda do ADR-057.
-6. [ ] Publicar no Pages (habilitar a fonte "GitHub Actions" e disparar o workflow) — só com autorização.
+6. [x] Responsivo (ADR-063, `feat/braco-responsivo`): braço vertical no celular em pé, geometria pura em
+   `dominio/geometria.ts`, setas por orientação, números das casas, barra do metrônomo rápido fixa;
+   e2e a 390 × 844, 844 × 390 e 1280 × 800 (`tela` em `tests/navegador/cdp.py`).
+7. [ ] Publicar no Pages (habilitar a fonte "GitHub Actions" e disparar o workflow) — só com autorização.
 
 Dono exclusivo de `package.json`/lockfile, configs, `tasks/*`, `Containerfile`, `app.py`: o integrador (Claude).
 

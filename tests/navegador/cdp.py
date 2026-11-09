@@ -37,13 +37,18 @@ def avaliar(url: str, expressao: str, *, espera_s: float = 15.0) -> Any:
 
 
 def sessao(
-    url: str, leituras: list[tuple[float, str]], *, script_inicial: str | None = None
+    url: str,
+    leituras: list[tuple[float, str]],
+    *,
+    script_inicial: str | None = None,
+    tela: tuple[int, int] | None = None,
 ) -> list[Any]:
     """Abre `url` e, para cada `(espera_s, expressao)`, espera e avalia, na mesma página.
 
     `script_inicial` roda antes de qualquer script da página. O autoplay fica liberado:
     o clique vem de `Runtime.evaluate`, não de gesto humano, e sem isso o navegador
-    calaria o som que o teste quer medir.
+    calaria o som que o teste quer medir. `tela` (largura, altura) emula a janela de um
+    aparelho, como celular em pé ou deitado, antes de a página carregar.
     """
     if CHROMIUM is None:
         raise RuntimeError("chromium não encontrado")
@@ -63,9 +68,13 @@ def sessao(
             _comando(ws, 1, "Page.enable")
             if script_inicial is not None:
                 _comando(ws, 2, "Page.addScriptToEvaluateOnNewDocument", source=script_inicial)
-            _comando(ws, 3, "Page.navigate", url=url)
+            if tela is not None:
+                largura, altura = tela
+                _comando(ws, 3, "Emulation.setDeviceMetricsOverride", width=largura,
+                         height=altura, deviceScaleFactor=1, mobile=largura <= 640)
+            _comando(ws, 4, "Page.navigate", url=url)
             valores = []
-            for ident, (espera_s, expressao) in enumerate(leituras, start=4):
+            for ident, (espera_s, expressao) in enumerate(leituras, start=5):
                 time.sleep(espera_s)
                 msg = _comando(ws, ident, "Runtime.evaluate", expression=expressao,
                                returnByValue=True, awaitPromise=True)

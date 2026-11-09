@@ -5,6 +5,7 @@ import type { ConfigMetronomo, SomDoClique, Subdivisao } from '@/som/tipos'
 import { useConfigStore } from '@/stores/config'
 import { useMetronomoStore } from '@/stores/metronomo'
 import GrupoDeOpcoes from './GrupoDeOpcoes.vue'
+import IndicadorDeTempos from './IndicadorDeTempos.vue'
 
 const config = useConfigStore()
 const metro = useMetronomoStore()
@@ -29,16 +30,6 @@ const SONS: readonly { valor: SomDoClique; rotulo: string }[] = [
   { valor: 'madeira', rotulo: 'Bloco de madeira' },
   { valor: 'bipe', rotulo: 'Bipe' },
 ]
-
-const tempos = computed(() => Array.from({ length: metro.config.temposPorCompasso }, (_, i) => i + 1))
-const acesa = computed(() => metro.pulso?.batida ?? null)
-const estado = computed(() => {
-  const p = metro.pulso
-  if (!p) return ''
-  if (p.contagem) return 'Contagem'
-  if (p.silenciado) return 'Compasso em silêncio'
-  return `Compasso ${p.compasso + 1}`
-})
 
 const tap = () => metro.tap(performance.now()).catch((erro: unknown) => console.error("tap recusado", erro))
 
@@ -65,18 +56,7 @@ function silencio(parcial: Partial<ConfigMetronomo['silencio']>) {
       >
         {{ metro.tocando ? '■ Parar' : '▶ Tocar' }}
       </button>
-      <div
-        class="indicador"
-        role="status"
-        :aria-label="estado || 'Metrônomo parado'"
-      >
-        <span
-          v-for="t in tempos"
-          :key="t"
-          class="tempo"
-          :class="{ aceso: acesa === t, acento: t === 1 && metro.config.acentoNoUm, mudo: metro.pulso?.silenciado, contagem: metro.pulso?.contagem }"
-        />
-      </div>
+      <IndicadorDeTempos />
     </div>
 
     <div class="andamento">
@@ -255,32 +235,6 @@ function silencio(parcial: Partial<ConfigMetronomo['silencio']>) {
 .tocar {
   min-width: 120px;
   font-size: 1.1rem;
-}
-.indicador {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-}
-.tempo {
-  width: 18px;
-  height: 18px;
-  border-radius: 50%;
-  border: 2px solid var(--borda);
-  transition: background 60ms linear;
-}
-.tempo.acento {
-  border-color: var(--destaque);
-}
-.tempo.aceso {
-  background: var(--destaque);
-  border-color: var(--destaque);
-}
-.tempo.aceso.mudo {
-  background: transparent;
-  border-style: dashed;
-}
-.tempo.aceso.contagem {
-  background: var(--texto-suave);
 }
 .andamento {
   display: flex;
