@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import { exibirNome, nomeDaClasse } from '@/dominio/nomes'
-import { alturasDaSequencia } from '@/dominio/sequencia'
+import { alturasDaSequencia, alturasVisiveis } from '@/dominio/sequencia'
 import { PADROES } from '@/dominio/teoria'
 import type { ClasseAltura, TipoPadrao } from '@/dominio/tipos'
 import { TODAS_AS_CLASSES } from '@/dominio/vista'
@@ -25,6 +25,13 @@ const padraoId = computed({
   get: () => config.padraoId ?? '',
   set: (v: string) => (config.padraoId = v === '' ? null : v),
 })
+
+const acesas = computed(() => alturasVisiveis(config.afinacao, config.casas, config.escolhas))
+
+/** Modo notas: as alturas acesas no braço soam nos pulsos, pela mesma sequência do S6. */
+function tocarAcesas() {
+  metro.tocarSequencia(acesas.value).catch((erro: unknown) => console.error('falha ao tocar as notas', erro))
+}
 
 function tocarSequencia() {
   if (config.tonica === null) return
@@ -91,6 +98,16 @@ function tocarSequencia() {
           Toque uma nota para ouvi-la e vê-la em todo o braço.
         </template>
       </p>
+      <div class="acoes">
+        <button
+          type="button"
+          data-acao="tocar-notas"
+          :disabled="!metro.sequenciaAtiva && acesas.length === 0"
+          @click="metro.sequenciaAtiva ? metro.pararSequencia() : tocarAcesas()"
+        >
+          {{ metro.sequenciaAtiva ? 'Parar notas' : 'Tocar notas do braço no metrônomo' }}
+        </button>
+      </div>
     </template>
 
     <template v-else>

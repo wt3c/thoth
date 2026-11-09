@@ -4334,6 +4334,16 @@ fica declarado como não coberto.
   é agendado de 50 a 95 ms à frente do `currentTime`, com intervalo de 0,500000 s entre eles. Isso prova que o instante
   vem do relógio de áudio, não do despertador. A saída real do dispositivo de som continua fora do alcance do teste.
 
+### Emenda (2026-11-09) — notas acesas no metrônomo
+
+O modo Notas também toca no metrônomo, pela mesma `SequenciaNoMetronomo` do S6. As alturas tocadas são as acesas
+no braço (`alturasVisiveis`), segundo a mesma regra de `vistaDaNota` que decide o desenho. Cada altura soa uma vez,
+da mais grave à mais aguda, e a sequência recomeça da mais grave. A lista é fixada no início: mudar o filtro com a
+sequência tocando não altera o que soa até ela ser parada e tocada de novo.
+
+Medido no Chromium, com E e A em 5 casas a 120 BPM: E e A acendem alternando, uma por tempo, e os instantes ficam
+espaçados exatamente 0,5 s.
+
 ## ADR-058 — baixo de 7 cordas: B-E-A-D-G-C-F padrão, F♯-B-E-A-D-G-C como preset
 
 **Data:** 2026-11-09 · **Status:** aceito
