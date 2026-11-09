@@ -1,5 +1,7 @@
 <script setup lang="ts">
-import { watchEffect } from 'vue'
+import { useMediaQuery } from '@vueuse/core'
+import { computed, watchEffect } from 'vue'
+import BarraMetronomo from '@/components/BarraMetronomo.vue'
 import BracoSvg from '@/components/BracoSvg.vue'
 import PainelExibicao from '@/components/PainelExibicao.vue'
 import PainelInstrumento from '@/components/PainelInstrumento.vue'
@@ -15,6 +17,10 @@ const config = useConfigStore()
 const metro = useMetronomoStore()
 const { tocarNota } = useSom()
 ligarPersistencia()
+
+// ADR-063: celular em pé vê o braço na vertical, que cabe na largura e rola para baixo.
+const emPe = useMediaQuery('(orientation: portrait) and (max-width: 640px)')
+const orientacao = computed(() => (emPe.value ? 'vertical' : 'horizontal'))
 
 // "sistema" fica a cargo do prefers-color-scheme do CSS; os outros fixam o tema.
 watchEffect(() => {
@@ -42,6 +48,7 @@ function tocar(posicao: Posicao) {
           :casas="config.casas"
           :escolhas="config.escolhas"
           :soando="metro.soando"
+          :orientacao="orientacao"
           @tocar="tocar"
         />
       </div>
@@ -52,6 +59,7 @@ function tocar(posicao: Posicao) {
         <PainelExibicao />
       </div>
     </main>
+    <BarraMetronomo class="rapida" />
   </div>
 </template>
 
@@ -79,6 +87,25 @@ header p {
 .braco {
   overflow-x: auto;
   margin-bottom: 16px;
+}
+.rapida {
+  display: none;
+}
+/* Tela estreita ou baixa: o painel do metrônomo fica longe do braço, então a barra rápida
+   acompanha a rolagem no pé da tela. */
+@media (max-width: 640px), (max-height: 500px) {
+  .app {
+    padding-bottom: 96px;
+  }
+  .rapida {
+    display: flex;
+    position: fixed;
+    inset: auto 0 0;
+    z-index: 10;
+  }
+  header {
+    margin-bottom: 8px;
+  }
 }
 .paineis {
   display: grid;

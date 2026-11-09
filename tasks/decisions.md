@@ -4385,3 +4385,30 @@ localStorage (`thoth-braco:preferencias`). Na abertura, a URL vence o armazenado
   os põe de acordo, voltando à afinação padrão do instrumento com aviso.
 - localStorage indisponível (aba privada, cota) não impede a página; ela só não lembra.
 - O padrão do store de configuração vem de `PREFERENCIAS_PADRAO`, para não haver dois padrões.
+
+## ADR-063 — braço vertical no celular em pé e metrônomo rápido fixo
+
+**Data:** 2026-11-09 · **Status:** aceito
+
+A 390 px o braço horizontal mostrava 4 das 24 casas, com rolagem lateral escondida, e o metrônomo ficava uma tela
+abaixo. Em celular em pé (`(orientation: portrait) and (max-width: 640px)`) o braço vira **vertical**: pestana em
+cima, corda grave à esquerda, como diagrama de acorde. A página rola só na vertical. Em tela estreita ou baixa
+(`max-width: 640px` ou `max-height: 500px`) aparece a **barra do metrônomo rápido**, fixa no pé, com Tocar, BPM −/+ e
+indicador de tempos. Ela usa o mesmo store do painel completo.
+
+- A geometria saiu do componente para `dominio/geometria.ts`, uma função pura. Ela calcula sobre os eixos "ao longo"
+  (casas) e "através" (cordas) e só no fim troca para x/y. As duas orientações têm os mesmos testes: alvo ≥ 44 px
+  sem sobreposição, notas dentro do desenho e até 7 cordas em ≤ 358 px.
+- Cada orientação usa um espaço por corda: 52 px na horizontal e 46 px na vertical, onde 7 cordas somam 350 px.
+  O alvo continua 48 × 44 px, girado.
+- As setas andam na direção em que o braço aparece na tela. Na vertical, ↓ avança uma casa e → vai para a corda
+  mais aguda.
+- Os números das casas aparecem só nas casas marcadas (3, 5, 7, 9, 12…), fora da madeira.
+- No celular deitado, o braço fica horizontal e com rolagem lateral. Limitar a altura a 70% da tela encolheria o alvo
+  abaixo de 44 px, por isso não foi feito.
+- `IndicadorDeTempos.vue` foi extraído do painel para ser compartilhado com a barra.
+- Medido no Chromium (`tests/navegador/test_braco.py`, 7 cordas, 24 casas):
+  - 390 × 844: vertical, braço com 350 px, sem rolagem horizontal, menor alvo 44 px, barra presa ao pé;
+  - 844 × 390: horizontal, com barra;
+  - 1280 × 800: horizontal, sem barra.
+- Pendência anterior a este ADR: com número ímpar de cordas, o ponto de marcação fica sob a corda do meio.

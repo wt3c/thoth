@@ -168,3 +168,45 @@ def test_sequencia_soa_nos_pulsos_e_acende_no_braco(servidor: str) -> None:
     print("instantes:", quandos)
     assert len(quandos) >= 2
     assert statistics.fmean(intervalos) == pytest.approx(0.5, abs=1e-6)
+
+
+LAYOUT = """JSON.stringify({
+  orientacao: document.querySelector('svg.braco').dataset.orientacao,
+  transborda: document.documentElement.scrollWidth > window.innerWidth,
+  larguraBraco: document.querySelector('svg.braco').getBoundingClientRect().width,
+  alvos: [...document.querySelectorAll('.nota .alvo')].map((a) => {
+    const r = a.getBoundingClientRect();
+    return [r.width, r.height];
+  }),
+  barra: (() => {
+    const b = document.querySelector('[aria-label="Metrônomo rápido"]');
+    const r = b.getBoundingClientRect();
+    return { visivel: getComputedStyle(b).display !== 'none', fundo: r.bottom, topo: r.top };
+  })(),
+  altura: window.innerHeight,
+})"""
+
+
+@pytest.mark.parametrize(
+    ("tela", "orientacao", "barra"),
+    [((390, 844), "vertical", True), ((844, 390), "horizontal", True),
+     ((1280, 800), "horizontal", False)],
+)
+def test_layout_responsivo(
+    servidor: str, tela: tuple[int, int], orientacao: str, barra: bool
+) -> None:
+    # O pior caso de largura: 7 cordas, 24 casas (ADR-063).
+    url = f"{servidor}/braco/?casas=24&cordas=7&afinacao=baixo-7"
+    estado = json.loads(sessao(url, [(1.5, LAYOUT)], tela=tela)[0])
+    menor = min(min(w, h) for w, h in estado["alvos"])
+    print(tela, estado["orientacao"], f"braço {estado['larguraBraco']:.0f} px;",
+          f"menor alvo {menor:.0f} px;", "barra", estado["barra"])
+    assert estado["orientacao"] == orientacao
+    assert len(estado["alvos"]) == 7 * 25
+    assert menor >= 44 - 0.01, "alvo de toque abaixo de 44 px"  # 43,9997: sub-pixel do layout
+    assert estado["barra"]["visivel"] is barra
+    if orientacao == "vertical":
+        assert not estado["transborda"], "rolagem horizontal no celular em pé"
+        assert estado["larguraBraco"] <= tela[0]
+    if barra:
+        assert estado["barra"]["fundo"] == pytest.approx(estado["altura"], abs=1)

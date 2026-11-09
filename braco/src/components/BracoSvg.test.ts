@@ -16,8 +16,12 @@ const NOTAS: EscolhasDaVista = {
   nome: { nomenclatura: 'cifra', acidente: 'sustenido' },
   paleta: PALETAS.claro,
 }
-const montar = (escolhas: Partial<EscolhasDaVista> = {}, casas = 12, soando: number | null = null) =>
-  mount(BracoSvg, { props: { afinacao: BAIXO_4, casas, escolhas: { ...NOTAS, ...escolhas }, soando } })
+const montar = (
+  escolhas: Partial<EscolhasDaVista> = {},
+  casas = 12,
+  soando: number | null = null,
+  orientacao: 'horizontal' | 'vertical' = 'horizontal',
+) => mount(BracoSvg, { props: { afinacao: BAIXO_4, casas, escolhas: { ...NOTAS, ...escolhas }, soando, orientacao } })
 
 describe('BracoSvg', () => {
   it('desenha uma nota por casa de cada corda, da solta à última', () => {
@@ -80,4 +84,33 @@ describe('BracoSvg', () => {
     expect(casas).toEqual([3, 5, 7, 9, 12, 12])
     expect(montar({}, 24).findAll('.marcacao').filter((m) => m.attributes('data-casa') === '24')).toHaveLength(2)
   })
+
+  it('vertical: corda grave à esquerda, casas descendo, números das casas marcadas', () => {
+    const braco = montar({}, 12, null, 'vertical')
+    const xy = (corda: number, casa: number) => {
+      const n = braco.get(`[data-corda="${corda}"][data-casa="${casa}"]`)
+      return [Number(n.attributes('data-x')), Number(n.attributes('data-y'))] as const
+    }
+    expect(xy(0, 0)[0]).toBeLessThan(xy(3, 0)[0])
+    expect(xy(0, 5)[1]).toBeGreaterThan(xy(0, 4)[1])
+    expect(braco.get('svg').attributes('data-orientacao')).toBe('vertical')
+    expect(braco.findAll('.numero').map((n) => n.text())).toEqual(['3', '5', '7', '9', '12'])
+  })
+
+  it.each([
+    ['horizontal', { ArrowRight: [0, 6], ArrowLeft: [0, 4], ArrowUp: [1, 5], ArrowDown: [0, 5] }],
+    ['vertical', { ArrowDown: [0, 6], ArrowUp: [0, 4], ArrowRight: [1, 5], ArrowLeft: [0, 5] }],
+  ] as const)('%s: as setas andam na direção em que se vê o braço', async (orientacao, esperado) => {
+    for (const [tecla, [corda, casa]] of Object.entries(esperado)) {
+      const braco = montar({}, 12, null, orientacao)
+      await braco.get('[data-corda="0"][data-casa="5"]').trigger('keydown', { key: tecla })
+      const focavel = braco.get('[tabindex="0"]')
+      expect([tecla, focavel.attributes('data-corda'), focavel.attributes('data-casa')]).toEqual([
+        tecla,
+        String(corda),
+        String(casa),
+      ])
+    }
+  })
 })
+
