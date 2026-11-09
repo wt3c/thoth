@@ -42,7 +42,37 @@ function tocar(posicao: Posicao) {
     <header>
       <h1>Mapa do braço</h1>
       <p>{{ config.afinacao.nome }} · {{ config.casas }} casas</p>
-      <a href="#como-usar">Como usar</a>
+      <a href="#como-usar">
+        <svg
+          viewBox="0 0 16 16"
+          width="16"
+          height="16"
+          aria-hidden="true"
+        >
+          <circle
+            cx="8"
+            cy="8"
+            r="7"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="1.5"
+          />
+          <path
+            d="M6 6.2a2 2 0 1 1 2.8 1.8c-.5.3-.8.7-.8 1.3v.4"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="1.5"
+            stroke-linecap="round"
+          />
+          <circle
+            cx="8"
+            cy="12"
+            r="1"
+            fill="currentColor"
+          />
+        </svg>
+        Como usar
+      </a>
     </header>
     <main>
       <div class="braco">
@@ -91,6 +121,10 @@ header p {
 }
 header a {
   margin-left: auto;
+  color: var(--destaque);
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
 }
 .braco {
   overflow-x: auto;
