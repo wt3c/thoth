@@ -143,6 +143,7 @@ function aoTeclar(evento: KeyboardEvent, p: Posicao) {
         :data-y="centro(p).y"
         :data-destaque="vistaDe(p).destaque"
         :data-soando="soa(p)"
+        :data-referencia="vistaDe(p).referencia"
         :class="{ soando: soa(p) }"
         @click="emit('tocar', p); focada = { corda: p.corda, casa: p.casa }"
         @keydown="aoTeclar($event, p)"
@@ -163,6 +164,13 @@ function aoTeclar(evento: KeyboardEvent, p: Posicao) {
             :fill="vistaDe(p).fundo"
             r="17"
           />
+          <circle
+            v-if="vistaDe(p).referencia"
+            class="anel-referencia"
+            :cx="centro(p).x"
+            :cy="centro(p).y"
+            r="21"
+          />
           <text
             class="nome"
             :x="centro(p).x"
@@ -170,6 +178,21 @@ function aoTeclar(evento: KeyboardEvent, p: Posicao) {
             :fill="vistaDe(p).corTexto"
             aria-hidden="true"
           >{{ vistaDe(p).texto }}</text>
+          <g
+            v-if="vistaDe(p).oitava !== null"
+            class="oitava"
+            aria-hidden="true"
+          >
+            <circle
+              :cx="centro(p).x + 15"
+              :cy="centro(p).y - 15"
+              r="10"
+            />
+            <text
+              :x="centro(p).x + 15"
+              :y="centro(p).y - 15"
+            >{{ vistaDe(p).oitava }}</text>
+          </g>
         </template>
       </g>
     </svg>
@@ -236,6 +259,24 @@ function aoTeclar(evento: KeyboardEvent, p: Posicao) {
   text-anchor: middle;
   dominant-baseline: central;
   pointer-events: none;
+}
+.anel-referencia {
+  fill: none;
+  stroke: var(--destaque);
+  stroke-width: 3;
+  pointer-events: none;
+}
+.oitava {
+  pointer-events: none;
+}
+.oitava circle {
+  fill: var(--destaque);
+}
+.oitava text {
+  fill: var(--destaque-texto);
+  font: 700 11px/1 system-ui, sans-serif;
+  text-anchor: middle;
+  dominant-baseline: central;
 }
 .nota:focus-visible .alvo {
   stroke: var(--foco);

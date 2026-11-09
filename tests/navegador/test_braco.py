@@ -264,3 +264,33 @@ def test_notas_acesas_soam_no_metronomo_da_grave_a_aguda(servidor: str) -> None:
     print("instantes:", quandos)
     assert len(quandos) >= 3
     assert statistics.fmean(intervalos) == pytest.approx(0.5, abs=1e-6)
+
+
+OITAVAS = """JSON.stringify({
+  referencia: [...document.querySelectorAll('[data-referencia="true"]')]
+    .map((n) => `${n.dataset.corda}-${n.dataset.casa}`),
+  etiquetas: Object.fromEntries([...document.querySelectorAll('.nota')]
+    .filter((n) => n.querySelector('.oitava'))
+    .map((n) => [`${n.dataset.corda}-${n.dataset.casa}`, n.querySelector('.oitava').textContent])),
+})"""
+
+
+def test_nota_tocada_sinaliza_as_oitavas_das_outras(servidor: str) -> None:
+    # Baixo E A D G, 12 casas: o C da corda A, casa 3 (C2) é tocado e vira a referência.
+    url = f"{servidor}/braco/"
+    leituras = sessao(
+        url,
+        [
+            (
+                1.5,
+                'document.querySelector(\'[data-corda="1"][data-casa="3"]\').dispatchEvent('
+                "new MouseEvent('click', { bubbles: true }))",
+            ),
+            (0.3, OITAVAS),
+        ],
+    )
+    estado = json.loads(leituras[1])
+    print("referência:", estado["referencia"], "etiquetas:", estado["etiquetas"])
+    assert estado["referencia"] == ["1-3"]
+    # Corda E casa 8: o mesmo C2. Corda D casa 10 e corda G casa 5: C3, uma oitava acima.
+    assert estado["etiquetas"] == {"0-8": "=", "2-10": "+1", "3-5": "+1"}

@@ -23,6 +23,8 @@ export const useConfigStore = defineStore('config', () => {
   const modo = ref<Modo>(P.modo)
   const filtro = ref<ClasseAltura[]>([...P.filtro])
   const selecionada = ref<ClasseAltura | null>(P.selecionada)
+  /** O lugar tocado no modo notas, ponto de partida das oitavas; não é persistido. */
+  const tocada = ref<{ corda: number; casa: number } | null>(null)
   const tonica = ref<ClasseAltura | null>(P.tonica)
   const padraoId = ref<string | null>(P.padraoId)
   const rotulo = ref<Rotulo>(P.rotulo)
@@ -44,10 +46,22 @@ export const useConfigStore = defineStore('config', () => {
     return achado
   })
 
+  /** Derivada: vale só enquanto o lugar tocado ainda existe e ainda é a nota selecionada. */
+  const referencia = computed<Posicao | null>(() => {
+    const t = tocada.value
+    const classe = selecionada.value
+    if (t === null || classe === null) return null
+    const solta = afinacao.value.cordas[t.corda]
+    if (solta === undefined || t.casa > casas.value) return null
+    const altura = solta + t.casa
+    return altura % 12 === classe ? { ...t, altura, classe } : null
+  })
+
   const escolhas = computed<EscolhasDaVista>(() => ({
     modo: modo.value,
     filtro: filtro.value,
     selecionada: selecionada.value,
+    referencia: referencia.value,
     tonica: tonica.value,
     padrao: padrao.value,
     rotulo: rotulo.value,
@@ -82,6 +96,7 @@ export const useConfigStore = defineStore('config', () => {
     modo.value = p.modo
     filtro.value = [...p.filtro]
     selecionada.value = p.selecionada
+    tocada.value = null
     tonica.value = p.tonica
     padraoId.value = p.padraoId
     rotulo.value = p.rotulo
@@ -110,13 +125,22 @@ export const useConfigStore = defineStore('config', () => {
 
   function aoTocar(p: Posicao) {
     if (modo.value === 'teoria') tonica.value = p.classe
-    else selecionada.value = selecionada.value === p.classe ? null : p.classe
+    else if (selecionada.value === p.classe && tocada.value?.corda === p.corda && tocada.value.casa === p.casa) {
+      selecionada.value = null
+      tocada.value = null
+    } else {
+      selecionada.value = p.classe
+      tocada.value = { corda: p.corda, casa: p.casa }
+    }
   }
 
   function mostrarClasses(classes: readonly ClasseAltura[]) {
     filtro.value = TODAS_AS_CLASSES.filter((c) => classes.includes(c))
     // A selecionada aparece mesmo fora do filtro; esconder a classe dela tem de soltá-la.
-    if (selecionada.value !== null && !classes.includes(selecionada.value)) selecionada.value = null
+    if (selecionada.value !== null && !classes.includes(selecionada.value)) {
+      selecionada.value = null
+      tocada.value = null
+    }
   }
 
   function alternarClasse(c: ClasseAltura) {

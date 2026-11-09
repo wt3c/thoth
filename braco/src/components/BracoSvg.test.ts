@@ -10,6 +10,7 @@ const NOTAS: EscolhasDaVista = {
   modo: 'notas',
   filtro: TODAS_AS_CLASSES,
   selecionada: null,
+  referencia: null,
   tonica: null,
   padrao: null,
   rotulo: 'nome',
@@ -83,6 +84,17 @@ describe('BracoSvg', () => {
     // A1 na corda A solta; a corda E casa 5 tem o mesmo som e fica apagada.
     const acesas = montar({}, 12, { corda: 1, casa: 0, altura: 33, classe: 9 }).findAll('[data-soando="true"]')
     expect(acesas.map((n) => `${n.attributes('data-corda')}-${n.attributes('data-casa')}`)).toEqual(['1-0'])
+  })
+
+  it('com uma nota tocada, as outras do mesmo nome mostram a oitava em relação a ela', () => {
+    const braco = montar({ selecionada: 0, referencia: { corda: 1, casa: 3, altura: 36, classe: 0 } })
+    const nota = (corda: number, casa: number) => braco.get(`[data-corda="${corda}"][data-casa="${casa}"]`)
+    expect(nota(3, 5).get('.oitava').text()).toBe('+1')
+    expect(nota(3, 5).attributes('aria-label')).toContain('uma oitava acima da selecionada')
+    expect(nota(0, 8).get('.oitava').text()).toBe('=')
+    expect(nota(1, 3).attributes('data-referencia')).toBe('true')
+    expect(nota(1, 3).find('.oitava').exists()).toBe(false)
+    expect(braco.findAll('.oitava')).toHaveLength(braco.findAll('[data-nota="C"] .marcador').length - 1)
   })
 
   it('marcações nas casas 3, 5, 7, 9 e 12, dupla na 12', () => {

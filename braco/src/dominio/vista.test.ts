@@ -14,6 +14,7 @@ const NOTAS: EscolhasDaVista = {
   modo: 'notas',
   filtro: TODAS_AS_CLASSES,
   selecionada: null,
+  referencia: null,
   tonica: null,
   padrao: null,
   rotulo: 'nome',
@@ -87,5 +88,33 @@ describe('vistaDaNota — modo teoria (M9)', () => {
 describe('exibirGrau', () => {
   it('troca os acidentes ASCII pelos musicais', () => {
     expect(['1', 'b3', '#4', 'bb7', '##5'].map(exibirGrau)).toEqual(['1', '♭3', '♯4', '𝄫7', '𝄪5'])
+  })
+})
+
+describe('vistaDaNota — oitavas a partir da nota selecionada', () => {
+  // C na corda A, casa 3 (C2 = 36) tocado no braço: é a referência.
+  const C2 = pos(36, 1, 3)
+  const REF: EscolhasDaVista = { ...NOTAS, selecionada: 0, referencia: C2 }
+
+  it('a mesma nota mais aguda leva +1, +2; o mesmo som em outro lugar leva =', () => {
+    expect(vistaDaNota(pos(48, 3, 5), REF)).toMatchObject({ oitava: '+1', falado: 'C, uma oitava acima da selecionada' })
+    expect(vistaDaNota(pos(60, 3, 17), REF)).toMatchObject({ oitava: '+2', falado: 'C, duas oitavas acima da selecionada' })
+    expect(vistaDaNota(pos(36, 0, 8), REF)).toMatchObject({ oitava: '=', falado: 'C, mesmo som da selecionada' })
+  })
+
+  it('a mesma nota mais grave leva −1', () => {
+    const e = { ...REF, referencia: pos(48, 3, 5) }
+    expect(vistaDaNota(C2, e)).toMatchObject({ oitava: '−1', falado: 'C, uma oitava abaixo da selecionada' })
+  })
+
+  it('a própria referência não leva etiqueta e é dita como a selecionada', () => {
+    expect(vistaDaNota(C2, REF)).toMatchObject({ oitava: null, referencia: true, falado: 'C, nota selecionada' })
+    expect(vistaDaNota(pos(48, 3, 5), REF).referencia).toBe(false)
+  })
+
+  it('outra nota, seleção sem referência ou modo teoria: sem etiqueta', () => {
+    expect(vistaDaNota(pos(40, 2, 2), REF).oitava).toBeNull()
+    expect(vistaDaNota(pos(48, 3, 5), { ...REF, referencia: null }).oitava).toBeNull()
+    expect(vistaDaNota(pos(48, 3, 5), { ...REF, modo: 'teoria', tonica: 0 }).oitava).toBeNull()
   })
 })
