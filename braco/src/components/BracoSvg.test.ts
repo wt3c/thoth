@@ -85,6 +85,14 @@ describe('BracoSvg', () => {
     expect(montar({}, 24).findAll('.marcacao').filter((m) => m.attributes('data-casa') === '24')).toHaveLength(2)
   })
 
+  it.each(['horizontal', 'vertical'] as const)('%s: a corda grave é a mais grossa, e a espessura cai até a aguda', (orientacao) => {
+    const larguras = montar({}, 12, null, orientacao)
+      .findAll('.corda')
+      .map((c) => Number(c.attributes('stroke-width')))
+    expect(larguras).toHaveLength(4)
+    for (const [i, l] of larguras.slice(1).entries()) expect(l).toBeLessThan(larguras[i] ?? 0)
+  })
+
   it('vertical: corda grave à esquerda, casas descendo, números das casas marcadas', () => {
     const braco = montar({}, 12, null, 'vertical')
     const xy = (corda: number, casa: number) => {

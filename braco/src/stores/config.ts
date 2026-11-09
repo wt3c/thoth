@@ -115,6 +115,8 @@ export const useConfigStore = defineStore('config', () => {
 
   function mostrarClasses(classes: readonly ClasseAltura[]) {
     filtro.value = TODAS_AS_CLASSES.filter((c) => classes.includes(c))
+    // A selecionada aparece mesmo fora do filtro; esconder a classe dela tem de soltá-la.
+    if (selecionada.value !== null && !classes.includes(selecionada.value)) selecionada.value = null
   }
 
   function alternarClasse(c: ClasseAltura) {

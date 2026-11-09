@@ -102,7 +102,7 @@ function aoTeclar(evento: KeyboardEvent, p: Posicao) {
         :key="`corda-${corda}`"
         class="corda"
         v-bind="s"
-        :stroke-width="1.5 + (numCordas - 1 - corda) * 0.2 + corda * 0.6"
+        :stroke-width="1.5 + (numCordas - 1 - corda) * 0.6"
       />
       <circle
         v-for="(m, i) in g.marcacoes"
