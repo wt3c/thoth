@@ -46,7 +46,8 @@ autorização); M8 com quantização opcional, desligada por padrão.
     da `main` (`cceae87`); https://wt3c.github.io/thoth/ respondeu 200 com o braço.
 11. [x] Oitavas a partir da nota tocada (`feat/braco-oitavas`): referência com anel, etiquetas `+1`/`−1`/`=` nas
     outras posições da mesma nota, nome acessível com a oitava; emenda do ADR-061.
-12. [ ] Republicar no Pages com as oitavas, depois do merge na `main`.
+12. [x] Republicado no Pages com as oitavas (2026-11-09): run 42714491558 a partir de `ee9c4dd`; o bundle
+    publicado traz o anel de referência.
 
 Dono exclusivo de `package.json`/lockfile, configs, `tasks/*`, `Containerfile`, `app.py`: o integrador (Claude).
 
