@@ -51,7 +51,8 @@ autorização); M8 com quantização opcional, desligada por padrão.
 13. [x] Braço abre limpo e "Nenhuma" vira "Limpar" (`feat/braco-limpar`); emenda do ADR-062.
 14. [x] Legenda das oitavas abaixo do braço, só no modo Notas (`feat/braco-limpar`); emenda do ADR-061.
 15. [x] Guia "Como usar" no fim da página, com link no cabeçalho (`feat/braco-limpar`); ADR-064.
-16. [ ] Republicar no Pages com o braço limpo, a legenda e o guia, depois do merge na `main`.
+16. [x] Republicado no Pages com o braço limpo, a legenda e o guia (2026-11-09): run 42718737888 a partir de
+    `12eed6e`; o bundle publicado traz `#como-usar`, a legenda e "Limpar".
 
 Dono exclusivo de `package.json`/lockfile, configs, `tasks/*`, `Containerfile`, `app.py`: o integrador (Claude).
 
