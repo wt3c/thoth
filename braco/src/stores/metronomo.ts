@@ -81,5 +81,5 @@ export const useMetronomoStore = defineStore('metronomo', () => {
     soando.value = null
   }
 
-  return { config, tocando, pulso, sequenciaAtiva, soando, atualizar, alternar, tap, tocarSequencia, pararSequencia }
+  return { config, tocando, pulso, sequenciaAtiva, soando, atualizar, alternar, parar, tap, tocarSequencia, pararSequencia }
 })

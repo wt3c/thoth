@@ -4357,6 +4357,12 @@ Medido no Chromium, com E e A nas 12 casas do baixo de 4 cordas a 120 BPM: `A 0-
 posição por leitura, e os instantes espaçados exatamente 0,5 s. A medição da emenda anterior dizia "5 casas", mas
 `casas=5` na URL é recusado (o mínimo é 12), e o braço tinha 12 casas.
 
+### Emenda (2026-11-09) — "Parar notas" para o metrônomo
+
+No modo Notas, "Parar notas" para o metrônomo inteiro (`parar` do store), que leva a sequência junto. Antes, a
+sequência parava e os cliques continuavam. O "Parar sequência" do modo Teoria (S6) não mudou. Medido no Chromium:
+depois do clique, nenhum som novo é agendado em 1 s e nenhuma posição fica acesa.
+
 ## ADR-058 — baixo de 7 cordas: B-E-A-D-G-C-F padrão, F♯-B-E-A-D-G-C como preset
 
 **Data:** 2026-11-09 · **Status:** aceito

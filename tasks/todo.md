@@ -41,7 +41,8 @@ autorização); M8 com quantização opcional, desligada por padrão.
 8. [x] Nota a nota (`fix/braco-nota-a-nota`): o modo Notas toca as **posições** acesas, uma por tempo, e só a
    que soa acende; o mesmo som em dois lugares tem dois tempos. `posicoesVisiveis`, `soando` altura ou posição,
    e2e exigindo uma posição por leitura; emenda do ADR-057.
-9. [ ] Publicar no Pages (habilitar a fonte "GitHub Actions" e disparar o workflow) — só com autorização.
+9. [x] "Parar notas" para também o metrônomo (`fix/braco-parar-notas`); e2e confere que nada mais é agendado.
+10. [ ] Publicar no Pages (habilitar a fonte "GitHub Actions" e disparar o workflow) — só com autorização.
 
 Dono exclusivo de `package.json`/lockfile, configs, `tasks/*`, `Containerfile`, `app.py`: o integrador (Claude).
 
