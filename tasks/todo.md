@@ -2,6 +2,23 @@
 
 > Áudio → partitura e tablatura, foco em contrabaixo. Uso pessoal. CPU-only. Decisões em `tasks/decisions.md`.
 
+## Mapa de notas do braço — SPA Vue (aprovado: "pode seguir", 2026-11-09)
+
+ADR-056 a 061. Celular pelo build estático publicado (Pages, ação externa só com
+autorização); M8 com quantização opcional, desligada por padrão.
+
+0. [x] ADRs 056–061 e este plano.
+1. [ ] Esqueleto: `braco/` (Vite+Vue+TS+Pinia+Vitest, dependências congeladas),
+   contratos de `dominio/`, `audio/`, `stores/`; braço de 4 cordas com clique tocando;
+   `/braco/` no FastAPI com 503 sem build; Containerfile; teste offline do Web Audio.
+2. [ ] Trilha A `dominio/` (Codex, worktree): afinações, braço, teoria grafada, frequência, paleta e contraste.
+3. [ ] Trilha B `audio/` (Claude, worktree): agendador, metrônomo completo (inventário Musicca), reprodução.
+4. [ ] Trilha C UI: controles, teoria, tema, acessibilidade, responsivo — depois do merge da A.
+5. [ ] Integração: M8, S6, S8 (URL > localStorage > padrão, esquema versionado), e2e `-m navegador`,
+   README, `/verificacao` + skill Codex, workflow do Pages (sem publicar).
+
+Dono exclusivo de `package.json`/lockfile, configs, `tasks/*`, `Containerfile`, `app.py`: o integrador (Claude).
+
 ## Corpus humano para velocidade e ritmo (2026-10-30)
 
 O usuário ouviu a candidata, reprovou principalmente velocidade e ritmo e

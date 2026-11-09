@@ -4269,3 +4269,87 @@ rápido); 10 épocas, 40 frases de 32 notas por música a cada época, semente 0
 - Mais tabs de 4 cordas devem melhorar o modelo; retreinar muda o arquivo de pesos e exige nova medição nos testes.
 - A API (`POST /jobs`) ainda não oferece `aprendida`.
 - _Você_ ainda não sai igual à tab humana: 597 de 846 notas completas. Faltam notas que faltam/sobram e durações.
+
+## ADR-056 — o mapa do braço é uma SPA Vue em `braco/`, servida pelo Thoth em `/braco/` e publicável sozinha
+
+**Data:** 2026-11-09 · **Status:** aceito · **Complementa:** ADR-040, ADR-051
+
+### Contexto
+
+Feature nova: mapa de notas do braço (baixo de 4 a 7 cordas e guitarra) com teoria e metrônomo, para estudo no desktop
+e no celular. Tudo roda no navegador; não há dado do servidor. O Thoth serve `web/` em `/` só se o alphaTab estiver
+vendorizado (`api/app.py`) e escuta só em `127.0.0.1`. Abrir a LAN (`--host 0.0.0.0`) expõe upload e jobs; service
+worker exige HTTPS ou `localhost`.
+
+### Opções
+
+- (a) SPA independente, fora do Thoth — sem acoplamento, mas outro processo para servir no desktop.
+- (b) Vue em `braco/`, build Vite em `braco/dist/` (não versionado), montado em `/braco/` **antes** do `/` e sem
+  depender do alphaTab; o mesmo build publicado como site estático (GitHub Pages) para o celular, com HTTPS.
+- (c) Migrar `web/` para Vue — fora do escopo.
+
+### Decisão
+
+(b). Sem `braco/dist/index.html`, `GET /braco/` responde 503 com o comando de build, no padrão do alphaTab — o
+`StaticFiles` levantaria `RuntimeError` com o diretório ausente. O build usa `base: './'` para servir igual em
+`/braco/` e na raiz do Pages. O `Containerfile` ganha um estágio `node:22-slim` (o `npm` do bookworm traz Node 18;
+o Vite exige ≥ 20.19) com `npm ci`; a imagem final continua sem Node. Publicar no Pages é ação externa: preparada,
+executada só com autorização.
+
+## ADR-057 — som por oscilador com envelope, no relógio do `AudioContext`
+
+**Data:** 2026-11-09 · **Status:** aceito
+
+### Opções
+
+Osciladores Web Audio (0 KB, sem latência de carga, timbre sintético) · samples (realismo, MB por instrumento e
+licença a conferir num repositório público) · Tone.js (~150 KB, traz relógio próprio — o pedido exige o do Web Audio).
+
+### Decisão
+
+Osciladores com envelope (nota) e ruído curto filtrado (clique do metrônomo), atrás da interface `Sintetizador`,
+trocável por samples depois. Todo instante de som sai de `AudioContext.currentTime`. Um Web Worker só acorda o
+agendador (tique de 25 ms); o agendador marca os eventos dos próximos 100 ms no relógio de áudio. `setTimeout` nunca é
+fonte de tempo. Parar cancela os nós já agendados; iniciar de novo é inócuo; BPM e subdivisão mudam na batida seguinte;
+o contexto é criado/retomado no primeiro gesto do usuário.
+
+**Teste:** o agendador é função pura, com relógio falso e tolerância zero. A matemática contra Web Audio real é
+conferida com `OfflineAudioContext` (renderização determinística, ±1 ms); isso não mede o jitter em tempo real, que
+fica declarado como não coberto.
+
+**M8:** com o metrônomo parado, o clique toca na hora. Rodando, a opção "quantizar" (desligada por padrão) leva a nota
+à próxima subdivisão da grade.
+
+## ADR-058 — baixo de 7 cordas: B-E-A-D-G-C-F padrão, F♯-B-E-A-D-G-C como preset
+
+**Data:** 2026-11-09 · **Status:** aceito
+
+Não há padrão de mercado. Os dois presets mais usados entram, ambos editáveis. Afinações são dado
+(`braco/src/dominio/afinacoes.json`); um teste pytest confere que os presets comuns ao pipeline (4, 5, 6 cordas e drop D)
+têm as mesmas alturas de `AFINACOES` — o conhecimento não diverge em silêncio.
+
+## ADR-059 — braço em SVG com componentes Vue
+
+**Data:** 2026-11-09 · **Status:** aceito
+
+SVG (≤ 7 × 25 = 175 marcadores, estilizável por variáveis CSS, acessível) · Canvas (rápido, sem acessibilidade nativa)
+· DOM em grade (trastes com espaçamento proporcional ficam difíceis). Escolhido SVG. Cada marcador é botão: um só
+focável por vez (`tabindex` itinerante), setas andam entre cordas e casas, Enter toca, nome acessível com nota, corda
+e casa. Espaço fica com o metrônomo.
+
+## ADR-060 — CSS escopado com variáveis, sem Tailwind
+
+**Data:** 2026-11-09 · **Status:** aceito
+
+Os temas (claro, escuro, daltônico) já são variáveis CSS; Tailwind traria uma segunda linguagem de estilo e
+configuração sem ganho num app deste tamanho.
+
+## ADR-061 — cor por nota fora da teoria, cor por função dentro dela
+
+**Data:** 2026-11-09 · **Status:** aceito
+
+Fora do modo teoria: 12 cores, uma por classe de altura. No modo teoria: a tônica tem cor exclusiva e as demais saem
+por grau do padrão (escala, acorde ou intervalo), nunca com a cor da tônica. Os padrões guardam graus grafados
+(`1 2 b3 4 5 b6 b7`), não só semitons — ré♯ e mi♭ são graus diferentes. Contraste calculado por teste em cada paleta ×
+tema × modo: marcador ≥ 3:1 contra madeira, traste e corda (WCAG 1.4.11); texto do marcador ≥ 4,5:1 contra o marcador.
+A paleta daltônica garante contraste e rótulo, não 12 matizes distinguíveis.
