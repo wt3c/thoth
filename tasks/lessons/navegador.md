@@ -32,3 +32,11 @@ apareceu `rodando` no meio, e o teste passou a ler o estado intermediário.
 
 **Regra:** espere pelo conjunto de estados **terminais** (`['pronto', 'erro'].includes(status)`), nunca pela saída
 de um estado anterior. A condição de parada não pode depender de quantos estados existem entre o início e o fim.
+
+## Desenho que passa nos testes de posição ainda pode estar errado na aparência
+
+No braço (2026-11-09), a espessura das cordas crescia com o índice: a corda grave saía fina e a aguda grossa. Os
+testes afirmavam posição, alvo e ordem; nenhum afirmava a espessura. O usuário notou o problema ao ver a página.
+
+**Regra:** todo atributo visual que carrega significado (espessura, cor, ordem) precisa de uma asserção sobre a
+relação que ele expressa, por exemplo "a grave é a mais grossa e a espessura cai até a aguda". O valor exato não basta.
