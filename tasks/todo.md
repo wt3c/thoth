@@ -49,7 +49,8 @@ autorização); M8 com quantização opcional, desligada por padrão.
 12. [x] Republicado no Pages com as oitavas (2026-11-09): run 42714491558 a partir de `ee9c4dd`; o bundle
     publicado traz o anel de referência.
 13. [x] Braço abre limpo e "Nenhuma" vira "Limpar" (`feat/braco-limpar`); emenda do ADR-062.
-14. [ ] Republicar no Pages com o braço limpo, depois do merge na `main`.
+14. [x] Legenda das oitavas abaixo do braço, só no modo Notas (`feat/braco-limpar`); emenda do ADR-061.
+15. [ ] Republicar no Pages com o braço limpo e a legenda, depois do merge na `main`.
 
 Dono exclusivo de `package.json`/lockfile, configs, `tasks/*`, `Containerfile`, `app.py`: o integrador (Claude).
 

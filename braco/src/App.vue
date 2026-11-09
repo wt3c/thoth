@@ -3,6 +3,7 @@ import { useMediaQuery } from '@vueuse/core'
 import { computed, watchEffect } from 'vue'
 import BarraMetronomo from '@/components/BarraMetronomo.vue'
 import BracoSvg from '@/components/BracoSvg.vue'
+import LegendaDoBraco from '@/components/LegendaDoBraco.vue'
 import PainelExibicao from '@/components/PainelExibicao.vue'
 import PainelInstrumento from '@/components/PainelInstrumento.vue'
 import PainelMetronomo from '@/components/PainelMetronomo.vue'
@@ -52,6 +53,7 @@ function tocar(posicao: Posicao) {
           @tocar="tocar"
         />
       </div>
+      <LegendaDoBraco />
       <div class="paineis">
         <PainelNotas />
         <PainelMetronomo />

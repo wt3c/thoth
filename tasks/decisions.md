@@ -4413,6 +4413,17 @@ no próximo toque.
 Medido no Chromium, tocando o C da corda A, casa 3 (C2): anel em `1-3`, `=` na corda E casa 8, `+1` na corda D
 casa 10 e na corda G casa 5. Contra o build anterior, o mesmo teste não encontra referência nem etiqueta.
 
+### Emenda (2026-11-09) — legenda das oitavas
+
+A pedido do usuário, `LegendaDoBraco.vue` fica logo abaixo do braço e aparece só no modo Notas, o único onde há
+oitavas. Ela explica o anel e as etiquetas `+1`, `+2`, `−1` e `=` em linguagem de quem não lê música e diz o que é
+uma oitava: a mesma nota mais aguda ou mais grave, 12 casas adiante na mesma corda. Cada sinal é desenhado com as
+mesmas classes e cores do braço (`.anel-referencia`, `.oitava`), e o desenho fica fora da árvore de
+acessibilidade: quem usa leitor de tela já ouve a oitava no nome de cada nota.
+
+Medido no Chromium, a legenda começa 16 px abaixo do fim do braço, a 390×844 e a 1280×800, sem rolagem
+horizontal. No celular em pé ela vem depois do braço inteiro, que é longo na vertical.
+
 ## ADR-062 — preferências do braço num único texto de query string, na URL e no localStorage
 
 **Data:** 2026-11-09 · **Status:** aceito

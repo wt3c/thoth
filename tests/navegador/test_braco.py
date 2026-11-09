@@ -274,8 +274,8 @@ def test_o_site_abre_com_o_braco_limpo(servidor: str) -> None:
                 (
                     1.5,
                     """JSON.stringify({
-  posicoes: document.querySelectorAll('svg .nota').length,
-  marcadores: document.querySelectorAll('svg .marcador').length,
+  posicoes: document.querySelectorAll('svg.braco .nota').length,
+  marcadores: document.querySelectorAll('svg.braco .marcador').length,
   limpar: document.querySelector('[data-acao="limpar"]')?.textContent.trim() ?? null,
 })""",
                 )
@@ -284,6 +284,26 @@ def test_o_site_abre_com_o_braco_limpo(servidor: str) -> None:
     )
     print("braço ao abrir:", estado)
     assert estado == {"posicoes": 4 * 13, "marcadores": 0, "limpar": "Limpar"}
+
+
+LEGENDA = """JSON.stringify({
+  sinais: [...document.querySelectorAll('.legenda [data-sinal]')].map((i) => i.dataset.sinal),
+  topoLegenda: document.querySelector('.legenda')?.getBoundingClientRect().top ?? null,
+  fimBraco: document.querySelector('svg.braco').getBoundingClientRect().bottom,
+  transborda: document.documentElement.scrollWidth > innerWidth,
+})"""
+
+
+@pytest.mark.parametrize("tela", [(390, 844), (1280, 800)])
+def test_legenda_das_oitavas_fica_logo_abaixo_do_braco(
+    servidor: str, tela: tuple[int, int]
+) -> None:
+    estado = json.loads(sessao(f"{servidor}/braco/", [(1.5, LEGENDA)], tela=tela)[0])
+    print(tela, "legenda:", estado)
+    # O sinal de menos é o da etiqueta no braço (U+2212), não o hífen.
+    assert estado["sinais"] == ["referencia", "+1", "+2", "\u22121", "="]
+    assert estado["topoLegenda"] >= estado["fimBraco"]
+    assert not estado["transborda"]
 
 
 OITAVAS = """JSON.stringify({
