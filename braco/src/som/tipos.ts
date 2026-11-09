@@ -78,6 +78,8 @@ export interface Metronomo {
   configurar(config: ConfigMetronomo): void
   /** Chamado quando cada pulso **soa** (para o indicador visual), não quando é agendado. */
   aoPulso(cb: (pulso: Pulso) => void): () => void
+  /** Chamado quando cada pulso é **agendado**, ~100 ms antes de soar: para agendar notas no mesmo instante (S6). */
+  aoAgendar(cb: (pulso: Pulso) => void): () => void
   /** Próximo instante da grade (tempo × subdivisão) depois de `agora`; `null` se parado. */
   proximoDaGrade(agora: number): number | null
 }
