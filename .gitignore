@@ -240,3 +240,6 @@ web/vendor/
 
 # ai-memory (marker local de captura)
 .ai-memory.toml
+
+# Capturas do Playwright MCP (conferência no navegador)
+.playwright-mcp/
