@@ -1,0 +1,16 @@
+[
+  { "id": "baixo-4", "nome": "E A D G", "instrumento": "baixo", "cordas": [28, 33, 38, 43] },
+  { "id": "baixo-5", "nome": "B E A D G", "instrumento": "baixo", "cordas": [23, 28, 33, 38, 43] },
+  { "id": "baixo-6", "nome": "B E A D G C", "instrumento": "baixo", "cordas": [23, 28, 33, 38, 43, 48] },
+  { "id": "baixo-drop-d", "nome": "Drop D", "instrumento": "baixo", "cordas": [26, 33, 38, 43] },
+  { "id": "guitarra-6", "nome": "E A D G B E", "instrumento": "guitarra", "cordas": [40, 45, 50, 55, 59, 64] },
+  { "id": "baixo-7", "nome": "B E A D G C F", "instrumento": "baixo", "cordas": [23, 28, 33, 38, 43, 48, 53] },
+  { "id": "baixo-7-fa-sustenido", "nome": "F♯ B E A D G C", "instrumento": "baixo", "cordas": [18, 23, 28, 33, 38, 43, 48] },
+  { "id": "baixo-5-agudo", "nome": "E A D G C (agudo)", "instrumento": "baixo", "cordas": [28, 33, 38, 43, 48] },
+  { "id": "baixo-meio-tom-abaixo", "nome": "Meio tom abaixo", "instrumento": "baixo", "cordas": [27, 32, 37, 42] },
+  { "id": "baixo-d-standard", "nome": "D standard", "instrumento": "baixo", "cordas": [26, 31, 36, 41] },
+  { "id": "guitarra-drop-d", "nome": "Drop D", "instrumento": "guitarra", "cordas": [38, 45, 50, 55, 59, 64] },
+  { "id": "guitarra-meio-tom-abaixo", "nome": "Meio tom abaixo", "instrumento": "guitarra", "cordas": [39, 44, 49, 54, 58, 63] },
+  { "id": "guitarra-dadgad", "nome": "DADGAD", "instrumento": "guitarra", "cordas": [38, 45, 50, 55, 57, 62] },
+  { "id": "guitarra-open-g", "nome": "Open G", "instrumento": "guitarra", "cordas": [38, 43, 50, 55, 59, 62] }
+]

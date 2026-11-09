@@ -1,5 +1,19 @@
 # Lições — exportadores (GP5, MusicXML)
 
+## Não transportar a limitação de um formato para o outro (2026-10-30)
+
+A comparação de *Você* com a tab humana mostrou que o MusicXML arredondava
+119,86 para 120 BPM porque a limitação inteira do GP5 havia sido atribuída aos
+dois formatos. O `sound@tempo` do MusicXML aceita decimal. Em 480 semínimas,
+esse arredondamento adiantava o ataque em 280 ms, mesmo com alturas e ticks
+corretos.
+
+**Como aplicar:** conferir o contrato de cada formato e medir o tempo do arquivo
+relido numa sequência longa. Um teste a BPM inteiro não detecta deriva por
+arredondamento. Medir a partitura completa: a pauta inferior do piano herda o
+andamento global, embora o music21 use 120 BPM quando ela é medida isoladamente.
+Não confundir a diferença de fase deliberada da partitura com erro no cache.
+
 ## PyGuitarPro: `Beat.status` nasce `empty` e isso corrompe o arquivo em silêncio
 
 `gp.Beat(...)` tem `status=BeatStatus.empty` por padrão. O escritor aceita, o arquivo grava sem erro e a `Song` em

@@ -30,7 +30,7 @@ from urllib.parse import urlparse
 
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.trustedhost import TrustedHostMiddleware
-from fastapi.responses import FileResponse, PlainTextResponse
+from fastapi.responses import FileResponse, PlainTextResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field, field_validator, model_validator
 from starlette.concurrency import run_in_threadpool
@@ -57,6 +57,9 @@ HOSTS_LOCAIS = ("127.0.0.1", "localhost")
 
 #: Raiz do `web/`, servida como está — a UI não passa por build.
 WEB_PADRAO = Path(__file__).resolve().parents[3] / "web"
+
+#: Build do mapa do braço (ADR-056): sai do `vite build`, não é versionado.
+BRACO_PADRAO = Path(__file__).resolve().parents[3] / "braco" / "dist"
 
 # O `mimetypes` do Python não conhece woff2, e a tabela do SO tampouco, em geral.
 # Sem isto a fonte musical sai como `application/octet-stream`.
@@ -283,6 +286,7 @@ def criar_app(
     cache_dir: Path = Path("cache"),
     executar: Executor | None = None,
     web_dir: Path = WEB_PADRAO,
+    braco_dir: Path = BRACO_PADRAO,
     leitor_reproducao: LeitorDeReproducao | None = None,
     teto_de_upload: int = TETO_DE_UPLOAD,
     hosts: Sequence[str] = (),
@@ -411,6 +415,24 @@ def criar_app(
             disponiveis = sorted(job.resultado.artefatos)
             raise HTTPException(404, f"formato {formato!r} não existe; há {disponiveis}")
         return FileResponse(caminho, filename=caminho.name)
+
+    # O `Mount` só casa `/braco/...`; sem a barra, o pedido cairia no `/`.
+    @app.get("/braco", include_in_schema=False)
+    def braco_sem_barra() -> RedirectResponse:
+        return RedirectResponse("/braco/")
+
+    # Antes do `/`: aquele mount é catch-all e esconderia o `/braco/`.
+    if (braco_dir / "index.html").exists():
+        app.mount("/braco", StaticFiles(directory=braco_dir, html=True), name="braco")
+    else:
+
+        @app.get("/braco/", response_class=PlainTextResponse)
+        def sem_braco() -> PlainTextResponse:
+            return PlainTextResponse(
+                "Build do mapa do braço ausente (ADR-056).\n"
+                "Gere com: cd braco && npm ci && npm run build",
+                status_code=503,
+            )
 
     if (web_dir / "vendor" / "alphatab" / "alphaTab.min.mjs").exists():
         app.mount("/", StaticFiles(directory=web_dir, html=True), name="web")

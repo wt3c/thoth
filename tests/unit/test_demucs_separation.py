@@ -66,7 +66,7 @@ def test_localizar_reclama_quando_nao_ha_stem(tmp_path: Path) -> None:
 
 def test_separar_reaproveita_stem_existente(tmp_path: Path) -> None:
     """Separar custa ~88s por 30s de áudio: repetir à toa é caro demais."""
-    _toca(tmp_path / "htdemucs_ft" / "4.1.0" / "x" / "bass.wav")
+    _toca(tmp_path / "htdemucs_ft" / "4.1.0-shifts0" / "x" / "bass.wav")
     # `false` falha na hora: se o cache não pegar, o subprocesso denuncia.
     separador = DemucsSeparator(binary=("false",))
 
@@ -118,8 +118,8 @@ def test_stem_de_outro_modelo_nao_conta_como_cache(tmp_path: Path) -> None:
 
 def test_cada_modelo_tem_o_proprio_cache(tmp_path: Path) -> None:
     """Trocar de modelo não pode exigir apagar o cache na mão."""
-    _toca(tmp_path / "htdemucs_ft" / "4.1.0" / "x" / "bass.wav")
-    _toca(tmp_path / "mdx_extra" / "4.1.0" / "x" / "bass.wav")
+    _toca(tmp_path / "htdemucs_ft" / "4.1.0-shifts0" / "x" / "bass.wav")
+    _toca(tmp_path / "mdx_extra" / "4.1.0-shifts0" / "x" / "bass.wav")
 
     for modelo in ("htdemucs_ft", "mdx_extra"):
         achado = DemucsSeparator(model=modelo, binary=("false",)).separate(Path("a.wav"), tmp_path)
@@ -137,7 +137,7 @@ def test_stem_sem_versao_no_caminho_nao_conta_como_cache(tmp_path: Path) -> None
 
 def test_stem_de_outra_versao_nao_conta_como_cache(tmp_path: Path) -> None:
     """Mudar o pin não pode reaproveitar calado o stem da versão anterior."""
-    _toca(tmp_path / "htdemucs_ft" / "4.0.1" / "x" / "bass.wav")
+    _toca(tmp_path / "htdemucs_ft" / "4.0.1-shifts0" / "x" / "bass.wav")
     with pytest.raises(FileNotFoundError, match=r"bass\.wav"):
         DemucsSeparator(binary=("true",)).separate(Path("a.wav"), tmp_path)
 
@@ -145,13 +145,13 @@ def test_stem_de_outra_versao_nao_conta_como_cache(tmp_path: Path) -> None:
 def test_cada_versao_tem_o_proprio_cache(tmp_path: Path) -> None:
     """Trocar o pin e voltar não exige apagar nem refazer nada."""
     for versao in ("4.0.1", "4.1.0"):
-        _toca(tmp_path / "htdemucs_ft" / versao / "x" / "bass.wav")
+        _toca(tmp_path / "htdemucs_ft" / f"{versao}-shifts0" / "x" / "bass.wav")
 
     for versao in ("4.0.1", "4.1.0"):
         achado = DemucsSeparator(versao=versao, binary=("false",)).separate(
             Path("a.wav"), tmp_path
         )
-        assert achado["bass"].parent.parent.name == versao
+        assert achado["bass"].parent.parent.name == f"{versao}-shifts0"
 
 
 def test_demucs_morto_no_meio_nao_deixa_stem_pela_metade(tmp_path: Path) -> None:
@@ -169,14 +169,14 @@ def test_demucs_morto_no_meio_nao_deixa_stem_pela_metade(tmp_path: Path) -> None
 
 def test_o_stem_fica_no_lugar_documentado(tmp_path: Path) -> None:
     """A promoção do diretório provisório não pode aninhar o modelo duas vezes:
-    `<out>/<modelo>/<versão>/<nome>/bass.wav` é o caminho que o docstring promete."""
+    `<out>/<modelo>/<versão>-shifts0/<nome>/bass.wav` é o caminho documentado."""
     # Imita o demucs: escreve sob `<-o>/<modelo>/<nome do arquivo>/`. `$8` é o `-o`.
     finge = ("sh", "-c", 'mkdir -p "$8/htdemucs_ft/a" && : > "$8/htdemucs_ft/a/bass.wav"'
              ' && : > "$8/htdemucs_ft/a/no_bass.wav"', "demucs")
 
     achado = DemucsSeparator(binary=finge).separate(Path("a.wav"), tmp_path)
 
-    assert achado["bass"] == tmp_path / "htdemucs_ft" / "4.1.0" / "a" / "bass.wav"
+    assert achado["bass"] == tmp_path / "htdemucs_ft" / "4.1.0-shifts0" / "a" / "bass.wav"
     assert sorted(achado) == ["bass", "no_bass"]
 
 
@@ -192,6 +192,35 @@ _FINGE_STEM = (
 )
 
 
+@pytest.mark.parametrize("stem", ["bass", "drums", "other", "vocals"])
+def test_comando_desliga_deslocamento_aleatorio(stem: str) -> None:
+    comando = DemucsSeparator(stem=stem)._comando(Path("a.wav"), Path("saida"))
+
+    assert comando[comando.index("--shifts") + 1] == "0"
+
+
+@pytest.mark.parametrize("stem", ["bass", "drums", "other", "vocals"])
+def test_configuracao_deterministica_nao_reaproveita_nem_apaga_cache_antigo(
+    stem: str, tmp_path: Path
+) -> None:
+    """O default antigo tinha deslocamento aleatório; não pertence ao novo escopo."""
+    antigo = "4.1.0" if stem == "bass" else f"4.1.0-{stem}"
+    anterior = _toca(tmp_path / "htdemucs_ft" / antigo / "a" / f"{stem}.wav")
+    anterior.write_bytes(b"anterior")
+    separador = DemucsSeparator(stem=stem, binary=_FINGE_STEM)
+    novo = "4.1.0-shifts0" if stem == "bass" else f"4.1.0-shifts0-{stem}"
+
+    assert separador.escopo(tmp_path) == tmp_path / "htdemucs_ft" / novo
+    achado = separador.separate(Path("a.wav"), tmp_path)
+
+    assert achado[stem] == separador.escopo(tmp_path) / "a" / f"{stem}.wav"
+    assert achado[stem].read_bytes() == b""
+    assert anterior.read_bytes() == b"anterior"
+    assert DemucsSeparator(stem=stem, binary=("false",)).separate(
+        Path("a.wav"), tmp_path
+    ) == achado
+
+
 @pytest.mark.parametrize("stem", ["drums", "other"])
 def test_separa_o_stem_do_perfil(stem: str, tmp_path: Path) -> None:
     separador = DemucsSeparator(stem=stem, binary=_FINGE_STEM)
@@ -204,11 +233,11 @@ def test_separa_o_stem_do_perfil(stem: str, tmp_path: Path) -> None:
     assert achado[stem].name == f"{stem}.wav"
 
 
-def test_o_stem_do_baixo_continua_onde_sempre_esteve(tmp_path: Path) -> None:
-    """Mudar o caminho do baixo invalidaria em silêncio todo stem já em cache."""
+def test_o_stem_do_baixo_identifica_a_configuracao_deterministica(tmp_path: Path) -> None:
+    """O baixo também muda de escopo: o cache antigo foi produzido com aleatoriedade."""
     achado = DemucsSeparator(stem="bass", binary=_FINGE_STEM).separate(Path("a.wav"), tmp_path)
 
-    assert achado["bass"] == tmp_path / "htdemucs_ft" / "4.1.0" / "a" / "bass.wav"
+    assert achado["bass"] == tmp_path / "htdemucs_ft" / "4.1.0-shifts0" / "a" / "bass.wav"
 
 
 def test_stem_de_um_perfil_nao_e_cache_de_outro(tmp_path: Path) -> None:

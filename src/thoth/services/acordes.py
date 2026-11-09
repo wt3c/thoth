@@ -41,23 +41,24 @@ ABERTURA_MAXIMA = 4
 _Forma = tuple[tuple[int, int], ...]  # (corda, traste) por nota, na ordem do acorde
 
 
-def _agrupar(notas: list[NoteEvent]) -> list[list[NoteEvent]]:
+def _agrupar(notas: list[NoteEvent], janela_s: float = JANELA_ACORDE_S) -> list[list[NoteEvent]]:
     grupos: list[list[NoteEvent]] = []
     for nota in sorted(notas, key=lambda n: (n.onset_s, n.pitch)):
-        if grupos and nota.onset_s - grupos[-1][0].onset_s < JANELA_ACORDE_S:
+        if grupos and nota.onset_s - grupos[-1][0].onset_s < janela_s:
             grupos[-1].append(nota)
         else:
             grupos.append([nota])
     return grupos
 
 
-def inicios_de_acorde(notas: list[NoteEvent]) -> list[float]:
+def inicios_de_acorde(notas: list[NoteEvent], janela_s: float = JANELA_ACORDE_S) -> list[float]:
     """Um ataque por acorde: o que o andamento e a fase devem medir (ADR-024).
 
     Seis notas do mesmo acorde contadas uma a uma parecem cinco colisões na grade, e o
-    desdobramento dobraria o andamento à toa.
+    desdobramento dobraria o andamento à toa. `janela_s` estreita o que conta como o
+    mesmo instante, para quem toca ataques distintos mais juntos que um acorde.
     """
-    return [grupo[0].onset_s for grupo in _agrupar(notas)]
+    return [grupo[0].onset_s for grupo in _agrupar(notas, janela_s)]
 
 
 def _digitacoes(

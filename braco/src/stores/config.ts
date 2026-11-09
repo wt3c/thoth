@@ -1,0 +1,129 @@
+import { usePreferredDark } from '@vueuse/core'
+import { defineStore } from 'pinia'
+import { computed, ref } from 'vue'
+import { afinacaoPadrao, afinacaoPorId, afinacoesDe } from '@/dominio/afinacoes'
+import { PALETAS } from '@/dominio/cores'
+import { PADROES } from '@/dominio/teoria'
+import type { Acidente, ClasseAltura, Instrumento, Nomenclatura, Posicao } from '@/dominio/tipos'
+import { TODAS_AS_CLASSES, type EscolhasDaVista, type Modo, type Rotulo } from '@/dominio/vista'
+import { CASAS_MAX, CASAS_MIN, CORDAS, PREFERENCIAS_PADRAO, type Preferencias, type Tema } from '@/persistencia/preferencias'
+
+export { CASAS_MAX, CASAS_MIN, CORDAS, type Tema }
+
+export type PreferenciasDaVista = Omit<Preferencias, 'metronomo'>
+
+const P = PREFERENCIAS_PADRAO
+
+/** Escolhas serializáveis do usuário; o padrão e a persistência (S8) vêm de `persistencia/preferencias`. */
+export const useConfigStore = defineStore('config', () => {
+  const instrumento = ref<Instrumento>(P.instrumento)
+  const numCordas = ref(P.numCordas)
+  const afinacaoId = ref(P.afinacaoId)
+  const casas = ref(P.casas)
+  const modo = ref<Modo>(P.modo)
+  const filtro = ref<ClasseAltura[]>([...P.filtro])
+  const selecionada = ref<ClasseAltura | null>(P.selecionada)
+  const tonica = ref<ClasseAltura | null>(P.tonica)
+  const padraoId = ref<string | null>(P.padraoId)
+  const rotulo = ref<Rotulo>(P.rotulo)
+  const nomenclatura = ref<Nomenclatura>(P.nomenclatura)
+  const acidente = ref<Acidente>(P.acidente)
+  const tema = ref<Tema>(P.tema)
+  const daltonico = ref(P.daltonico)
+  const quantizar = ref(P.quantizar)
+
+  const prefereEscuro = usePreferredDark()
+  const temaEfetivo = computed(() => (tema.value === 'sistema' ? (prefereEscuro.value ? 'escuro' : 'claro') : tema.value))
+
+  const afinacao = computed(() => afinacaoPorId(afinacaoId.value))
+  const afinacoesDisponiveis = computed(() => afinacoesDe(instrumento.value, numCordas.value))
+  const padrao = computed(() => {
+    if (padraoId.value === null) return null
+    const achado = PADROES.find((p) => p.id === padraoId.value)
+    if (!achado) throw new Error(`Padrão desconhecido: ${padraoId.value}`)
+    return achado
+  })
+
+  const escolhas = computed<EscolhasDaVista>(() => ({
+    modo: modo.value,
+    filtro: filtro.value,
+    selecionada: selecionada.value,
+    tonica: tonica.value,
+    padrao: padrao.value,
+    rotulo: rotulo.value,
+    nome: { nomenclatura: nomenclatura.value, acidente: acidente.value },
+    paleta: PALETAS[daltonico.value ? 'daltonico' : temaEfetivo.value],
+  }))
+
+  const preferencias = computed<PreferenciasDaVista>(() => ({
+    instrumento: instrumento.value,
+    numCordas: numCordas.value,
+    afinacaoId: afinacaoId.value,
+    casas: casas.value,
+    modo: modo.value,
+    filtro: filtro.value,
+    selecionada: selecionada.value,
+    tonica: tonica.value,
+    padraoId: padraoId.value,
+    rotulo: rotulo.value,
+    nomenclatura: nomenclatura.value,
+    acidente: acidente.value,
+    tema: tema.value,
+    daltonico: daltonico.value,
+    quantizar: quantizar.value,
+  }))
+
+  /** Recebe preferências já validadas e coerentes (`carregar`). */
+  function aplicar(p: PreferenciasDaVista) {
+    instrumento.value = p.instrumento
+    numCordas.value = p.numCordas
+    afinacaoId.value = p.afinacaoId
+    casas.value = p.casas
+    modo.value = p.modo
+    filtro.value = [...p.filtro]
+    selecionada.value = p.selecionada
+    tonica.value = p.tonica
+    padraoId.value = p.padraoId
+    rotulo.value = p.rotulo
+    nomenclatura.value = p.nomenclatura
+    acidente.value = p.acidente
+    tema.value = p.tema
+    daltonico.value = p.daltonico
+    quantizar.value = p.quantizar
+  }
+
+  function escolherNumCordas(n: number) {
+    if (!CORDAS[instrumento.value].includes(n)) throw new RangeError(`${instrumento.value} não tem ${n} cordas`)
+    numCordas.value = n
+    afinacaoId.value = afinacaoPadrao(instrumento.value, n).id
+  }
+
+  function escolherInstrumento(novo: Instrumento) {
+    instrumento.value = novo
+    escolherNumCordas(CORDAS[novo][0] ?? 0)
+  }
+
+  function escolherCasas(n: number) {
+    if (!Number.isInteger(n) || n < CASAS_MIN || n > CASAS_MAX) throw new RangeError(`casas fora de ${CASAS_MIN}–${CASAS_MAX}: ${n}`)
+    casas.value = n
+  }
+
+  function aoTocar(p: Posicao) {
+    if (modo.value === 'teoria') tonica.value = p.classe
+    else selecionada.value = selecionada.value === p.classe ? null : p.classe
+  }
+
+  function mostrarClasses(classes: readonly ClasseAltura[]) {
+    filtro.value = TODAS_AS_CLASSES.filter((c) => classes.includes(c))
+  }
+
+  function alternarClasse(c: ClasseAltura) {
+    mostrarClasses(filtro.value.includes(c) ? filtro.value.filter((x) => x !== c) : [...filtro.value, c])
+  }
+
+  return {
+    instrumento, numCordas, afinacaoId, casas, modo, filtro, selecionada, tonica, padraoId, rotulo,
+    nomenclatura, acidente, tema, daltonico, quantizar, temaEfetivo, afinacao, afinacoesDisponiveis, escolhas, preferencias,
+    escolherNumCordas, escolherInstrumento, escolherCasas, aoTocar, mostrarClasses, alternarClasse, aplicar,
+  }
+})

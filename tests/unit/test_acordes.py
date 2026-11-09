@@ -133,3 +133,14 @@ def test_inicios_de_acorde_conta_um_ataque_por_acorde() -> None:
     notas = [*_acorde((40, 47, 52), 0.0), NoteEvent(45, 0.02, 0.4, ROTULO), *_acorde((45,), 0.5)]
 
     assert inicios_de_acorde(notas) == [0.0, 0.5]
+
+
+def test_inicios_de_acorde_com_janela_estreita_separa_ataques_proximos() -> None:
+    """O baixo usa uma janela de simultaneidade, não a de acorde: semicolcheias a 360 BPM
+    (41,7 ms) são ataques distintos, e as duas notas do `medium` no mesmo instante não."""
+    from thoth.services.acordes import inicios_de_acorde
+
+    notas = [*_acorde((36, 48), 0.0), *_acorde((38,), 0.0417), NoteEvent(50, 0.0447, 0.4, ROTULO)]
+
+    assert inicios_de_acorde(notas) == [0.0]
+    assert inicios_de_acorde(notas, janela_s=0.01) == [0.0, 0.0417]

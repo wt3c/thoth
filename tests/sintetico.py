@@ -14,6 +14,7 @@ Duas exigências descobertas medindo, não supondo:
 
 from __future__ import annotations
 
+import random
 import re
 import subprocess
 from pathlib import Path
@@ -132,3 +133,20 @@ def renderizar_midi(midi: pretty_midi.PrettyMIDI, nome: str, destino: Path) -> P
         check=True,
     )
     return wav
+
+
+def execucao_em_andamentos(trechos: list[tuple[int, float]], fase: float = 0.1) -> list[float]:
+    """Ataques de uma execução de andamento conhecido: `(compassos, bpm)` por trecho.
+
+    A grade é contínua através da troca, como numa banda que muda de andamento sem
+    parar de tocar; metade das semicolcheias soa, com 5 ms de imprecisão. Com
+    `fase` menor que uma semicolcheia, a troca cai na barra da partitura.
+    """
+    sorteio = random.Random(0)
+    onsets, t = [], fase
+    for compassos, bpm in trechos:
+        for _ in range(compassos * 16):
+            if sorteio.random() < 0.5:
+                onsets.append(t + sorteio.gauss(0, 0.005))
+            t += 15.0 / bpm
+    return onsets

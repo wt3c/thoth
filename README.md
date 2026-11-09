@@ -47,8 +47,8 @@ repositório dentro do sistema de arquivos Linux — por exemplo, em `~/thoth`, 
 [Instalação nativa em Linux](#instalação-nativa-em-linux), usando os comandos para Debian/Ubuntu. Dessa forma, os
 caminhos, executáveis e caches usados pelo pipeline permanecem iguais aos do ambiente Linux validado.
 
-O **Docker Desktop com backend WSL2** é uma alternativa para executar a interface web: faça o clone e a autenticação
-do Hugging Face dentro do WSL2 e siga [Instalação com Docker Compose](#instalação-com-docker-compose). Assim, o cache
+O **Docker Desktop com backend WSL2** é uma alternativa para executar a interface web: faça o clone e a autenticação do
+Hugging Face dentro do WSL2 e siga [Instalação com Docker Compose](#instalação-com-docker-compose). Assim, o cache
 autenticado do Hugging Face pode ser montado pelo contêiner sem depender de conversão de caminhos do Windows.
 
 A instalação diretamente no Windows, por PowerShell ou Prompt de Comando, **não é suportada atualmente**. Embora parte
@@ -60,21 +60,21 @@ da sessão Linux e não acompanha um player do Windows, do WSL ou do host a part
 
 ### O que será instalado
 
-| Componente | Obrigatório | Finalidade |
-| --- | --- | --- |
-| Git | sim | obter o repositório |
-| `uv` | sim | instalar o Python 3.12, as dependências e executar o projeto |
-| `ffmpeg` e `ffprobe` | sim | normalizar áudio e montar os arquivos de saída |
-| `yt-dlp` | só para YouTube | baixar a faixa de áudio de uma URL |
-| `fluidsynth` + `FluidR3_GM.sf2` | recomendado | gerar a auralização; sem eles, GP5 e MusicXML continuam sendo exportados |
-| Node.js + npm | só para `thoth serve` | baixar o alphaTab uma vez; Node não participa da execução da aplicação |
-| `dbus-next` | só para sincronização externa | biblioteca Python instalada automaticamente pelo `uv sync` |
-| Sessão D-Bus + player MPRIS | só para sincronização externa | ler estado/posição de um player no Linux; instalado à parte |
-| Docker + Compose | só na instalação em contêiner | construir e executar a imagem local |
+| Componente                      | Obrigatório                   | Finalidade                                                               |
+|---------------------------------|-------------------------------|--------------------------------------------------------------------------|
+| Git                             | sim                           | obter o repositório                                                      |
+| `uv`                            | sim                           | instalar o Python 3.12, as dependências e executar o projeto             |
+| `ffmpeg` e `ffprobe`            | sim                           | normalizar áudio e montar os arquivos de saída                           |
+| `yt-dlp`                        | só para YouTube               | baixar a faixa de áudio de uma URL                                       |
+| `fluidsynth` + `FluidR3_GM.sf2` | recomendado                   | gerar a auralização; sem eles, GP5 e MusicXML continuam sendo exportados |
+| Node.js + npm                   | só para `thoth serve`         | baixar o alphaTab uma vez; Node não participa da execução da aplicação   |
+| `dbus-next`                     | só para sincronização externa | biblioteca Python instalada automaticamente pelo `uv sync`               |
+| Sessão D-Bus + player MPRIS     | só para sincronização externa | ler estado/posição de um player no Linux; instalado à parte              |
+| Docker + Compose                | só na instalação em contêiner | construir e executar a imagem local                                      |
 
-Demucs e MuScriptor **não** são instalados globalmente. O pipeline chama versões fixadas por `uvx` e guarda os
-ambientes no cache do `uv`. A primeira transcrição também baixa os pesos dos modelos; reserve alguns gigabytes em disco
-e espere uma execução mais longa.
+Demucs e MuScriptor **não** são instalados globalmente. O pipeline chama versões fixadas por `uvx` e guarda os ambientes
+no cache do `uv`. A primeira transcrição também baixa os pesos dos modelos; reserve alguns gigabytes em disco e espere
+uma execução mais longa.
 
 ### Instalação nativa em Linux
 
@@ -161,8 +161,8 @@ O download dos pesos ocorre automaticamente na primeira transcrição.
 
 #### 5. Instale os arquivos locais da interface web
 
-Este passo é necessário apenas para `thoth serve`. O script baixa o alphaTab 1.8.4 pelo npm, confere o SHA-256 e
-extrai somente os arquivos usados pela página:
+Este passo é necessário apenas para `thoth serve`. O script baixa o alphaTab 1.8.4 pelo npm, confere o SHA-256 e extrai
+somente os arquivos usados pela página:
 
 ```bash
 uv run python scripts/vendor_alphatab.py
@@ -245,10 +245,9 @@ uv run thoth transcribe --help
 
 Nos comandos que recebem `ref`, a referência pode ser um arquivo local ou uma URL do YouTube. O Thoth escolhe a fonte
 automaticamente. Arquivos intermediários ficam em `cache/`; os arquivos que você abre, escuta ou move ficam em `out/`.
-Use `--cache outro/diretorio` ou `--out outro/diretorio` quando precisar mudar esses locais.
-A transcrição bruta do MuScriptor também fica em `cache/transcricoes/`, chaveada pelo conteúdo do stem, pelos pesos
-de `models.lock.toml` e pela configuração do transcritor: repetir a mesma música com outro `--bpm` ou outra digitação
-não paga o modelo de novo.
+Use `--cache outro/diretorio` ou `--out outro/diretorio` quando precisar mudar esses locais. A transcrição bruta do
+MuScriptor também fica em `cache/transcricoes/`, chaveada pelo conteúdo do stem, pelos pesos de `models.lock.toml` e
+pela configuração do transcritor: repetir a mesma música com outro `--bpm` ou outra digitação não paga o modelo de novo.
 
 ### `fetch` — obter e normalizar o áudio
 
@@ -289,8 +288,9 @@ O comando usa o `htdemucs_ft` em CPU e entrega três arquivos em `out/<título>/
 principal, gutural, harmonias e dobragens, além de conter vazamento. Ele não transcreve melodia ou letra e não adiciona
 uma faixa vocal à partitura.
 
-Na primeira execução, a separação leva alguns múltiplos da duração do áudio; as seguintes reutilizam o cache identificado
-por modelo e versão. `--out` troca a pasta de entrega e `--cache`, a dos arquivos intermediários.
+Na primeira execução, a separação leva alguns múltiplos da duração do áudio; as seguintes reutilizam o cache
+identificado por modelo, versão e configuração (`--shifts 0`, sem deslocamento aleatório). Stems do cache anterior
+precisam ser refeitos. `--out` troca a pasta de entrega e `--cache`, a dos arquivos intermediários.
 
 ### `transcribe` — executar o pipeline completo
 
@@ -333,33 +333,36 @@ somente a auralização: os demais artefatos continuam válidos e a causa é exi
 
 Principais opções:
 
-| Opção | Padrão | Efeito |
-| --- | --- | --- |
-| `--instrumento` | `baixo` | Escolhe `todos`, `baixo`, `bateria`, `guitarra-acustica`, `guitarra-limpa` ou `guitarra-distorcida`. |
-| `--afinacao` | `4` | Afinação do baixo: `4`, `5`, `6` ou `drop-d`; é recusada para outros instrumentos. |
-| `--digitacao` | `iniciante` | Define o custo de posicionamento no braço: `iniciante` ou `experiente`. |
-| `--bpm` | estimado | Fixa o andamento entre 20 e 300 BPM; informado, ele prevalece sobre a estimativa. |
-| `--tom` | estimado | Fixa tom e modo, como `Bb maior` ou `f menor`; vazio, o tom é estimado das notas. |
-| `--out` | `out` | Diretório raiz dos artefatos finais. |
-| `--cache` | `cache` | Diretório dos áudios, stems e notas reutilizáveis. |
+| Opção           | Padrão      | Efeito                                                                                               |
+|-----------------|-------------|------------------------------------------------------------------------------------------------------|
+| `--instrumento` | `baixo`     | Escolhe `todos`, `baixo`, `bateria`, `guitarra-acustica`, `guitarra-limpa` ou `guitarra-distorcida`. |
+| `--afinacao`    | `4`         | Afinação do baixo: `4`, `5`, `6` ou `drop-d`; é recusada para outros instrumentos.                   |
+| `--digitacao`   | `iniciante` | Define o custo de posicionamento no braço: `iniciante`, `experiente` ou `aprendida`.                            |
+| `--alcance-mao` | `0` | Janela opcional de casas alcançáveis no baixo: `3` abrange quatro casas; `0` desativa a janela. Não identifica a corda pelo timbre. |
+| `--modelo` | `small` | Modelo para o baixo: `small` ou `medium`. O `medium` usa mais recursos e precisa dos pesos e do acesso correspondentes no HuggingFace. |
+| `--bpm`         | estimado    | Fixa o andamento entre 20 e 300 BPM; informado, ele prevalece sobre a estimativa.                    |
+| `--tom`         | estimado    | Fixa tom e modo, como `Bb maior` ou `f menor`; vazio, o tom é estimado das notas.                    |
+| `--out`         | `out`       | Diretório raiz dos artefatos finais.                                                                 |
+| `--cache`       | `cache`     | Diretório dos áudios, stems e notas reutilizáveis.                                                   |
 
-Sem `--bpm`, o andamento estimado é exibido com sua confiança. Confira a auralização; se o ritmo estiver errado,
-repita o comando com `--bpm`. Sem `--tom`, a CLI também informa o tom estimado e evita escrever uma armadura quando a
-margem é pequena.
+Sem `--bpm`, o andamento estimado é exibido com sua confiança. Confira a auralização; se o ritmo estiver errado, repita
+o comando com `--bpm`. As batidas do mix decidem onde cai a cabeça de cada tempo na grade; quando elas não decidem, a
+CLI avisa e a fase da grade fica como estava (ADR-054). Sem `--tom`, a CLI também informa o tom estimado e evita
+escrever uma armadura quando a margem é pequena.
 
 Cada música recebe uma pasta `out/<título>/`. Os arquivos específicos dependem do instrumento:
 
-| Instrumento | Partitura | Áudios específicos |
-| --- | --- | --- |
-| baixo | `<título>.gp5`, `<título>.musicxml` | `.baixo.wav`, `.sem-baixo.wav`, `.aural.wav` |
-| guitarra | `<título>.<perfil>.gp5`, `<título>.<perfil>.musicxml` | `.outros.wav`, `.sem-outros.wav`, `.<perfil>.aural.wav` |
-| bateria | `<título>.bateria.gp5`, `<título>.bateria.musicxml` | `.bateria.wav`, `.sem-bateria.wav`, `.bateria.aural.wav` |
-| todos | `<título>.todos.gp5`, `<título>.todos.musicxml` com uma faixa por perfil | `.baixo.wav`, `.sem-baixo.wav`, `.aural.wav` do baixo |
+| Instrumento | Partitura                                                                | Áudios específicos                                       |
+|-------------|--------------------------------------------------------------------------|----------------------------------------------------------|
+| baixo       | `<título>.gp5`, `<título>.musicxml`                                      | `.baixo.wav`, `.sem-baixo.wav`, `.aural.wav`             |
+| guitarra    | `<título>.<perfil>.gp5`, `<título>.<perfil>.musicxml`                    | `.outros.wav`, `.sem-outros.wav`, `.<perfil>.aural.wav`  |
+| bateria     | `<título>.bateria.gp5`, `<título>.bateria.musicxml`                      | `.bateria.wav`, `.sem-bateria.wav`, `.bateria.aural.wav` |
+| todos       | `<título>.todos.gp5`, `<título>.todos.musicxml` com uma faixa por perfil | `.baixo.wav`, `.sem-baixo.wav`, `.aural.wav` do baixo    |
 
 Todas as variantes também copiam `<título>.mix.wav`. No baixo, o relatório aponta simultaneidades descartadas, notas
 fora do braço, trechos readmitidos e oitavas suspeitas. Na guitarra, separa erro de rótulo, contaminação do stem e
-acordes que não cabem no braço. Na bateria, informa ataques repetidos no mesmo tique, peças fora do kit GM de 35 a 59
-e grupos com mais de seis peças.
+acordes que não cabem no braço. Na bateria, informa ataques repetidos no mesmo tique, peças fora do kit GM de 35 a 59 e
+grupos com mais de seis peças.
 
 No modo `todos`, uma parte sem eventos é relatada e as demais continuam. O piano acústico permanece fora do GP5
 multifaixa até o round-trip do formato provar acordes, vozes e extremos sem inventar cordas ou trastes; esse limite está
@@ -379,16 +382,16 @@ uv run thoth estudar out/Música/Música.todos.gp5 --faixa 1
 ```
 
 O comando lê o GP5 já gerado, sem repetir o processamento de áudio. O Markdown apresenta afinação, ritmo, corda e casa,
-figura musical, nome de cada nota, intervalo em relação à anterior, quintas, oitavas, escalas, legato e técnicas de baixo.
-Ele comenta cada ataque na ordem escrita, destaca o desenho fundamental-quinta-oitava quando aparece e propõe um roteiro
-de prática. O padrão de saída é `<nome>.estudo.md` ao lado do GP5; `--saida` muda o caminho.
+figura musical, nome de cada nota, intervalo em relação à anterior, quintas, oitavas, escalas, legato e técnicas de
+baixo. Ele comenta cada ataque na ordem escrita, destaca o desenho fundamental-quinta-oitava quando aparece e propõe um
+roteiro de prática. O padrão de saída é `<nome>.estudo.md` ao lado do GP5; `--saida` muda o caminho.
 
 Sem `--tom`, o guia estima um **tom candidato** das notas escritas no GP5, mostra a margem e apresenta os graus como
-hipóteses condicionais. Essa margem ajuda a escolher a grafia com sustenidos ou bemóis; ela não confirma a tônica nem
-o modo. Use `--tom` quando tiver uma tonalidade conhecida por outra fonte: ela prevalece sobre a estimativa. O guia
-nunca atribui função de acorde a cada nota sem conhecer a harmonia. Técnicas como hammer-on e slide só são
-apresentadas como execução usada quando há marcação explícita no GP5; uma ligadura de duração não prova legato real.
-O guia inclui fontes didáticas e lembra que uma transcrição automática deve ser conferida com o áudio.
+hipóteses condicionais. Essa margem ajuda a escolher a grafia com sustenidos ou bemóis; ela não confirma a tônica nem o
+modo. Use `--tom` quando tiver uma tonalidade conhecida por outra fonte: ela prevalece sobre a estimativa. O guia nunca
+atribui função de acorde a cada nota sem conhecer a harmonia. Técnicas como hammer-on e slide só são apresentadas como
+execução usada quando há marcação explícita no GP5; uma ligadura de duração não prova legato real. O guia inclui fontes
+didáticas e lembra que uma transcrição automática deve ser conferida com o áudio.
 
 ### `auralizar` — refazer a comparação auditiva
 
@@ -399,14 +402,13 @@ uv run thoth auralizar caminho/para/musica.mp3
 uv run thoth auralizar caminho/para/musica.mp3 --cache cache --out out
 ```
 
-O `auralizar` recria apenas `<título>.aural.wav`, sem repetir Demucs, MuScriptor ou a exportação das partituras. O WAV
-é estéreo: o áudio original fica à esquerda e as notas sintetizadas à direita. Diferenças de ataque ou duração entre os
+O `auralizar` recria apenas `<título>.aural.wav`, sem repetir Demucs, MuScriptor ou a exportação das partituras. O WAV é
+estéreo: o áudio original fica à esquerda e as notas sintetizadas à direita. Diferenças de ataque ou duração entre os
 canais ajudam a perceber quando a transcrição se descola do áudio.
 
-O comando exige a transcrição **de baixo** já gravada em `cache/<source_id>/notas.jsonl`; por isso, execute
-`transcribe` sem outro `--instrumento` pelo menos uma vez. Ele também exige `fluidsynth` e
-`/usr/share/soundfonts/FluidR3_GM.sf2`. `--out` muda a raiz da pasta da música e `--cache` precisa apontar para o mesmo
-cache usado na transcrição.
+O comando exige a transcrição **de baixo** já gravada em `cache/<source_id>/notas.jsonl`; por isso, execute `transcribe`
+sem outro `--instrumento` pelo menos uma vez. Ele também exige `fluidsynth` e `/usr/share/soundfonts/FluidR3_GM.sf2`.
+`--out` muda a raiz da pasta da música e `--cache` precisa apontar para o mesmo cache usado na transcrição.
 
 ### `comparar` — avaliar contra uma tablatura humana
 
@@ -417,8 +419,8 @@ uv run thoth comparar tab.gp5 caminho/para/musica.mp3
 uv run thoth comparar tab.gp5 caminho/para/musica.mp3 --faixa 2
 ```
 
-O primeiro argumento é uma tablatura `.gp5` humana, baixada manualmente; o segundo é exatamente a referência de áudio
-já usada no `transcribe`. O comando não baixa tablaturas e não aceita referência gerada por IA como validação confiável.
+O primeiro argumento é uma tablatura `.gp5` humana, baixada manualmente; o segundo é exatamente a referência de áudio já
+usada no `transcribe`. O comando não baixa tablaturas e não aceita referência gerada por IA como validação confiável.
 
 Ele lê `cache/<source_id>/notas.jsonl`, alinha a tab à transcrição e relata:
 
@@ -435,9 +437,9 @@ baixo identificável.
 
 ### `serve` — abrir a API e a página de estudo
 
-O `serve` é a forma mais simples de usar o Thoth: uma página no navegador para transcrever, abrir partituras e
-estudar com o cursor acompanhando o áudio. Por trás dela há uma API FastAPI, e a partitura é desenhada pelo alphaTab
-local, sem CDN.
+O `serve` é a forma mais simples de usar o Thoth: uma página no navegador para transcrever, abrir partituras e estudar
+com o cursor acompanhando o áudio. Por trás dela há uma API FastAPI, e a partitura é desenhada pelo alphaTab local, sem
+CDN.
 
 #### 1. Subir o servidor
 
@@ -455,9 +457,9 @@ responder 503, o alphaTab não foi instalado; a resposta mostra o comando acima.
 
 Opções:
 
-- `--host HOST`: endereço de escuta; o padrão seguro é `127.0.0.1`. O servidor só responde a requisições cujo
-  cabeçalho `Host` seja `127.0.0.1`, `localhost` ou o próprio `HOST` (proteção contra DNS rebinding); com `0.0.0.0` ou
-  `::` a aplicação já está aberta à rede por escolha, e qualquer `Host` é aceito;
+- `--host HOST`: endereço de escuta; o padrão seguro é `127.0.0.1`. O servidor só responde a requisições cujo cabeçalho
+  `Host` seja `127.0.0.1`, `localhost` ou o próprio `HOST` (proteção contra DNS rebinding); com `0.0.0.0` ou `::` a
+  aplicação já está aberta à rede por escolha, e qualquer `Host` é aceito;
 - `--port PORT`: porta HTTP, padrão `8000`;
 - `--out PATH`: diretório dos artefatos gerados pelos jobs, padrão `out/`;
 - `--cache PATH`: cache compartilhado pelos jobs e pelos envios da página.
@@ -473,32 +475,32 @@ Há duas formas de indicar o áudio:
 
 O que acontece depende do tipo do arquivo (ADR-051):
 
-| Arquivo | O que a página faz |
-| --- | --- |
-| `.mp3` ou `.wav` | envia o áudio ao servidor, que o copia para `cache/uploads/` e preenche o campo de referência. Nada é transcrito ainda: ajuste as opções e clique em **Transcrever**. |
-| `.gp5` ou `.musicxml` | apenas **abre** a partitura na tela, para estudar. O arquivo não sai do navegador e nenhum job é criado. |
+| Arquivo               | O que a página faz                                                                                                                                                    |
+|-----------------------|-----------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| `.mp3` ou `.wav`      | envia o áudio ao servidor, que o copia para `cache/uploads/` e preenche o campo de referência. Nada é transcrito ainda: ajuste as opções e clique em **Transcrever**. |
+| `.gp5` ou `.musicxml` | apenas **abre** a partitura na tela, para estudar. O arquivo não sai do navegador e nenhum job é criado.                                                              |
 
-O nome do arquivo enviado vira o título da partitura. Reenviar o mesmo áudio, mesmo com outro nome de arquivo
-escolhido antes, cai na mesma pasta de `cache/uploads/<sha256 do conteúdo>/` e reaproveita o cache de ingestão. O envio
-tem teto de 512 MiB; acima disso o servidor responde `413`.
+O nome do arquivo enviado vira o título da partitura. Reenviar o mesmo áudio, mesmo com outro nome de arquivo escolhido
+antes, cai na mesma pasta de `cache/uploads/<sha256 do conteúdo>/` e reaproveita o cache de ingestão. O envio tem teto
+de 512 MiB; acima disso o servidor responde `413`.
 
 #### 3. Ajustar as opções e transcrever
 
-| Campo | Para que serve |
-| --- | --- |
-| **Andamento da música (BPM)** | vazio, o Thoth estima do áudio; informe quando souber o valor certo |
-| **Tom** | vazio, o tom é estimado das notas; aceita `Bb maior`, `f menor` etc. |
-| **Instrumento** | `baixo` (padrão), `todos` (partitura multifaixa), guitarra limpa, distorcida ou acústica, `bateria` |
-| **Afinação** | só vale para o baixo: 4 cordas, 5 cordas ou drop D; a guitarra usa a afinação do perfil |
-| **Digitação** | `iniciante` prefere casas baixas e cordas soltas; `experiente` fica numa posição do braço (ADR-050) |
+| Campo                         | Para que serve                                                                                      |
+|-------------------------------|-----------------------------------------------------------------------------------------------------|
+| **Andamento da música (BPM)** | vazio, o Thoth estima do áudio; informe quando souber o valor certo                                 |
+| **Tom**                       | vazio, o tom é estimado das notas; aceita `Bb maior`, `f menor` etc.                                |
+| **Instrumento**               | `baixo` (padrão), `todos` (partitura multifaixa), guitarra limpa, distorcida ou acústica, `bateria` |
+| **Afinação**                  | só vale para o baixo: 4 cordas, 5 cordas ou drop D; a guitarra usa a afinação do perfil             |
+| **Digitação**                 | `iniciante` prefere casas baixas e cordas soltas; `experiente` fica numa posição do braço (ADR-050); `aprendida` aprendeu com tabs humanas, só 4 cordas (ADR-055) |
 
-Clique em **Transcrever**. A área de estado mostra o job passando por `na fila`, `rodando` e `pronto` (ou `erro`).
-Em CPU, a transcrição leva minutos. Os jobs rodam um por vez, pois compartilham caches e caminhos de saída; um pedido
-novo espera o anterior terminar.
+Clique em **Transcrever**. A área de estado mostra o job passando por `na fila`, `rodando` e `pronto` (ou `erro`). Em
+CPU, a transcrição leva minutos. Os jobs rodam um por vez, pois compartilham caches e caminhos de saída; um pedido novo
+espera o anterior terminar.
 
-Quando o job termina, o estado também resume o que merece conferência: andamento e tom **estimados** (com margem),
-notas descartadas por serem simultâneas ou fora do braço, notas tiradas da parte por erro de rótulo ou contaminação do
-stem, acordes impossíveis e avisos de oitava. Os avisos com `⚠` pedem que você confira ouvindo.
+Quando o job termina, o estado também resume o que merece conferência: andamento e tom **estimados** (com margem), notas
+descartadas por serem simultâneas ou fora do braço, notas tiradas da parte por erro de rótulo ou contaminação do stem,
+acordes impossíveis e avisos de oitava. Os avisos com `⚠` pedem que você confira ouvindo.
 
 A partitura GP5 aparece na tela e **Salvar transcrição** oferece os formatos produzidos pelo pipeline, como GP5 e
 MusicXML, preservando no download o nome do arquivo gerado. Os mesmos arquivos ficam em `out/`.
@@ -516,30 +518,30 @@ Clicar na pauta posiciona o cursor naquele ponto.
 
 #### 5. Tocar com um WAV seu
 
-**Tocar com WAV…** escolhe um WAV local — a auralização, um stem ou a mix — para tocar no player da página, com o
-cursor da partitura acompanhando a posição do áudio. O WAV não é enviado ao servidor.
+**Tocar com WAV…** escolhe um WAV local — a auralização, um stem ou a mix — para tocar no player da página, com o cursor
+da partitura acompanhando a posição do áudio. O WAV não é enviado ao servidor.
 
 - O player mostra os controles nativos do navegador: tocar, pausar e arrastar a posição. A velocidade fica no menu do
   próprio player.
 - Clicar na pauta move o áudio para aquele ponto.
-- **Deslocamento (segundos)** corrige o caso em que a partitura não começa no início do áudio, como uma introdução ou
-  um silêncio inicial.
+- **Deslocamento (segundos)** corrige o caso em que a partitura não começa no início do áudio, como uma introdução ou um
+  silêncio inicial.
 - **Trocar WAV** escolhe outro arquivo; **Voltar ao player do Thoth** restaura o áudio sintetizado.
 
 #### 6. Acompanhar a reprodução de outro player no Linux
 
 Depois de gerar uma partitura GP5, escolha **Usar player externo** para trocar o alphaTab para o modo de mídia externa.
 Abra um player compatível com MPRIS 2 — por exemplo, VLC ou Strawberry — na mesma sessão Linux e clique em **Atualizar
-players**. Selecione o player/faixa e clique em **Seguir player**. O cursor acompanha `Playing`, pausa junto com `Paused`
-e volta ao início em `Stopped`. **Voltar ao player do Thoth** restaura o áudio sintetizado e os controles de estudo
-locais.
+players**. Selecione o player/faixa e clique em **Seguir player**. O cursor acompanha `Playing`, pausa junto com
+`Paused` e volta ao início em `Stopped`. **Voltar ao player do Thoth** restaura o áudio sintetizado e os controles de
+estudo locais.
 
 O Thoth lê apenas estado, posição e metadados que o player publica no barramento D-Bus local; não toca, grava nem obtém
 o áudio externo. O pacote Python `dbus-next` é instalado pelo `uv sync`. **Spotify é excluído**, inclusive quando tenta
 aparecer como player local. Não há OAuth, token, credencial ou chamada à Web API do Spotify. A compatibilidade depende
-de o player implementar [MPRIS 2](https://specifications.freedesktop.org/mpris/latest/)
-e da sessão Linux disponibilizar um barramento D-Bus ao processo do Thoth. O [Strawberry](https://github.com/strawberrymusicplayer/strawberry)
-é um exemplo de player cujo projeto documenta suporte MPRIS2/D-Bus no Linux.
+de o player implementar [MPRIS 2](https://specifications.freedesktop.org/mpris/latest/) e da sessão Linux disponibilizar
+um barramento D-Bus ao processo do Thoth. O [Strawberry](https://github.com/strawberrymusicplayer/strawberry) é um
+exemplo de player cujo projeto documenta suporte MPRIS2/D-Bus no Linux.
 
 O recurso não comprova que a faixa selecionada é a mesma gravação usada na transcrição. Confira o título e o artista
 mostrados, selecione a mesma versão e ajuste **Deslocamento (segundos)** se a gravação começar com uma introdução ou
@@ -558,14 +560,14 @@ histórico de jobs, mas não remove os artefatos de `out/` nem o conteúdo de `c
 
 A página usa as mesmas rotas que um script pode chamar. A documentação interativa fica em `/docs`.
 
-| Rota | O que faz |
-| --- | --- |
-| `POST /uploads?nome=musica.mp3` | recebe o áudio como corpo cru (`application/octet-stream`); devolve `{"ref": ...}`. Só `.mp3` e `.wav`. |
-| `POST /jobs` | cria um job; corpo JSON com `ref` e, opcionais, `bpm`, `tom`, `instrumento`, `afinacao`, `digitacao` |
-| `GET /jobs` | lista os jobs em memória |
-| `GET /jobs/{id}` | estado e resumo de um job |
-| `GET /jobs/{id}/artifacts/{formato}` | baixa um artefato, por exemplo `gp5` ou `musicxml` |
-| `GET /playback/players` | players MPRIS visíveis na sessão; lista vazia sem player ou sem D-Bus |
+| Rota                                 | O que faz                                                                                               |
+|--------------------------------------|---------------------------------------------------------------------------------------------------------|
+| `POST /uploads?nome=musica.mp3`      | recebe o áudio como corpo cru (`application/octet-stream`); devolve `{"ref": ...}`. Só `.mp3` e `.wav`. |
+| `POST /jobs`                         | cria um job; corpo JSON com `ref` e, opcionais, `bpm`, `tom`, `instrumento`, `afinacao`, `digitacao`    |
+| `GET /jobs`                          | lista os jobs em memória                                                                                |
+| `GET /jobs/{id}`                     | estado e resumo de um job                                                                               |
+| `GET /jobs/{id}/artifacts/{formato}` | baixa um artefato, por exemplo `gp5` ou `musicxml`                                                      |
+| `GET /playback/players`              | players MPRIS visíveis na sessão; lista vazia sem player ou sem D-Bus                                   |
 
 ```bash
 ref=$(curl -s --data-binary @musica.mp3 -H 'Content-Type: application/octet-stream' \
@@ -574,6 +576,29 @@ curl -s -X POST http://127.0.0.1:8000/jobs -H 'Content-Type: application/json' \
   -d "{\"ref\": \"$ref\", \"instrumento\": \"baixo\"}"
 ```
 
+### Mapa de notas do braço
+
+Uma página à parte, em `braco/` (Vue 3 + TypeScript + Vite), para estudar o braço do baixo (4 a 7 cordas) ou da
+guitarra. Ela roda inteira no navegador, sem API: as notas são mostradas por cor e filtradas, e a teoria funciona assim:
+a nota clicada vira a tônica, e escalas, modos e acordes aparecem por grau. A página traz também metrônomo, sequência no
+pulso e tema claro ou escuro. As escolhas ficam na URL e no navegador, então um link reabre a mesma tela.
+
+```bash
+cd braco
+npm ci
+npm run dev          # desenvolvimento em http://127.0.0.1:5173
+npm run verificar    # tipos, lint, Vitest e build
+npm run build        # gera braco/dist/
+```
+
+Com o build feito, `uv run thoth serve` também serve a página em <http://127.0.0.1:8000/braco/>. O build usa caminhos
+relativos e funciona em qualquer hospedagem estática. O workflow `.github/workflows/braco-pages.yml` publica no GitHub
+Pages, mas só quando é disparado à mão (`workflow_dispatch`), depois de habilitar o Pages com a fonte "GitHub Actions"
+nas configurações do repositório.
+
+O som (cliques e notas) é sintetizado por osciladores Web Audio e só começa depois do primeiro toque na página, como
+exigem os navegadores. As decisões estão nos ADRs 056 a 062 de `tasks/decisions.md`.
+
 ## Desenvolvimento
 
 ```bash
@@ -581,6 +606,7 @@ uv run pytest -n auto          # suíte padrão
 uv run pytest -m "slow and not network"   # modelos de verdade — minutos em CPU
 uv run pytest -m network       # canário: avisa quando o YouTube quebrar o yt-dlp
 uv run pytest -m navegador     # abre um Chromium e inspeciona a página renderizada
+npm --prefix braco ci && npm --prefix braco run verificar   # mapa do braço
 uv run ruff check src/ tests/
 uv run mypy src/
 ```

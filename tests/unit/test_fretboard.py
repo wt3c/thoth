@@ -147,6 +147,33 @@ def test_experiente_fica_na_posicao_como_o_baixista_da_tab_humana() -> None:
     assert _posicoes([50, 46, 41, 36], custos=PADRAO) == [(3, 7), (2, 8), (1, 8), (0, 8)]
 
 
+def test_alcance_da_mao_preserva_re_pisado_na_frase() -> None:
+    """Casas 3 e 5 cabem na mesma mão; não pagar uma mudança de posição falsa."""
+    posicoes = _posicoes([31, 31, 38, 31], custos=PADRAO, alcance_da_mao=3)
+
+    assert posicoes == [(0, 3), (0, 3), (1, 5), (0, 3)]
+
+
+def test_alcance_zero_preserva_a_heuristica_anterior() -> None:
+    assert _posicoes([31, 31, 38, 31], custos=PADRAO, alcance_da_mao=0) == [
+        (0, 3),
+        (0, 3),
+        (2, 0),
+        (0, 3),
+    ]
+
+
+def test_a_corda_solta_preserva_a_janela_da_mao() -> None:
+    posicoes = _posicoes([52, 28, 40], custos=PADRAO, alcance_da_mao=3)
+
+    assert posicoes == [(2, 14), (0, 0), (0, 12)]
+
+
+def test_recusa_alcance_negativo() -> None:
+    with pytest.raises(ValueError, match="alcance"):
+        ViterbiFretAssigner(alcance_da_mao=-1)
+
+
 @pytest.mark.parametrize(
     ("nome", "afinacao"),
     [

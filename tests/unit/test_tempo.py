@@ -13,14 +13,17 @@ from pathlib import Path
 import numpy as np
 import pytest
 
-from tests.sintetico import BPM, SOUNDFONT, renderizar
+from tests.sintetico import BPM, SOUNDFONT, execucao_em_andamentos, renderizar
 from thoth.domain.models import NoteEvent
-from thoth.services.rhythm import monofonizar
+from thoth.services.cabeca_do_tempo import deslocamento
+from thoth.services.rhythm import COMPASSO, MapaDeAndamento, monofonizar
 from thoth.services.tempo import (
     ajustar,
+    batidas_do_mix,
     desdobrar,
     dobrar_para_faixa,
     estimar_andamento,
+    mapa_de_andamento,
     residuo,
 )
 
@@ -68,6 +71,23 @@ def test_concorda_quando_o_pulso_e_claro(tmp_path: Path) -> None:
     wav, _ = renderizar("walking", tmp_path)
 
     assert estimar_andamento(wav).confiavel
+
+
+@requer_soundfont
+def test_as_batidas_do_mix_caem_na_cabeca_do_tempo(tmp_path: Path) -> None:
+    """ADR-054: as batidas que a estimativa já calculava saem junto, no pulso da música.
+
+    `walking` toca semínimas a 90 a partir do zero: a cabeça do tempo é o zero da grade.
+    """
+    wav, _ = renderizar("walking", tmp_path)
+
+    andamento = estimar_andamento(wav)
+
+    intervalo = float(np.median(np.diff(andamento.batidas)))
+    print(f"{len(andamento.batidas)} batidas, intervalo mediano {intervalo:.3f} s")
+    assert intervalo == pytest.approx(60 / BPM, rel=0.05)
+    assert deslocamento(andamento.batidas, MapaDeAndamento(BPM)) == 0
+    assert batidas_do_mix(wav) == andamento.batidas
 
 
 # --- Ajuste conjunto de andamento e fase (ADR-021) ---------------------------
@@ -188,3 +208,61 @@ def test_desdobrar_salva_as_notas_que_a_dobra_descartava() -> None:
 
     assert len(monofonizar(notas, 85.0)[0]) == 33
     assert len(monofonizar(notas, desdobrar([n.onset_s for n in notas], 85.0))[0]) == 64
+
+
+def test_musica_estavel_nao_ganha_troca_de_andamento() -> None:
+    mapa = mapa_de_andamento(execucao_em_andamentos([(60, 120)]), 116)
+
+    assert mapa.trocas == ()
+    assert mapa.bpm == pytest.approx(120, abs=0.3)
+
+
+def test_recupera_os_dois_andamentos_e_a_barra_da_troca() -> None:
+    """A troca cai no meio de uma janela de 20 s, e tem que sair na barra certa.
+
+    35 compassos a 120 são 70 s: a troca está no tique do compasso 35, não na
+    fronteira de janela mais próxima (60 ou 80 s).
+    """
+    mapa = mapa_de_andamento(execucao_em_andamentos([(35, 120), (30, 110)]), 116)
+
+    assert mapa.bpm == pytest.approx(120, abs=0.3)
+    ((tique, bpm),) = mapa.marcas()
+    assert bpm == pytest.approx(110, abs=0.3)
+    assert tique == 35 * COMPASSO
+
+
+
+def test_o_primeiro_trecho_nao_herda_o_vies_da_janela() -> None:
+    """A troca aos 53 s cai no meio da janela de 40 a 60 s, e a programação dinâmica,
+    que só troca na fronteira, compensa com o primeiro trecho a 90,2. Grade a 90,2
+    chega a 53 s defasada, e a barra da troca escolhida por ela sai no compasso 15.
+    """
+    mapa = mapa_de_andamento(execucao_em_andamentos([(20, 90), (20, 84)]), 90.185)
+
+    print(f"bpm do primeiro trecho: {mapa.bpm:.3f}; marcas: {mapa.marcas()}")
+    assert mapa.bpm == pytest.approx(90, abs=0.05)
+    ((tique, _),) = mapa.marcas()
+    assert tique == 20 * COMPASSO
+
+def test_a_cabeca_do_tempo_entra_antes_da_barra() -> None:
+    """ADR-054: o deslocamento entra no recuo antes de escolher as barras.
+
+    Somado depois, a troca escolhida na grade antiga sairia três semicolcheias fora
+    da barra da partitura nova.
+    """
+    onsets = execucao_em_andamentos([(35, 120), (30, 110)])
+    antes = mapa_de_andamento(onsets, 116)
+
+    mapa = mapa_de_andamento(onsets, 116, cabeca=3)
+
+    print(f"recuo {antes.recuo:.4f} -> {mapa.recuo:.4f}; marcas {mapa.marcas()}")
+    assert mapa.recuo == pytest.approx(antes.recuo + 3 * 15 / antes.bpm - 60 / antes.bpm, abs=1e-3)
+    ((tique, _),) = mapa.marcas()
+    assert tique % COMPASSO == 0
+
+
+def test_material_curto_nao_tem_mapa() -> None:
+    """Menos de duas janelas não tem onde trocar: fica o andamento de entrada."""
+    mapa = mapa_de_andamento(execucao_em_andamentos([(8, 120)]), 120)
+
+    assert mapa.trocas == ()

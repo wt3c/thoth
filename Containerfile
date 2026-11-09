@@ -14,6 +14,14 @@ WORKDIR /app
 COPY scripts/vendor_alphatab.py scripts/
 RUN mkdir web && uv run --no-project python scripts/vendor_alphatab.py
 
+# --- mapa do braço (ADR-056): o Vite 8 exige Node ≥ 20.19, e o bookworm traz o 18 ----
+FROM node:22-slim AS braco
+WORKDIR /braco
+COPY braco/package.json braco/package-lock.json ./
+RUN npm ci
+COPY braco/ ./
+RUN npm run build
+
 # --- aplicação ---------------------------------------------------------------------
 FROM ghcr.io/astral-sh/uv:python3.12-bookworm-slim
 RUN apt-get update \
@@ -39,6 +47,7 @@ RUN uv sync --frozen --no-dev --no-install-project
 COPY src/ src/
 COPY web/ web/
 COPY --from=alphatab /app/web/vendor web/vendor
+COPY --from=braco /braco/dist braco/dist
 # Sem `chown`: o app só escreve em /data, e o chown recopiaria o venv inteiro numa camada.
 RUN uv sync --frozen --no-dev
 

@@ -6,6 +6,7 @@ import shutil
 from collections.abc import Mapping
 from dataclasses import dataclass
 from pathlib import Path
+from typing import Literal
 
 import typer
 from rich.console import Console
@@ -14,15 +15,19 @@ from rich.text import Text
 
 from thoth.adapters.ingest import resolver_fonte
 from thoth.adapters.separation import DemucsSeparator, localizar_stems
+from thoth.adapters.transcription.muscriptor import MuscriptorTranscriber
 from thoth.domain.models import AFINACOES, AcordeImpossivel
+from thoth.domain.ports import FretAssigner
 from thoth.services import pipeline
 from thoth.services.acordes import ViterbiAcordes
 from thoth.services.alinhamento_audio import alinhar_ao_stem
 from thoth.services.auralizacao import auralizar as _auralizar
 from thoth.services.cache_notas import ler
+from thoth.services.cache_transcricao import em_cache
 from thoth.services.comparacao import JanelaDeNota, veredito_de_nota
 from thoth.services.comparacao import comparar as _comparar
-from thoth.services.fretboard import DIGITACOES, ViterbiFretAssigner
+from thoth.services.digitacao_aprendida import DigitacaoAprendida, carregar_modelo
+from thoth.services.fretboard import DIGITACOES, PADRAO, ViterbiFretAssigner
 from thoth.services.guia_estudo import gerar_guia
 from thoth.services.nomes import nome_de_arquivo
 from thoth.services.octave_check import OctaveWarning
@@ -35,6 +40,11 @@ from thoth.services.vocais import separar as _separar_vocais
 app = typer.Typer(help="Áudio → partitura e tablatura, com foco em contrabaixo.")
 
 CACHE_PADRAO = Path("cache")
+
+#: Aprendida nas tabs humanas, só para 4 cordas (ADR-055). Os acordes e as outras
+#: afinações ficam com os custos do `experiente`.
+APRENDIDA = "aprendida"
+_DIGITACOES = {**DIGITACOES, APRENDIDA: PADRAO}
 
 #: `highlight=False` porque nome de música não é código: o rich colore número e
 #: pontuação no meio do título e o nome fica ilegível.
@@ -265,7 +275,13 @@ def transcribe(
         None, help=f"Afinação do baixo, por nome: {', '.join(AFINACOES)}. Padrão: 4."
     ),
     digitacao: str = typer.Option(
-        "iniciante", help=f"Perfil de digitação: {', '.join(DIGITACOES)} (ADR-006)."
+        "iniciante", help=f"Perfil de digitação: {', '.join(_DIGITACOES)} (ADR-006, ADR-055)."
+    ),
+    alcance_mao: int = typer.Option(
+        0, min=0, help="Alcance da mão no baixo, em casas: 3 abrange quatro casas."
+    ),
+    modelo: Literal["small", "medium"] = typer.Option(
+        "small", help="Modelo de transcrição do baixo; medium custa mais CPU (ADR-009)."
     ),
     cache: Path = typer.Option(CACHE_PADRAO, help="Diretório de cache."),
 ) -> None:
@@ -279,6 +295,10 @@ def transcribe(
             raise typer.BadParameter(str(erro), param_hint="--tom") from erro
 
     _escolher(pipeline.INSTRUMENTOS, instrumento, "--instrumento")
+    if modelo != "small" and instrumento != "baixo":
+        raise typer.BadParameter("modelo alternativo só vale para o baixo", param_hint="--modelo")
+    if alcance_mao and instrumento not in ("baixo", "todos"):
+        raise typer.BadParameter("alcance da mão só vale para o baixo", param_hint="--alcance-mao")
     # As afinações do catálogo são de baixo; a guitarra usa a do perfil (ADR-044).
     if instrumento != "baixo" and afinacao is not None:
         raise typer.BadParameter(
@@ -286,7 +306,19 @@ def transcribe(
             param_hint="--afinacao",
         )
     cordas = _escolher(AFINACOES, afinacao or "4", "--afinacao") if instrumento == "baixo" else None
-    custos = _escolher(DIGITACOES, digitacao, "--digitacao")
+    custos = _escolher(_DIGITACOES, digitacao, "--digitacao")
+    if digitacao == APRENDIDA and alcance_mao:
+        raise typer.BadParameter(
+            "a digitação aprendida foi treinada com alcance zero", param_hint="--alcance-mao"
+        )
+    assigner: FretAssigner = (
+        DigitacaoAprendida(carregar_modelo().pesos)
+        if digitacao == APRENDIDA
+        else ViterbiFretAssigner(custos=custos, alcance_da_mao=alcance_mao)
+    )
+    transcritor = (
+        em_cache(MuscriptorTranscriber(model=modelo), cache) if modelo != "small" else None
+    )
     # O tempo por estágio é o que faltava: a separação e a transcrição levam
     # minutos cada, e uma frase solta antes da chamada não dizia em qual delas se
     # estava — nem se algo havia travado (ADR-037).
@@ -305,7 +337,8 @@ def transcribe(
             tuning=cordas,
             instrumento=instrumento,
             cache_dir=cache,
-            assigner=ViterbiFretAssigner(custos=custos),
+            assigner=assigner,
+            transcriber=transcritor,
             atribuidor_de_acordes=ViterbiAcordes(custos=custos),
             progresso=etapas,
         )
@@ -326,6 +359,11 @@ def transcribe(
                 "yellow",
             )
         _diz("confira ouvindo; se soar errado, reexporte com --bpm", "yellow")
+    if r.cabeca_do_tempo is None:
+        _diz(
+            "cabeça do tempo: as batidas do mix não decidiram, ficou a fase da grade (ADR-054)",
+            "yellow",
+        )
 
     if r.tonalidade:
         _diz(_tom(r.tonalidade))

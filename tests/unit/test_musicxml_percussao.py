@@ -222,3 +222,17 @@ def test_o_musescore_separa_pecas_de_mesma_posicao(tmp_path: Path) -> None:
         frozenset({41}),
         frozenset({43}),
     ]
+
+
+def test_marca_de_andamento_tambem_na_bateria(tmp_path: Path) -> None:
+    ataques = [EventoPercussivo(i * 0.5, 36) for i in range(16)]
+    arquivo = MusicXmlPercussaoExporter(bpm=BPM, marcas=((COMPASSO, 100.0),)).exportar(
+        ataques, tmp_path / "b.musicxml"
+    )
+    pauta = converter.parse(str(arquivo)).parts[0]
+
+    marcas = [
+        (m.getContextByClass("Measure").number, m.number)
+        for m in pauta.recurse().getElementsByClass("MetronomeMark")
+    ]
+    assert marcas == [(1, BPM), (2, 100)]

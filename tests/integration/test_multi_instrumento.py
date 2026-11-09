@@ -68,9 +68,9 @@ MEDIDO: dict[tuple[str, str], float] = {
     ("piano-eletrico", "mix-stem"): 0.0,
 }
 
-#: O Demucs não repete o stem entre rodadas (duas separações da mesma fixture diferem
-#: em até 0,04 na amostra; o piano deu 0,879 e 0,892). Um evento de folga em 34, só
-#: onde há separação — emenda do ADR-044 (2026-09-25).
+#: Folga histórica do default aleatório: duas separações diferiram até 0,04 na amostra;
+#: o piano deu 0,879 e 0,892. Um evento de folga em 34, só onde há separação (ADR-044,
+#: 2026-09-25). Preservada na medição de `--shifts 0`, sem redefinir os pisos.
 FOLGA_DEMUCS = 0.03
 
 #: A mesma variação contada em notas dos acordes de seis: três rodadas seguidas da
@@ -282,6 +282,11 @@ def _confere_partes_do_piano(
     )
     print(f"PARTES {perfil} {condicao} (perfil|qualquer rótulo/total): {tabela}")
     for parte, (piso_perfil, piso_qualquer) in MEDIDO_PARTES_PIANO[(perfil, condicao)].items():
+        print(
+            f"PARTE {perfil} {condicao} {parte}: "
+            f"perfil={do_perfil[parte][0]} piso={piso_perfil - folga}; "
+            f"qualquer={qualquer[parte][0]} piso={piso_qualquer - folga}"
+        )
         assert do_perfil[parte][0] >= piso_perfil - folga, f"{parte} regrediu no rótulo"
         assert qualquer[parte][0] >= piso_qualquer - folga, f"{parte} regrediu"
 

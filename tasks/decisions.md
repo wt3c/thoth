@@ -401,6 +401,27 @@ a que falta, precisa de referência humana (Camada 3, ADR-007).
 
 ---
 
+### Emenda (2026-10-30) — comparação em Você e modelo explícito no CLI
+
+A referência humana de *Você* foi assumida correta pelo usuário. No mesmo stem
+`htdemucs_ft/4.1.0-shifts0`, CPU, o `medium` produziu 837 eventos brutos em
+275,9 s; o pipeline manteve 834. O `small` havia produzido 823, mantendo 822.
+Na avaliação de altura e ataque no relógio do áudio, tolerância fixa de 100 ms e
+mesmo alinhamento independente (ADR-042), o F1 processado passou de 0,926 para
+0,950. Não é porcentagem de alturas corretas nem prova de igualdade rítmica.
+
+O CLI ganha `--modelo small|medium`, apenas para o baixo, com `small` como
+padrão e o mesmo cache de transcrição identificado por modelo, pesos, código e
+stem (ADR-052). Os outros instrumentos preservam os defaults, inclusive o
+silêncio inicial da bateria. Não promover `medium` a padrão a partir de uma
+música; as limitações sintéticas registradas neste ADR continuam válidas.
+
+A distância mínima de edição de alturas, ignorando tempo, caiu de 66 operações
+(28 omissões, 5 extras, 33 substituições no small bruto) para 31 (12 omissões,
+3 extras, 16 substituições no medium bruto). Em sequências repetidas pode haver
+vários alinhamentos ótimos. Nenhuma nota humana entrou na inferência e a saída
+permanece diferente do gabarito. A tarefa de igualdade ainda está aberta.
+
 ## ADR-010 — Demucs promovido de condicional a etapa do pipeline
 
 **Data:** 2026-09-22 · **Status:** aceito · **Revoga:** condicional C1
@@ -487,6 +508,22 @@ O piso antigo fica, com a mensagem própria: cair abaixo de 0,682 não é regres
 são coisas diferentes de investigar. O teste imprime a margem contra o piso.
 
 ---
+
+### Emenda (2026-10-23) — `--shifts 0` mantém o piso do baixo sintético
+
+Medição na worktree `medir/demucs-shifts0`, com o mesmo estímulo canônico `misto`,
+MuScriptor `small` pregado e sem reaproveitar cache da configuração anterior:
+
+| `misto` separado | onset F1 / piso | nota F1 / piso | referência / estimativa |
+|---|---:|---:|---:|
+| default (`shifts 1`) | 0,938 / 0,938 | 0,968 / 0,968 | 16 / 15 |
+| `shifts 0` | 0,938 / 0,938 | 0,968 / 0,968 | 16 / 15 |
+
+Os seis casos diretos de `test_regressao_fase0` também reproduziram seus pisos.
+O resultado sustenta desligar o deslocamento aleatório no separador de um stem,
+sem afrouxar os pisos nem mudar a ordem do pipeline. A evidência continua sendo
+sintética; as 15 músicas do acervo não foram reprocessadas nesta medição.
+Determinismo, tempos e isolamento do cache estão na emenda de 2026-10-23 do ADR-026.
 
 ## ADR-011 — Baixo-primeiro é limite medido, não preferência
 
@@ -884,6 +921,27 @@ pressupunha.
 A decisão deste ADR não muda: a grade constante segue adequada, e o ADR-034 registra por que o aviso de andamento
 variável não é implementável com um único caso.
 
+### Emenda (2026-10-30) — o MusicXML preserva o andamento fracionário
+
+A comparação solicitada de `samples/catedral-voce_build.gp5` com a saída de
+30/09 revelou duas coisas distintas. As 802 alturas do GP5 gerado são idênticas
+às do cache, na mesma ordem; seus ataques, porém, adiantam 30–420 ms. A relação
+medida entre tempo relido e cache é `0,99882919 × t − 0,08503391`: a taxa bate
+com `119,86 / 120`, além do recuo de fase e da quantização.
+
+A premissa deste ADR de que **MusicXML também exige andamento inteiro estava
+errada**. O atributo `sound@tempo` aceita decimal na
+[especificação MusicXML 4.0](https://www.w3.org/2021/06/musicxml40/musicxml-reference/elements/sound/).
+Os exportadores de cordas, piano e bateria passam a preservar o BPM fracionário,
+inclusive nas marcas recebidas. A seleção das marcas pelo mapa permanece a do
+ADR-053. Não mudar quantização, recuo de fase nem tempo do cache.
+
+Regressão com arquivos reais: 119,86 BPM e um ataque após 480 semínimas,
+cuja posição esperada é 240,280327 s. O arredondamento o levava a 240 s.
+Testes verificam `sound@tempo`, o instante relido pelo music21 e a posição e o
+valor de uma mudança fracionária. O GP5 continua limitado ao inteiro; esta
+correção não promete remover sua deriva nem recuperar notas não transcritas.
+
 ## ADR-022 — A sustentação é escrita com ligadura, decomposta no exportador
 
 **Data:** 2026-09-23 · **Status:** aceito
@@ -1059,6 +1117,27 @@ estimado: dobra o BPM enquanto a colisão passar de 10%, no máximo duas vezes.
 - `services/tempo.py` passou a importar `services/rhythm.py` (por `para_ticks`). Mesma camada, sem ciclo — `rhythm` só
   conhece `domain`.
 
+### Emenda (2026-10-30) — no baixo, notas simultâneas contam como um ataque
+
+O transcritor `medium` dá duas notas no mesmo instante (em geral a fundamental e outra altura), e elas colidem em
+**qualquer** grade. Contadas uma a uma, a colisão passava do limiar no andamento certo e `desdobrar` ia ao teto:
+
+| música (treino) | colisão `medium` | sem as simultâneas | `desdobrar` antes → depois |
+|-----------------|------------------|--------------------|----------------------------|
+| Dance of Death  | 13,0%            | 0,9%               | 516 → 129                  |
+| FITK            | 12,2%            | 5,5%               | 192 → 96                   |
+| Eyrie           | 16,4%            | 5,0%               | 396 → 99                   |
+
+Gesu, Plague e todas as execuções do `small` não mudam (≤ 6,8% antes, ≤ 5,3% depois).
+
+**Decisão.** O baixo passa a `_medir_grade` um ataque por grupo simultâneo, como a guitarra e a bateria já fazem com
+`inicios_de_acorde`, mas com janela própria de **10 ms** (`_SIMULTANEAS_NO_BAIXO_S`), não a de acorde (50 ms). A
+distância entre ataques consecutivos de baixo no treino justifica o número: `medium` tem 748 pares a menos de 5 ms e
+nenhum entre 5 e 15 ms; `small`, 136 a menos de 5 ms, 1 entre 5 e 10 ms e nenhum abaixo de 60 ms. A janela de 50 ms
+fundiria semicolcheias a 360 BPM (41,7 ms), justamente o caso que motivou este ADR — há teste das duas pontas.
+
+Só a medição do andamento muda; as notas que seguem para a grade são as mesmas.
+
 ## ADR-025 — Pedido inválido é recusado na entrada, não interpretado
 
 **Data:** 2026-09-23 · **Status:** aceito
@@ -1180,6 +1259,38 @@ tratava nem a falha nem a interrupção.
 - **`comparar` lê o stem pelo escopo do separador** (`DemucsSeparator().escopo`), não por `stems/<id>` cru. Stem de
   outra versão do demucs não é este (emenda acima); antes, o comparador o aceitava e media contra áudio de outro
   modelo. Sem stem no escopo atual, a mensagem é a mesma de quando não há stem.
+
+### Emenda (2026-10-23) — o deslocamento aleatório também identifica o cache
+
+Medição em worktree descartável, com a fixture sintética canônica `misto` (13,137 s),
+`demucs@4.1.0`, `htdemucs_ft`, CPU e `--two-stems bass`, em processos independentes:
+
+| configuração | WAVs byte a byte | diferença máxima | SNR entre rodadas |
+|---|---|---:|---:|
+| default (`--shifts 1` implícito) | diferentes | 0,047760 | 29,945 dB |
+| `--shifts 0` | idênticos | 0 | infinito |
+
+O novo `DemucsSeparator` usa `--shifts 0`. Comando e escopo leem a mesma constante;
+o baixo passa a `<modelo>/<versão>-shifts0`, e os demais stems a
+`<modelo>/<versão>-shifts0-<stem>`. Os diretórios antigos são preservados, mas nunca
+reutilizados nem promovidos para o novo escopo. O comparador usa esse mesmo escopo.
+O cache existente das 15 músicas precisaria ser refeito na adoção.
+
+Os quatro processos levaram, respectivamente, 60,31/35,21 s de relógio e
+240,13/235,49 s de CPU no default, 35,48/35,18 s de relógio e 234,82/232,09 s de CPU
+com `shifts 0`. CPU é usuário + sistema, incluindo os subprocessos; a primeira
+rodada inclui preparação do ambiente. Não se conclui ganho relevante de velocidade.
+
+O determinismo foi observado neste estímulo e nesta máquina, não demonstrado para
+qualquer plataforma. Esta mudança cobre o separador de um stem; a separação
+multifaixa do ADR-047 mantém sua configuração e cache próprios. As rodadas reais
+antes e depois passaram: 48 testes em cada, com um skip de MPRIS por ausência da
+sessão D-Bus descartável. As 115 métricas de piso/teto coincidiram, sem alterar
+pisos nem folgas. Relógio/CPU da suíte: 1.091,65/7.423,01 s antes e
+974,40/6.745,85 s depois. Recomendação: adotar no separador de um stem, aceitando
+refazer o cache das 15 músicas; não reclassificar as folgas nesta mudança.
+**Adotado em 2026-10-23.** As folgas do `mix-stem` (ADR-044) ficam até haver rodadas
+repetidas com `shifts 0` mostrando que deixaram de ser necessárias.
 
 ## ADR-027 — Um job por vez, e histórico com teto
 
@@ -1490,6 +1601,50 @@ Três motivos, todos medidos:
 **Decisão:** nada muda no aviso de oitava. O discriminador do erro para baixo continua esperando tabs de músicas com
 linha menos repetitiva, para que as janelas sejam conclusivas.
 
+### Emenda (2026-10-23) — *Você* e *Gesu* também não ampliam a amostra
+
+As duas tabs que entraram em 2026-09-30 (*Você*, `yt_veGD1Gzpa_o`, e *Watashi Igai Watashi Ja Nai No*,
+`yt_Ae6gQmhaMn4`) foram medidas com o código existente: `alinhar_ao_stem`, `veredito_de_nota` e
+`verificar_oitavas(limiar=1e300)` sobre o `bass.wav`. O rótulo segue o texto das emendas acima, porque o script de
+2026-09-25 não está no repositório.
+
+Antes da amostra nova, a medição antiga foi refeita. O AUC e o alarme batem com as emendas acima (±0,03), mas a
+contagem de casos não: em *And Plague Flowers*, os casos "abaixo" caíram de 66 para 26. O `notas.jsonl` foi regenerado
+em 2026-09-28 (`1c91fcf`, transcritor corrigido). O dado mais provável da diferença é esse, mas não está provado.
+
+| música               | concordam | casos "abaixo" | AUC "abaixo" (IC 95%, bootstrap) |
+| -------------------- | --------- | -------------- | -------------------------------- |
+| *Fear Is the Key*    | 773       | 13             | 0,72 (0,55–0,87)                 |
+| *And Plague Flowers* | 2588      | 26             | 0,76 (0,65–0,85)                 |
+| *Dance of Death*     | 0         | 0              | — (nenhuma janela conclusiva)    |
+| *Você*               | 754       | 1              | sem significado                  |
+| *Gesu*               | 609       | 4              | 0,71 (0,16–1,00)                 |
+| agregado             | —         | 44             | 0,748 (0,67–0,82)                |
+
+As duas tabs novas somam **5 casos**: a transcrição atual quase não erra oitava para baixo nelas. Com 26 dos 44
+positivos numa música só, comparar candidatos música a música não se sustenta, e nenhum foi testado. Em *Gesu*, o
+limiar de 0,40 alarma em 43,8% das notas corretas (em *Você*, 0,4%), provavelmente porque a música tem pouco grave.
+
+**Decisão:** nada muda. O discriminador espera tab de música com mais erro de oitava para baixo, não só mais tabs.
+
+### Emenda (2026-10-30) — _Fear of the Dark_ não amplia a amostra
+
+A tab de _Fear of the Dark_ (`yt_bePCRKGUwAY`, faixa 4 "Steve Harris") foi medida pelo método da emenda anterior,
+com o stem `htdemucs_ft/4.1.0`. A régua foi congelada antes da medição: a tab ampliaria a amostra com pelo menos
+10 casos "abaixo" em janelas conclusivas. O script ficou fora do repositório. Ele foi conferido antes de medir
+a tab nova, refazendo as duas músicas que concentram os casos:
+
+| música               | concordam | casos "abaixo" | AUC "abaixo" (IC 95%, bootstrap) |
+| -------------------- | --------- | -------------- | -------------------------------- |
+| *Fear Is the Key*    | 763       | 13             | 0,70 (0,53–0,84)                 |
+| *And Plague Flowers* | 2686      | 27             | 0,76 (0,66–0,85)                 |
+| *Fear of the Dark*   | 786       | 3              | sem significado                  |
+
+Só 4 das janelas de _Fear of the Dark_ são conclusivas. Com 3 casos, o AUC (0,11) não tem significado. O agregado
+passa a **47 casos**, 27 deles em _And Plague Flowers_.
+
+**Decisão:** nada muda. Mais uma tab não amplia a amostra, e a escolha da próxima continua externa.
+
 ## ADR-031 — a grafia do acidente segue o tom, com margem (B9)
 
 **Data:** 2026-09-23 · **Status:** aceito
@@ -1599,6 +1754,40 @@ anterior.
 - A leitura ampla do título do item ("digitação otimiza posição, não técnica": articulação, dinâmica, deslizes, pestana)
   **não** entra aqui — é território do B3, e fica registrado para não desaparecer.
 - Nenhum teste de regressão se move: o `COM_SEPARACAO_NOTA_F1 = 0.968` mede detecção de nota, não digitação.
+
+### Emenda (2026-10-30) — alcance da mão opcional, sem confundir altura e execução
+
+O usuário confirmou a tab humana de *Você* como gabarito de notas, ritmos e
+digitação, inclusive a diferença entre Ré solto e Ré na corda Lá, casa 5.
+Nas 141 ocorrências executadas de Ré2, a tab usa Lá/5; os perfis anteriores
+preferem Ré/0. A entrada do posicionador não contém evidência acústica de corda:
+ele apenas propõe uma digitação para alturas conhecidas.
+
+O estado anterior também cobrava deslocamento ao passar da casa 3 para a 5,
+mesmo quando ambas cabem na mesma posição da mão. `ViterbiFretAssigner` ganha
+`alcance_da_mao`, específico do baixo: com 3, a janela tem quatro casas e cada
+nota pisada pode pertencer a várias janelas. Corda solta conserva a janela;
+custo de deslocamento incide sobre seu início. O padrão 0 preserva exatamente
+a aproximação anterior e os custos compartilhados com acordes não mudam.
+O CLI expõe `--alcance-mao`; o ajuste não altera alturas, ataques ou durações.
+
+Comparação com as mesmas alturas humanas, isolando só digitação, perfil experiente:
+
+| Tab | Alcance 0 | Alcance 3 |
+| --- | ---: | ---: |
+| Gesu | 0,582 | 0,564 |
+| Dance of Death | 0,387 | 0,441 |
+| Fear Is the Key | 0,633 | 0,598 |
+| And Plague Flowers | 0,677 | 0,501 |
+| Eyrie | 0,745 | 0,813 |
+| Você | 0,738 | 0,936 |
+| Média por música | 0,627 | 0,642 |
+
+Não promover a padrão: três músicas pioraram. Em *Você*, 114 dos 141 Ré2
+passam a Lá/5, mas 27 continuam Ré/0. A melhora de tocabilidade não prova
+reconstrução da execução. Alcançar igualdade exige avaliar corda/casa, pausas,
+ritmo e altura separadamente; a mera igualdade MIDI não basta. O leitor
+`ler_tab` passa a preservar `tablatura` e `afinacao` para permitir essa avaliação.
 
 ## ADR-033 — dinâmica e articulação não são inferíveis desta entrada (B3)
 
@@ -1847,6 +2036,114 @@ número único; o aviso por discriminador fica descartado de vez, porque não se
 para a outra (o compasso não pode pular). Antes de construir exportadores e pipeline, a medida seguinte é o resíduo de um
 mapa **contínuo** — fase herdada da janela anterior, mudança de andamento só quando ela paga — e quantas mudanças
 ele escreve nas músicas planas.
+
+### Emenda (2026-10-23) — o mapa contínuo, medido fora da amostra
+
+Etapa 1b, só medição. Antes, a etapa 1 foi refeita, porque o script dela não está no repositório: o resíduo global
+bate com a tabela acima (±0,5 ms) e o resíduo por janela fica a até 1,1 ms dela (*Smooth Operator* 10,2 contra 11,3).
+Os números abaixo usam a reprodução, e não a tabela, como linha de base.
+
+**Método.** Mapa contínuo por programação dinâmica sobre janelas de 20 s. O estado no início de cada janela é o par
+(andamento corrente, fase da semicolcheia), e a fase **não é livre**: vem do fim da janela anterior. O andamento varia
+em ±10% do global, em passos de 0,05 bpm. Trocar de andamento custa λ, em ms·nota. O custo da janela é a mediana do
+resíduo vezes o número de notas, o mesmo "ponderado por nota" da etapa 1. A busca discretiza a fase em 128 posições,
+mas o mapa escolhido é avaliado com a fase exata.
+
+**Controle que faltava: sobreajuste.** A etapa 1 só media no próprio ajuste, e um parâmetro a mais por janela sempre
+baixa o resíduo. Aqui o mapa é ajustado nas notas pares (com λ/2, porque o custo cai à metade) e avaliado nas ímpares.
+A referência é o mesmo procedimento com λ infinito, isto é, um andamento só.
+
+| λ (ms·nota) | músicas piores que o andamento único, fora da amostra   | trocas nas planas (*Gesu*, *Smooth Operator*) |
+| ----------- | ------------------------------------------------------- | --------------------------------------------- |
+| 0           | 3 (*Se Eu Cair* 34,3 × 21,2; *Thalles* 28,6 × 27,1; *Arde Outra Vez* 29,8 × 26,7) | 11 e 12            |
+| 500         | 2 (*Se Eu Cair* 28,2 × 21,2; *Arde Outra Vez* 27,3 × 26,7) | 0 e 2 (0,2 bpm)                            |
+| 1000        | 1 (*Arde Outra Vez* 29,8 × 26,7)                        | 0 e 2 (0,2 bpm)                               |
+| **2000**    | **nenhuma**                                             | **0 e 0**                                     |
+
+Com λ = 2000, fora da amostra, contra o andamento único (ms):
+
+| música                 | único | mapa | trocas | Δ mediano (bpm) |
+| ---------------------- | ----- | ---- | ------ | --------------- |
+| *Hallowed Be Thy Name* | 29,6  | 18,7 | 4      | 0,5             |
+| *And Plague Flowers*   | 18,0  | 10,6 | 6      | 1,8             |
+| *Fear Is the Key*      | 33,3  | 27,6 | 2      | 2,2             |
+| *Fear of the Dark*     | 31,0  | 24,7 | 6      | 5,5             |
+| *Você*                 | 23,4  | 18,6 | 2      | 2,5             |
+| *Equus*                | 15,6  | 12,5 | 2      | 0,3             |
+| *Tive Razão*           | 23,4  | 19,7 | 1      | 2,7             |
+| *Dance of Death*       | 26,5  | 24,0 | 3      | 9,9             |
+
+Outras quatro também ganham: *Eyrie* (28,2 → 22,6), *SOJA*, *Feel Like Makin' Love* e uma fonte local. As nove
+restantes, das 21 fontes, ficam sem troca e com o resíduo do andamento único, entre elas *Gesu*, *Smooth Operator*,
+*O Sol*, *Se Eu Cair* e *Arde Outra Vez*. O ganho no próprio ajuste, de 35% a 73% na etapa 1, **superestimava** o que
+generaliza: fora da amostra, com λ = 2000, ele fica entre 0 e 41%.
+
+**Limites desta medida.** O λ foi escolhido olhando a mesma divisão par/ímpar em que foi avaliado; é um viés pequeno,
+porque ele vale para todas as músicas, mas existe. As trocas caem em fronteiras fixas de 20 s, não em barras de
+compasso, e uma partitura precisa delas no compasso. Os Δ de ~10 bpm (*Dance of Death*, uma fonte local) podem ser uma
+troca real, como na introdução de *Dance of Death* (75 a 170 na tab humana), ou uma grade que pulou para outra
+leitura. Esta medida não separa as duas coisas.
+
+### Decisão da emenda (2026-10-23)
+
+O mapa contínuo com λ = 2000 é o candidato para a etapa 2. Ele não piora música nenhuma fora da amostra, não escreve
+troca nas planas e melhora 12 das 21 fontes do acervo. A etapa 2 é produto e não entra nesta emenda: trocas
+no compasso, `rhythm` quantizando pelo mapa, marcação de andamento no GP5 e no MusicXML, auralização e cursor da página
+seguindo o mapa. Antes dela, conferir as trocas de ~10 bpm contra a tab humana de *Dance of Death*.
+
+#### Conferência em *Dance of Death* (2026-10-23)
+
+O gabarito é o da etapa 1: tab humana (`samples/`, ver 4 by Mirko88) alinhada ao stem pelo `alinhar_ao_stem`, e o
+andamento da gravação em cada janela é a inclinação batidas da tab × segundos do áudio. O ADR-042 não confirma o
+alinhamento desta música nota a nota, mas a inclinação concorda com o BPM marcado na tab onde ele é constante
+(83–90 contra 80–85; 131–137 contra 130), e é a inclinação que importa aqui.
+
+| trecho     | mapa (λ = 2000) | gravação, pela tab | marcado na tab |
+| ---------- | --------------- | ------------------ | -------------- |
+| 0–100 s    | 141,0           | 144 a 155          | 150            |
+| 100–180 s  | 141,0           | 83 a 90            | 80–85          |
+| 180–220 s  | 141,0           | 115 a 120          | 120            |
+| 220–300 s  | 124,1           | 123 a 131          | 120–125        |
+| 300–420 s  | 134,0           | 131 a 137          | 130            |
+| 420–460 s  | 127,1           | 126 a 129          | 125–132        |
+| 460–500 s  | 127,1           | 138 a 148          | 150            |
+
+**As três trocas que o mapa escreve são reais.** Nas janelas de 220 s a 460 s ele fica a 2 bpm, na mediana, da
+gravação. O erro está nas trocas que ele **não** escreve. A busca vai de ±10% em torno do global de 129 bpm, ou seja,
+de 116 a 142, e deixa de fora três trechos: o lento (83 a 90 bpm), a abertura (144 a 155) e a volta a 150 no fim. O
+mapa encosta no teto, 141, e não tem como ir além.
+
+**Consequência para a etapa 2.** O ±10% foi herdado do `ajustar` (ADR-034) e serve a um número só. Um mapa precisa de
+faixa mais larga, ou de grade que admita a metade e o dobro, e qualquer das duas abre a porta para a confusão de
+oitava rítmica que o ±10% fecha. A largura da faixa entra na etapa 2 como medição própria, nas 21 fontes e com o mesmo
+controle fora da amostra, antes de qualquer exportador.
+
+#### Largura da faixa, medida (2026-10-23)
+
+Três faixas: ±10%; ±40%; e ±10% em torno da metade, do global e do dobro ("oitavas"). O custo passa a ser a fração da
+semicolcheia (0 a 0,5) em vez de ms, porque o ms premia a grade mais fina e uma faixa larga escolheria sempre o
+andamento mais rápido. O critério foi fixado antes da rodada: fora da amostra, contra o andamento único de ±10%, nenhuma
+música pior (mais de 2%), nenhuma troca nas planas, e o trecho lento de *Dance of Death* alcançado.
+
+| faixa / λ (fração·nota) | músicas piores | trocas nas planas | *Dance*: 0–100 s / 100–180 s / 460–500 s |
+| ----------------------- | -------------- | ----------------- | ---------------------------------------- |
+| ±10% / 5                | 0              | 0 e 2             | 141 / 135 / 130                          |
+| ±10% / 10               | 1              | 0 e 0             | 116 / 116 / 127                          |
+| ±40% / 10               | 4              | 0 e 2             | 112 / **83** / 111                       |
+| ±40% / 20               | 4              | 0 e 0             | 126 / 126 / 135                          |
+| ±40% / andamento único  | 9              | 0 e 0             | 126 / 126 / 126                          |
+| oitavas / 10            | 1              | 0 e 2             | 232 / 174 / 128                          |
+| oitavas / 20            | 2              | 0 e 0             | 126 / 126 / 124                          |
+| gabarito (tab alinhada) |                |                   | 144–155 / 83–90 / 138–148                |
+
+**Nenhuma faixa larga cumpre o critério.** A única que chega ao trecho lento (±40%, λ = 10) piora 4 músicas. A linha
+mais reveladora é a do andamento único com ±40%: sem troca nenhuma, ela piora 9 das 21 fontes fora da amostra. Mais
+candidatos são mais chances de achar, no ajuste, uma grade que não generaliza. As oitavas escrevem 232 e 174 em
+*Dance of Death*, o tipo de confusão que o ±10% evita.
+
+**Decisão:** a etapa 2 segue com ±10% e o custo em ms com λ = 2000, o candidato da etapa 1b (nenhuma piora, nenhuma
+troca nas planas). Trecho a mais de 10% do global continua sendo escrito no andamento mais próximo da faixa; esse é o
+limite conhecido do mapa, e *Dance of Death* é o caso que o mede.
 
 ---
 
@@ -2873,6 +3170,27 @@ sem impossível.
 - A folga dos acordes de seis notas no `mix-stem` passa a duas notas (`FOLGA_DEMUCS_SEIS_NOTAS = 2`). `isolada` e `mix`
   continuam exatos. O Demucs determinístico continua sendo a saída que tira as folgas, com a mesma ressalva do baixo.
 
+### Emenda (2026-10-23) — medição com o deslocamento aleatório desligado
+
+Na worktree de medição de `--shifts 0`, os 18 casos de `test_mede_perfil`
+reproduziram os valores da rodada imediatamente anterior, com o default aleatório.
+As partes do piano e os acordes de seis notas também mantiveram as contagens.
+
+| perfil `mix-stem` | F1 antes | F1 depois | piso existente | seis notas antes / depois / piso |
+|---|---:|---:|---:|---:|
+| bateria | 0,901 | 0,901 | 0,871 | não se aplica |
+| guitarra acústica | 0,981 | 0,981 | 0,951 | 23 / 23 / 21 |
+| guitarra distorcida | 0,981 | 0,981 | 0,951 | 24 / 24 / 22 |
+| guitarra limpa | 0,990 | 0,990 | 0,960 | 24 / 24 / 22 |
+| piano acústico | 0,879 | 0,879 | 0,849 | não se aplica |
+| piano elétrico | 0,000 | 0,000 | 0,000 | não se aplica |
+
+O baixo separado manteve nota F1 0,968 e onset F1 0,938 (emenda do ADR-010).
+O teste de determinismo comparou dois processos por configuração sobre o `misto`:
+WAVs diferentes no default e byte a byte idênticos com `shifts 0` (ADR-026).
+As folgas históricas de F1, seis notas e partes do piano ficam intactas: esta
+mudança mede a configuração contra os pisos existentes, não redefine os pisos.
+
 ### Emenda (2026-09-25) — GP5 com acordes de guitarra
 
 - `Gp5Exporter(acordes=True, faixa=..., programa_gm=...)`: as notas do mesmo tique da grade viram **um beat com uma nota
@@ -3576,6 +3894,29 @@ o acervo contém uma referência de baixo para `Equus`, não para esta faixa. A 
 também não localizou uma partitura/tab licenciada de `Urn`. Isso não prova que tal publicação inexista: por ora, a
 referência humana de `Eyrie` permanece pendente, e não substituímos essa lacuna por tabs colaborativas sem proveniência.
 
+#### Presença por stem no tempo — audibilidade da separação, não inventário por parte (2026-10-23)
+
+Medido sobre os quatro stems da multifaixa (`cache/stems/9771390c94c585ce/htdemucs_ft/4.1.0-multifaixa/`): RMS em
+janelas de 0,5 s, presença a partir de 30 dB abaixo do percentil 95 do próprio stem, histerese de 3 dB, presença e
+vazio com pelo menos 2 s.
+
+| stem   | presente (mm:ss)                                                                              | cobertura |
+| ------ | --------------------------------------------------------------------------------------------- | --------- |
+| bass   | 00:39–00:43, 00:47–00:51, 00:55–00:59, 01:03–03:45, 04:30–08:42, 09:09–11:19                  | 78,3%     |
+| drums  | 01:02–08:28, 09:00–11:00                                                                      | 79,5%     |
+| other  | 00:06–11:37, quase contínuo                                                                   | 97,1%     |
+| vocals | 01:45–02:37, 03:12–03:21, 03:24–03:54, 05:04–06:23, 07:06–07:08, 07:37–08:13, 09:27–10:06     | 34,5%     |
+
+Os níveis se dividem em dois grupos, e o silêncio do Demucs fica perto de −100 dB. Por isso, entre 20 e 50 dB abaixo
+do pico a cobertura quase não muda (bass de 75,6% a 81,4%, vocals de 33,8% a 40,2%), e o limiar relativo à mix dá o
+mesmo resultado. Os eventos do pipeline caem dentro da presença: bass 99,9%, bateria 100%. Os vocais ficam em 78,1%:
+63 eventos `voice` entre 3:55 e 3:57 caem onde o stem está abaixo do limiar, e a causa não foi investigada.
+
+Isso responde onde **cada stem** soa, não onde cada **parte** soa. O `other` mistura duas guitarras, violino, viola e
+cello, e `vocals` mistura voz limpa e extrema: o próprio texto acima já dizia que a entrada e saída por parte não se
+infere pelos stems. Esse mapeamento continua pendente, e depende de anotação humana que o projeto não tem. O usuário
+não é juiz de ouvido (`tasks/lessons/workflow.md`), então isso não volta para ele.
+
 ## ADR-049 — guia didático do baixo lê o GP5 e separa observação de hipótese
 
 **Data:** 2026-09-28 · **Status:** aceito · **Complementa:** ADR-022, ADR-031, ADR-033 e ADR-047
@@ -3747,3 +4088,300 @@ recuo. Ele depende do BPM e do instrumento escolhido, e não da transcrição em
 - `cache/transcricoes/` pode ser apagado a qualquer momento; o pior caso é transcrever de novo.
 - Se os pesos mudarem upstream sem o lock mudar, o cache serve o resultado antigo. É o mesmo risco que o lock já torna
   visível (o teste dele falha), e a correção é a mesma: atualizar o lock, o que também invalida o cache.
+
+## ADR-053 — andamento estimado que muda vira mapa, com a troca na barra
+
+**Data:** 2026-10-23 · **Status:** aceito · **Complementa:** ADR-019, ADR-021, ADR-034
+
+### Contexto
+
+A grade do ADR-021 é um andamento só para a música inteira. A emenda de 2026-10-23 do ADR-034 mediu que, nas músicas
+que mudam de andamento, isso custa a distância das notas à grade, e escolheu a busca por programação dinâmica: janelas
+de 20 s, ±10% em passos de 0,05 BPM, custo em ms e λ = 2000. A faixa larga (±40%) alcança o trecho lento de *Dance of
+Death*, mas piora outras quatro músicas. Faltava levar o resultado da busca para a partitura.
+
+### Decisão
+
+- **`MapaDeAndamento` (`services/rhythm`)** guarda o primeiro andamento, o recuo e as trocas `(instante no áudio,
+  bpm)`. A grade continua no primeiro andamento; cada trecho seguinte é escalado por `bpm_i / bpm`. Com isso,
+  quantização, monofonização e exportadores seguem trabalhando em tique, sem saber do mapa.
+- **`mapa_de_andamento` (`services/tempo`)** puxa cada troca da fronteira da janela para a **barra de compasso**. Ela
+  escolhe, entre as barras até a troca bruta seguinte, a que deixa as notas mais perto da grade.
+  - A programação dinâmica só troca na fronteira da janela. Quando a troca real cai no meio, ela compensa com o
+    primeiro trecho enviesado. No caso sintético de 20 compassos a 90 e 20 a 84, o primeiro trecho saiu a 90,2, a grade
+    chegou defasada aos 53 s e a troca foi parar um compasso antes. Por isso:
+    - o primeiro trecho é **reajustado com `ajustar`** só nas notas antes da primeira troca, e as barras são escolhidas
+      de novo;
+    - o andamento depois de cada troca é **refinado junto com a barra** (±0,1 BPM, passo 0,005). Sem isso, a troca
+      continuava um compasso antes.
+- **`marcas()`** converte as trocas em `(tique, bpm)` e descarta a troca cujo BPM arredondado repete o último escrito
+  (84,24 seguido de 83,99, por exemplo). O arquivo só guarda inteiro, e uma marca que não muda o número é ruído na
+  partitura.
+- **O mapa só vale para andamento estimado e só quando há troca.** Com `--bpm` informado (ADR-019) ou sem troca, roda o
+  caminho antigo (`ajustar` + `recuo_de_fase`), e a saída é idêntica à de antes. No caso sem troca, o primeiro trecho
+  da programação dinâmica às vezes fica mais perto da grade que o `ajustar`. Isso foi observado e não adotado: mudaria
+  a saída de músicas planas sem uma medição dedicada.
+- **O cache de notas fica na hora do áudio.** O pipeline passa a usar `mapa.na_partitura` e `mapa.no_audio` onde antes
+  usava `deslocar(x, ±recuo)`. A bateria (`para_audio`) e o multifaixa (que herda o mapa do baixo) seguem a mesma
+  regra.
+- **Exportadores recebem `marcas`.**
+  - GP5: `MixTableChange(tempo=…, hideTempo=False)` no primeiro beat do compasso da troca, que sempre existe, porque
+    pausa também é beat.
+  - MusicXML: `MetronomeMark` no tique da troca, só na pauta de notação (o music21 escreve o `<sound tempo>` junto).
+  - Troca depois da última nota não tem compasso onde cair e é ignorada.
+- **A página não sabe do mapa.** O alphaTab segue a automação de andamento do GP5, e o player externo continua
+  mandando segundos (ADR-046). A auralização trabalha na hora do áudio e não muda.
+
+### Medição (fora da amostra, 21 fontes)
+
+O mapa foi ajustado na parte de treino de cada música. A coluna é a distância média, em ms, das notas da parte de teste
+à grade. "Produção" é o que o pipeline faz: o mapa quando há troca, o andamento único quando não há.
+
+| música | único | produção | variação | trocas |
+|---|---:|---:|---:|---:|
+| And Plague Flowers | 20,3 | 11,1 | −45,2% | 6 |
+| Hallowed Be Thy Name | 31,2 | 21,2 | −32,0% | 4 |
+| `9771390c94c585ce` | 31,0 | 23,9 | −23,0% | 2 |
+| Você | 25,6 | 21,6 | −15,4% | 2 |
+| SOJA — Everything Changes | 15,9 | 13,5 | −15,3% | 1 |
+| `ddc20133ee4470da` | 26,4 | 22,7 | −14,2% | 4 |
+| Seu Jorge — Tive Razão | 26,2 | 22,5 | −13,9% | 1 |
+| Fear Is the Key | 35,4 | 30,5 | −13,8% | 2 |
+| Fear of the Dark | 31,8 | 27,8 | −12,6% | 6 |
+| Dance of Death | 28,5 | 25,1 | −12,1% | 3 |
+| Equus | 13,8 | 13,5 | −2,2% | 2 |
+| Feel Like Makin' Love | 36,2 | 36,3 | +0,2% | 2 |
+| as outras 9, inclusive as planas *Gesu* e *Smooth Operator* | — | — | 0,0% | 0 |
+
+Os três critérios valem: nenhuma música piora mais que 2% (a pior é *Feel Like*, +0,2%); as duas planas não ganham
+troca; e a troca na barra não perde para a troca bruta na mediana. Em *Dance of Death*, as trocas caem em 220,8 s
+(→124,1), 294,3 s (→134,0) e 428,6 s (→127,0). A tab humana marca 123–131 entre 220 e 300 s, 131–137 perto de 300 s e
+126–129 entre 420 e 460 s. O trecho lento continua fora da faixa de ±10%, como a emenda do ADR-034 previa.
+
+### Consequências
+
+- Uma música que muda de andamento sai com marcas de BPM na partitura, e o cursor da página acompanha. Isso é conferido
+  em `-m navegador` (`test_o_cursor_segue_a_troca_de_andamento_do_gp5`).
+- Conversões antigas de músicas com troca só ganham as marcas se forem refeitas. O cache de transcrição (ADR-052) torna
+  isso barato.
+- Mudança de andamento acima de ±10% entre janelas continua sem troca. Ampliar a faixa exige uma medição que não piore
+  as músicas planas.
+
+## ADR-054 — a cabeça do tempo é escolhida pelas batidas do mix
+
+**Data:** 2026-10-30 · **Status:** aceito · **Complementa:** ADR-021, ADR-053
+
+### Contexto
+
+O boletim em 5 dimensões (`services/avaliacao_ritmica.boletim`) mostrou que o maior erro contra as tabs humanas é a
+**posição da nota dentro do pulso**: as figuras estão certas e a semicolcheia da cabeça do tempo está errada. Em *Gesu*,
+580 de 668 pares ficam exatamente uma semicolcheia antes. A causa é estrutural. `ajustar` só busca a fase dentro de
+uma semicolcheia, e `recuo_de_fase` escolhe entre `fase` e `fase − grade`: nada decide **qual** das quatro
+semicolcheias do pulso é a cabeça.
+
+### Medição
+
+Régua congelada antes da rodada (`tasks/todo.md`, "Cabeça do tempo"). O gabarito de cada janela de 15 s é a moda de
+`(pulsos Thoth − pulsos humana) mod 1` nos pares casados por altura, e a régua usa o mapa exato de cada rodada.
+Candidatas sem parâmetro ajustado, contadas nas janelas dominantes (versão anterior da régua, janelas de 30 s):
+
+| regra | acertos (de 32) |
+|---|---:|
+| fase atual | 8 |
+| densidade de notas | 8 |
+| acentos do mix | 15 |
+| batidas do Beat This! | 19 |
+| **batidas do `librosa.beat.beat_track`** | **26** |
+
+Com a regra final (uma fase por música, abstenção), a posição no pulso prevista vai de 0,043 a 0,868 em *Gesu* e não
+muda em *Você*, *Fear*, *Plague* e *Dance*, que se abstêm. Somadas as cinco músicas, a posição sobe de 1801 para 2352
+pares, de 6577.
+
+### Decisão
+
+- **As batidas são as do `beat_track` que `estimar_andamento` já rodava e descartava.** Sem dependência nova, sem rede
+  e sem peso a versionar. O Beat This! foi medido e perdeu para elas; só volta se as superar fora da amostra.
+- **`services/cabeca_do_tempo`** recebe as batidas e o mapa e devolve o deslocamento em semicolcheias (0 a 3). É a
+  moda da fração do pulso, na partitura, onde as batidas caem. Batida em tempo negativo cai no mesmo resto.
+- **Abstenção:** quando a segunda fração mais votada tem pelo menos 80% dos votos da primeira, a fase atual fica. São
+  batidas em dobro sem paridade decidida, ou um mapa que deriva entre elas. O limiar foi fixado antes da medição, e é ele
+  que segura *Você* (86%), que sem abstenção escolheria a fração errada.
+- **O deslocamento entra no recuo antes de escolher as barras.** Em `mapa_de_andamento`, ele é aplicado antes de
+  `_nas_barras`; somado depois, tiraria as trocas da barra (`marcas()`). Se a primeira nota cair antes do zero, o recuo
+  volta um pulso inteiro, e a música começa com pausa (anacruse).
+- **Vale também para o `--bpm` informado.** O número manda no andamento (ADR-019), não em onde o pulso começa.
+- **Multifaixa:** as batidas vêm do mix, e as outras partes herdam o mapa do baixo como antes (ADR-047).
+- **`Resultado.cabeca_do_tempo`** guarda o deslocamento aplicado, ou `None` na abstenção, para a decisão ser
+  auditável sem reler a partitura.
+
+### Consequências
+
+- Músicas de andamento estável cuja cabeça do tempo estava deslocada mudam de saída; os hashes de saída estável se
+  atualizam com esta justificativa.
+- O ganho medido vem de uma música. Nas músicas com troca de andamento, o mapa deriva entre as batidas e a regra se
+  abstém; o ganho restante depende de corrigir essa deriva e escolher a fase por trecho, que fica para outra etapa.
+- O compasso continua 4/4 e o primeiro tempo do compasso não é escolhido aqui.
+- Com troca de andamento, a cabeça deslocada muda a barra em que a primeira troca cai, e o `ajustar` do primeiro
+  trecho mede sobre outras notas: o andamento desse trecho muda centésimos. Nas 18 fontes do cache (notas do stem
+  antigo), só Plague decidiu com troca: 104,88 → 104,94 BPM, primeira troca de 16,1 s para 18,6 s; as 6 trocas e os
+  andamentos delas ficaram iguais. Na rodada real, com o stem atual, Plague se abstém.
+- Abstenção sai no relatório da CLI e em `Resultado.cabeca_do_tempo` (`None`).
+
+## ADR-055 — digitação aprendida nas tabs humanas, só para baixo de 4 cordas
+
+**Data:** 2026-10-30 · **Status:** aceito · **Complementa:** ADR-032 e ADR-050
+
+### Contexto
+
+O `experiente` (ADR-050) concorda com o baixista em ~63% das notas, e os pesos dele foram escolhidos olhando seis tabs,
+_Você_ entre elas. Ajustar os quatro pesos à mão não generalizava. O objetivo é que _Você_ saia igual à tab humana
+**aprendendo com as outras tabs**, sem _Você_ em treino, calibração ou escolha de opção.
+
+### Medição
+
+Treino: _Gesu_, _Dance of Death_, _Fear Is the Key_, _Plague_ e _Eyrie_. Testes, nunca no treino: _Fear of the Dark_
+(faixa 4) e _Você_. Perceptron estruturado com média sobre o mesmo Viterbi, partindo dos pesos do `experiente`; features
+independentes da afinação (casa e região, corda solta, cordas atravessadas, deslocamento da mão em faixas, deslocamento
+rápido); 10 épocas, 40 frases de 32 notas por música a cada época, semente 0. Réguas congeladas antes de cada medição.
+
+- **Validação deixando uma tab de fora (reprovada como régua geral):** as três de 4 cordas ganham de 0,079 a 0,100; as
+  de 5 e 6 cordas, do mesmo baixista, perdem 0,059 e 0,093.
+- **Régua nova, só para 4 cordas, aprovada:** _Fear of the Dark_ 0,395 → 0,800 (piso 0,415); _Você_ 0,738 → 0,858;
+  no placar completo de _Você_, notas na corda/casa certa 549 → 618 (`small`) e 585 → 633 (`medium`), completas
+  557 → 597. Ataques, alturas, durações, faltas e sobras não mudam.
+- **Fontes sem tab (18 no cache):** nenhuma falha, até 0,14 s por música. A aprendida usa bem menos corda solta
+  (por exemplo, 41% → 0,6%), na direção das tabs humanas; ali não há verdade para medir.
+
+### Decisão
+
+- `services/digitacao_aprendida.py`: `DigitacaoAprendida` implementa o `FretAssigner`. Com 4 cordas, usa os pesos
+  aprendidos; com outra afinação, delega à `reserva`, o `experiente`.
+- Os pesos ficam em `services/digitacao_aprendida.json`, com o sha256 de cada tab de treino e os hiperparâmetros. As
+  tabs não entram no repositório (ADR-005). `treinar` recusa _Você_ e _Fear of the Dark_.
+- CLI: `--digitacao aprendida`. Acordes usam os custos do `experiente`. O modelo foi treinado com alcance zero, então
+  `--alcance-mao` diferente de zero é recusado com ele.
+- **O default continua `iniciante`** (ADR-006). Trocar exige ADR próprio.
+
+### Consequências
+
+- Teste `slow` confere os hashes das tabs, treina de novo e exige os mesmos pesos, bit a bit, e os pisos de _Fear of the
+  Dark_ e _Você_. Sem `samples/`, `skip`.
+- Mais tabs de 4 cordas devem melhorar o modelo; retreinar muda o arquivo de pesos e exige nova medição nos testes.
+- A API (`POST /jobs`) ainda não oferece `aprendida`.
+- _Você_ ainda não sai igual à tab humana: 597 de 846 notas completas. Faltam notas que faltam/sobram e durações.
+
+## ADR-056 — o mapa do braço é uma SPA Vue em `braco/`, servida pelo Thoth em `/braco/` e publicável sozinha
+
+**Data:** 2026-11-09 · **Status:** aceito · **Complementa:** ADR-040, ADR-051
+
+### Contexto
+
+Feature nova: mapa de notas do braço (baixo de 4 a 7 cordas e guitarra) com teoria e metrônomo, para estudo no desktop
+e no celular. Tudo roda no navegador; não há dado do servidor. O Thoth serve `web/` em `/` só se o alphaTab estiver
+vendorizado (`api/app.py`) e escuta só em `127.0.0.1`. Abrir a LAN (`--host 0.0.0.0`) expõe upload e jobs; service
+worker exige HTTPS ou `localhost`.
+
+### Opções
+
+- (a) SPA independente, fora do Thoth — sem acoplamento, mas outro processo para servir no desktop.
+- (b) Vue em `braco/`, build Vite em `braco/dist/` (não versionado), montado em `/braco/` **antes** do `/` e sem
+  depender do alphaTab; o mesmo build publicado como site estático (GitHub Pages) para o celular, com HTTPS.
+- (c) Migrar `web/` para Vue — fora do escopo.
+
+### Decisão
+
+(b). Sem `braco/dist/index.html`, `GET /braco/` responde 503 com o comando de build, no padrão do alphaTab — o
+`StaticFiles` levantaria `RuntimeError` com o diretório ausente. O build usa `base: './'` para servir igual em
+`/braco/` e na raiz do Pages. O `Containerfile` ganha um estágio `node:22-slim` (o `npm` do bookworm traz Node 18;
+o Vite exige ≥ 20.19) com `npm ci`; a imagem final continua sem Node. Publicar no Pages é ação externa: preparada,
+executada só com autorização.
+
+## ADR-057 — som por oscilador com envelope, no relógio do `AudioContext`
+
+**Data:** 2026-11-09 · **Status:** aceito
+
+### Opções
+
+Osciladores Web Audio (0 KB, sem latência de carga, timbre sintético) · samples (realismo, MB por instrumento e
+licença a conferir num repositório público) · Tone.js (~150 KB, traz relógio próprio — o pedido exige o do Web Audio).
+
+### Decisão
+
+Osciladores com envelope (nota) e ruído curto filtrado (clique do metrônomo), atrás da interface `Sintetizador`,
+trocável por samples depois. Todo instante de som sai de `AudioContext.currentTime`. Um Web Worker só acorda o
+agendador (tique de 25 ms); o agendador marca os eventos dos próximos 100 ms no relógio de áudio. `setTimeout` nunca é
+fonte de tempo. Parar cancela os nós já agendados; iniciar de novo é inócuo; BPM e subdivisão mudam na batida seguinte;
+o contexto é criado/retomado no primeiro gesto do usuário.
+
+**Teste:** o agendador é função pura, com relógio falso e tolerância zero. A matemática contra Web Audio real é
+conferida com `OfflineAudioContext` (renderização determinística, ±1 ms); isso não mede o jitter em tempo real, que
+fica declarado como não coberto.
+
+**M8:** com o metrônomo parado, o clique toca na hora. Rodando, a opção "quantizar" (desligada por padrão) leva a nota
+à próxima subdivisão da grade.
+
+### Emenda (2026-11-09)
+
+- **Clique por oscilador, não por ruído.** O clique saiu de um oscilador curto com envelope, como a nota; os timbres
+  (`eletronico`, `madeira`, `bipe`) mudam frequência e forma de onda. Um buffer de ruído não trazia ganho audível e
+  exigiria gerar e guardar amostras.
+- **`aoAgendar` além de `aoPulso`.** O metrônomo avisa cada pulso no momento do agendamento, uns 100 ms antes de soar,
+  inclusive os silenciados. A sequência (S6) se pendura nele para marcar a nota no mesmo instante do clique, no relógio
+  de áudio; `aoPulso`, que dispara quando o relógio alcança o pulso, só acende o indicador visual.
+- **A contagem de entrada conta compassos inteiros, com as subdivisões.** Os compassos de contagem têm número negativo
+  e soam como os demais, com as subdivisões escolhidas. A sequência começa no primeiro pulso fora da contagem.
+- **Jitter em tempo real medido no Chromium** (`tests/navegador/test_braco.py`, `-m navegador`): a 120 BPM cada clique
+  é agendado de 50 a 95 ms à frente do `currentTime`, com intervalo de 0,500000 s entre eles. Isso prova que o instante
+  vem do relógio de áudio, não do despertador. A saída real do dispositivo de som continua fora do alcance do teste.
+
+## ADR-058 — baixo de 7 cordas: B-E-A-D-G-C-F padrão, F♯-B-E-A-D-G-C como preset
+
+**Data:** 2026-11-09 · **Status:** aceito
+
+Não há padrão de mercado. Os dois presets mais usados entram, ambos editáveis. Afinações são dado
+(`braco/src/dominio/afinacoes.json`); um teste pytest confere que os presets comuns ao pipeline (4, 5, 6 cordas e drop D)
+têm as mesmas alturas de `AFINACOES` — o conhecimento não diverge em silêncio.
+
+## ADR-059 — braço em SVG com componentes Vue
+
+**Data:** 2026-11-09 · **Status:** aceito
+
+SVG (≤ 7 × 25 = 175 marcadores, estilizável por variáveis CSS, acessível) · Canvas (rápido, sem acessibilidade nativa)
+· DOM em grade (trastes com espaçamento proporcional ficam difíceis). Escolhido SVG. Cada marcador é botão: um só
+focável por vez (`tabindex` itinerante), setas andam entre cordas e casas, Enter toca, nome acessível com nota, corda
+e casa. Espaço fica com o metrônomo.
+
+## ADR-060 — CSS escopado com variáveis, sem Tailwind
+
+**Data:** 2026-11-09 · **Status:** aceito
+
+Os temas (claro, escuro, daltônico) já são variáveis CSS; Tailwind traria uma segunda linguagem de estilo e
+configuração sem ganho num app deste tamanho.
+
+## ADR-061 — cor por nota fora da teoria, cor por função dentro dela
+
+**Data:** 2026-11-09 · **Status:** aceito
+
+Fora do modo teoria: 12 cores, uma por classe de altura. No modo teoria: a tônica tem cor exclusiva e as demais saem
+por grau do padrão (escala, acorde ou intervalo), nunca com a cor da tônica. Os padrões guardam graus grafados
+(`1 2 b3 4 5 b6 b7`), não só semitons — ré♯ e mi♭ são graus diferentes. Contraste calculado por teste em cada paleta ×
+tema × modo: marcador ≥ 3:1 contra madeira, traste e corda (WCAG 1.4.11); texto do marcador ≥ 4,5:1 contra o marcador.
+A paleta daltônica garante contraste e rótulo, não 12 matizes distinguíveis.
+
+## ADR-062 — preferências do braço num único texto de query string, na URL e no localStorage
+
+**Data:** 2026-11-09 · **Status:** aceito
+
+As escolhas do usuário (instrumento, afinação, casas, modo, filtro, tônica, padrão, exibição, metrônomo) são
+serializadas por `persistencia/preferencias.ts` num texto de query string com versão (`v=1`), contendo só os campos
+diferentes do padrão. O mesmo texto vai para a URL (`history.replaceState`, sem nova entrada no histórico) e para o
+localStorage (`thoth-braco:preferencias`). Na abertura, a URL vence o armazenado, que vence o padrão.
+
+- Um formato só, em vez de JSON no armazenamento e query na URL: um codec por campo, uma tabela de validação.
+- Valor de fora é entrada não confiável: campo inválido é recusado e os demais valem; cada recusa vai para
+  `console.warn`. Armazenado de outra versão é descartado inteiro; na URL, a versão ausente vale como atual
+  (link digitado à mão).
+- Instrumento, cordas e afinação chegam em campos separados e podem divergir entre URL e armazenado; o carregamento
+  os põe de acordo, voltando à afinação padrão do instrumento com aviso.
+- localStorage indisponível (aba privada, cota) não impede a página; ela só não lembra.
+- O padrão do store de configuração vem de `PREFERENCIAS_PADRAO`, para não haver dois padrões.

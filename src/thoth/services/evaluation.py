@@ -28,10 +28,78 @@ from mir_eval.onset import f_measure
 from mir_eval.transcription import match_notes, precision_recall_f1_overlap
 from mir_eval.util import match_events
 
-from thoth.domain.models import TOLERANCIA_S, EventoPercussivo, NoteEvent
+from thoth.domain.models import TOLERANCIA_S, EventoPercussivo, NoteEvent, TabNote
 
 #: Quanto a duração pode errar e ainda contar como a mesma nota — padrão do mir_eval.
 OFFSET_RATIO = 0.2
+
+
+@dataclass(frozen=True, slots=True)
+class ScoresDeTablatura:
+    """Contagens separadas, sem esconder erro de digitação num acerto de altura."""
+
+    n_ref: int
+    n_est: int
+    ataques: int
+    alturas: int
+    posicoes: int
+    duracoes: int
+    completas: int
+
+    @property
+    def faltantes(self) -> int:
+        return self.n_ref - self.ataques
+
+    @property
+    def extras(self) -> int:
+        return self.n_est - self.ataques
+
+    @property
+    def coincide(self) -> bool:
+        """Todos os eventos coincidem nas tolerâncias declaradas pelo chamador."""
+        return self.completas == self.n_ref == self.n_est
+
+
+def avaliar_tablatura(
+    referencia: Sequence[TabNote],
+    estimativa: Sequence[TabNote],
+    *,
+    tolerancia_s: float = TOLERANCIA_S,
+    tolerancia_duracao_s: float = TOLERANCIA_S,
+) -> ScoresDeTablatura:
+    """Avalia tabs no mesmo relógio, incluindo corda, casa, duração e pausas.
+
+    Ataques são casados um a um somente pelo instante, sem favorecer altura ou
+    posição. As afinações precisam usar a mesma ordem de cordas. O chamador
+    resolve diferenças entre relógios antes; este método não desloca, estica ou
+    extrai notas para aproximar uma estimativa do gabarito.
+    """
+    if not referencia:
+        raise ValueError("referência vazia: não há o que avaliar")
+    if tolerancia_s < 0 or tolerancia_duracao_s < 0:
+        raise ValueError("tolerâncias não podem ser negativas")
+    ref = sorted(referencia, key=lambda t: (t.event.onset_s, t.event.pitch))
+    est = sorted(estimativa, key=lambda t: (t.event.onset_s, t.event.pitch))
+    pares = (
+        match_events(
+            np.array([t.event.onset_s for t in ref]),
+            np.array([t.event.onset_s for t in est]),
+            tolerancia_s,
+        )
+        if est
+        else []
+    )
+    alturas = posicoes = duracoes = completas = 0
+    for i, j in pares:
+        a, b = ref[i], est[j]
+        altura = a.event.pitch == b.event.pitch
+        posicao = altura and (a.string, a.fret) == (b.string, b.fret)
+        duracao = abs(a.event.duration_s - b.event.duration_s) <= tolerancia_duracao_s
+        alturas += altura
+        posicoes += posicao
+        duracoes += duracao
+        completas += posicao and duracao
+    return ScoresDeTablatura(len(ref), len(est), len(pares), alturas, posicoes, duracoes, completas)
 
 
 @dataclass(frozen=True, slots=True)

@@ -8,13 +8,17 @@ from tests.sintetico import BPM
 from tests.sintetico_multi import FIXTURES_MULTI, referencia
 from thoth.domain.models import EventoPercussivo, NoteEvent, TabNote
 from thoth.services.rhythm import (
+    COMPASSO,
     GRADE,
     PPQ,
+    MapaDeAndamento,
     a_partir_do_zero,
     alinhar,
     ataques_em_ticks,
+    deslocar,
     eventos,
     monofonizar,
+    para_ticks,
 )
 
 
@@ -206,3 +210,49 @@ def test_nota_antes_do_zero_encosta_no_zero_com_a_mesma_duracao() -> None:
     encostada, intacta = a_partir_do_zero([antes, depois])
     assert (encostada.onset_s, encostada.offset_s) == (0.0, pytest.approx(0.32))
     assert intacta == depois
+
+
+def test_mapa_sem_troca_e_o_recuo_de_hoje() -> None:
+    """Música estável: a deformação tem que ser o deslocamento constante, bit a bit."""
+    mapa = MapaDeAndamento(bpm=107.3, recuo=0.137)
+    notas = [_nota(31, 0.5), _nota(33, 41.25)]
+
+    assert mapa.na_partitura(notas) == deslocar(notas, 0.137)
+    assert mapa.no_audio(mapa.na_partitura(notas)) == deslocar(deslocar(notas, 0.137), -0.137)
+    assert mapa.marcas() == []
+
+
+def test_trecho_mais_lento_ocupa_na_partitura_o_que_ocupa_na_musica() -> None:
+    """A 120 o compasso dura 2 s; a troca para 100 no compasso 4 estica o resto.
+
+    Uma semínima a 100 BPM dura 0,6 s no áudio e tem que sair uma semínima na grade
+    de 120 — senão a figura escrita não é a tocada.
+    """
+    mapa = MapaDeAndamento(bpm=120, trocas=((8.0, 100),))
+
+    assert mapa.para_partitura(8.6) == pytest.approx(8.5)
+    assert para_ticks(mapa.para_partitura(8.6), mapa.bpm) == 17 * PPQ
+    assert mapa.marcas() == [(4 * COMPASSO, 100)]
+
+
+def test_a_volta_ao_audio_desfaz_a_ida() -> None:
+    mapa = MapaDeAndamento(bpm=120, recuo=0.05, trocas=((8.0, 100), (20.0, 131.5)))
+
+    for t in (0.1, 7.99, 8.0, 13.3, 20.0, 31.7):
+        assert mapa.para_audio(mapa.para_partitura(t)) == pytest.approx(t)
+
+
+def test_nota_que_atravessa_a_troca_tem_cada_pedaco_no_seu_andamento() -> None:
+    """Ataque a 120 e término a 100: o fim da nota é deformado pelo trecho dele."""
+    mapa = MapaDeAndamento(bpm=120, trocas=((8.0, 100),))
+
+    (nota,) = mapa.na_partitura([NoteEvent(31, 7.5, 8.6, "x")])
+
+    assert (nota.onset_s, nota.offset_s) == (pytest.approx(7.5), pytest.approx(8.5))
+
+
+def test_troca_que_o_arredondamento_apaga_nao_vira_marca() -> None:
+    """A partitura escreve BPM inteiro: 84,2 seguido de 84,0 é uma marca só."""
+    mapa = MapaDeAndamento(90.0, trocas=((8.0, 84.2), (10.0, 84.0), (16.0, 84.4)))
+
+    assert [bpm for _, bpm in mapa.marcas()] == [84.2]

@@ -1,0 +1,45 @@
+# Publica o mapa do braço (braco/) no GitHub Pages.
+# Só roda quando disparado à mão: nada é publicado por push.
+# Antes do primeiro uso: Settings → Pages → Source: "GitHub Actions".
+name: braço no Pages
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  construir:
+    runs-on: ubuntu-24.04
+    defaults:
+      run:
+        working-directory: braco
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: braco/package-lock.json
+      - run: npm ci
+      - run: npm run verificar
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: braco/dist
+
+  publicar:
+    needs: construir
+    runs-on: ubuntu-24.04
+    environment:
+      name: github-pages
+      url: ${{ steps.publicacao.outputs.page_url }}
+    steps:
+      - id: publicacao
+        uses: actions/deploy-pages@v4

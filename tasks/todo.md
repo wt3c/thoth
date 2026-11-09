@@ -2,6 +2,886 @@
 
 > Áudio → partitura e tablatura, foco em contrabaixo. Uso pessoal. CPU-only. Decisões em `tasks/decisions.md`.
 
+## Mapa de notas do braço — SPA Vue (aprovado: "pode seguir", 2026-11-09)
+
+ADR-056 a 061. Celular pelo build estático publicado (Pages, ação externa só com
+autorização); M8 com quantização opcional, desligada por padrão.
+
+0. [x] ADRs 056–061 e este plano.
+1. [x] Esqueleto: `braco/` (Vite+Vue+TS+Pinia+Vitest, dependências congeladas),
+   contratos de `dominio/`, `som/` (não `audio/`: a regra de deny dos áudios casa com qualquer
+   `audio/`, `tasks/lessons/workflow.md`), `stores/`; braço de 4 cordas com clique tocando;
+   `/braco/` no FastAPI com 503 sem build; Containerfile; teste offline do Web Audio.
+2. [x] Trilha A `dominio/` (Codex, worktree): 14 afinações (baixo 4–7, guitarra), cifra/solfejo,
+   42 padrões com grafia por grau, 3 paletas (mínimo medido: marcador 4,36/4,45/3,22 ≥ 3; texto
+   6,82/9,57/4,68 ≥ 4,5). O sandbox do Codex não grava no `.git` compartilhado: commit pelo integrador.
+   Para a UI: tônica em classe preta precisa da escolha ♯/♭ (A♯ maior grafa B♯, C𝄪); id
+   `acorde-°7` exige codificar na URL; paleta daltônica tem graus 2–7 todos azuis (o rótulo é que distingue).
+3. [x] Trilha B `som/` (Claude, worktree): agendador puro, metrônomo com janela de 100 ms e Worker,
+   contagem, silêncio por compassos, tap tempo, `momentoDaNota` (M8) e `SequenciaNoMetronomo` (S6)
+   via `aoAgendar`. Real offline: cliques a ±0,02 ms do esperado. Jitter em tempo real fica para o e2e.
+   Integradas em `feat/braco`: 147 testes, tipos, lint e build.
+4. [x] Trilha C UI: painéis de notas/teoria, metrônomo, instrumento e exibição; tokens claro/escuro;
+   alvos ≥ 44 px; conferida no navegador a 1234 e 390 px (o braço rola dentro do quadro, a página não).
+5. [x] Integração:
+   - [x] M8 (quantizar, desligado) e S6 (sequência no metrônomo) ligados à UI.
+   - [x] S8 (ADR-062): query string versionada na URL e no localStorage; conferido no navegador.
+   - [x] e2e `-m navegador` (`tests/navegador/test_braco.py`): áudio só após o gesto, Worker real,
+     cliques 50–95 ms à frente do `currentTime`, intervalo exato de 0,5 s a 120 BPM; sequência acende no braço.
+   - [x] README; `/verificacao` + skill Codex com `npm --prefix braco`; workflow do Pages só por
+     `workflow_dispatch` (não publicado); emenda do ADR-057.
+6. [ ] Publicar no Pages (habilitar a fonte "GitHub Actions" e disparar o workflow) — só com autorização.
+
+Dono exclusivo de `package.json`/lockfile, configs, `tasks/*`, `Containerfile`, `app.py`: o integrador (Claude).
+
+## Corpus humano para velocidade e ritmo (2026-10-30)
+
+O usuário ouviu a candidata, reprovou principalmente velocidade e ritmo e
+solicitou usar as outras versões humanas de `samples/` para melhorar o processo.
+Continuar o trabalho já autorizado; o objetivo de equivalência permanece aberto.
+Origem: leitores e avaliadores do Thoth, ADR-021/034/041/042/053 e testes de
+quantização existentes. Não há solução musical no banco entre projetos.
+
+1. [ ] Conferir os seis pares referência/áudio/saída, hashes, versões e afinação;
+   não confundir saídas antigas homônimas com as atuais.
+2. [ ] Validar GP5 → MuseScore → MIDI com fixture existente (pausas, ligaduras,
+   mudança de andamento), sem copiar áudio ou notas humanas para a inferência.
+3. [ ] Produzir comparativo reproduzível de velocidade, figuras, pausas,
+   compassos e notas nas seis músicas; separar reprodução e transcrição.
+4. [ ] Corrigir causas comprovadas por testes; avaliar generalização com uma
+   música fora dos ajustes por vez; executar verificação de entrega.
+
+Progresso (2026-10-30, Claude, retomando a sessão do Codex interrompida):
+
+- `comparar_ritmo` informa a velocidade por janela (`janela_s`, padrão 20 s, no
+  relógio da referência): a mediana global escondia trechos acelerados. TDD com
+  vermelho visto (`janelas` e `janela_s` inexistentes).
+- GP5 grava a marca de andamento explícita no compasso 1. Os hashes de
+  `test_gp5_saida_estavel` foram refeitos; sem a marca, os bytes reproduzem os
+  hashes antigos exatamente (conferido).
+- MuseScore 4.7.5 recusa `catedral-voce_build.gp5` (GP5 v5.00) com código 40,
+  determinístico, na importação; a causa é a faixa de bateria (sem ela, converte).
+  Uma cópia só da bateria regravada pelo PyGuitarPro falha de forma intermitente
+  (código 1). É limitação do leitor com o arquivo humano: o lado MIDI de Você fica
+  sem medição e o script registra `erro_reproducao`; o leitor PyGuitarPro mede.
+- Velocidade 0,5 em Dance of Death e Plague é artefato de alinhamento: nota
+  repetida omitida faz o par consecutivo saltar um ataque. Entre alturas
+  distintas, p10 sobe para 0,78 e 0,95. Eyrie não: a tab humana toca 366 s
+  (68→434 s) contra 711 s da gravação; não serve de gabarito de velocidade.
+- Duração total no tempo real bate com o áudio em Você, Gesu, Dance e Plague
+  (±1%); Fear termina 14 s antes. O BPM escrito diverge (Você 116 × 106,
+  Dance 129 × 150) com o relógio igual: as figuras compensam o andamento.
+
+Verificação: 770 testes padrão, Ruff limpo, mypy sem erros (47 arquivos);
+`-m "slow and not network"` do corpus e da reprodução MIDI: 3 passaram.
+
+Régua corrigida (aprovada: "pode seguir"): repetição de mesma altura com
+tamanhos diferentes nos dois lados torna o par ambíguo; esses intervalos saem
+da velocidade e do erro de intervalo (`intervalos_ambiguos`). TDD: p10 0,75 no
+vermelho. Corpus refeito em `out/avaliacao-ritmo-2026-10-30-regua2/`: p10 de
+Fear 0,49 → 0,98 e de Plague 0,48 → 0,95. Onde há medida, o Thoth segue o
+relógio da gravação; razões constantes (Dance 1,075, Plague 0,955) são o
+andamento da tab humana diferente da gravação.
+
+Causa do 116 × 106 em Você: a tab humana acelera aos poucos (106 → 124 → 121);
+janelas de 20 s e λ = 2000 (ADR-034/053) não pagam trocas pequenas e o mapa fica
+em 116 até o compasso 53. O quantizador compensa com figuras erradas: figura
+igual à humana 98,6% onde o andamento escrito difere < 1% do tocado; 91,9%
+(1–3%), 89,6% (3–6%), 77,6% (> 6%). Fear: 36% acima de 6%. Andamento local medido
+em ±8 notas; não é totalmente independente das figuras. Próximo: varrer janela e
+λ a partir do cache de notas, medindo figuras contra as tabs válidas (Você, Gesu,
+Fear, Plague) com uma música fora por vez; mudança de parâmetro exige emenda ao
+ADR-053. Verificação: 772 testes, Ruff, mypy limpos.
+
+Varredura janela × λ (aprovada: "pode seguir"; só medição, programa intacto):
+pipeline real com cache, stems Demucs `shifts0` refeitos (Gesu tem 762 notas
+contra 765 do GP5 antigo; a régua é a rodada nova com 20 s/2000). Fração de
+intervalos certos contra a tab humana:
+
+| config | Você | Gesu | Fear | Plague |
+| --- | --- | --- | --- | --- |
+| 20 s / 2000 (atual) | 684/721, 2 trocas | 402/442, 0 | 284/340, 2 | 1758/1828, 6 |
+| 20 s / 1000 | 701/721, 6 | 402/442, 0 | 296/350, 9 | 1764/1836, 8 |
+| 10 s / 1000 | 700/721, 6 | 402/442, 0 | 300/353, 5 | 1772/1841, 9 |
+| 5 s / 250 | 0,981, 19 | 0,914, 7 | 0,860, 27 | 0,963, 24 |
+
+λ ≤ 500 põe 3 a 20 trocas em Gesu (constante); a janela pesa pouco. Deixando
+Gesu de fora, as outras três escolhem (10 s, 250): Gesu cai 0,001 e ganha 9
+trocas. λ = 1000 manteria Gesu, mas nas 18 fontes do cache (notas do stem
+antigo + `_medir_grade` real; a aproximação reproduz 2→6, 0→0, 6→8 das rodadas
+reais) 5 das 9 músicas sem troca ganham trocas: Arde Outra Vez salta de 124 para
+135 e Is It A Crime começa em 106,4 em vez de 111,8. Com λ 1500 e 1250, Is It A
+Crime ainda ganha 2–3. **Não adotado** (critério do ADR-053). O custo fixo por
+troca não distingue a aceleração gradual de Você (106 → 124) de trocas
+espúrias; com λ global não há ajuste que sirva. Scripts em scratchpad
+(`varredura/`), não versionados.
+
+Objetivo esclarecido pelo usuário: as tabs humanas são gabarito para o Thoth
+**aprender a identificar**; medir na música deixada de fora. Ele julga pela
+partitura tocada no Guitar Pro.
+
+Beat This! (modelo pronto; aprovado: "pode"): checkpoint `final0` baixado de
+cloud.cp.jku.at (81 058 141 bytes, sha256 `8c328b45…8331`), pacote PyPI
+`beat-this` só em overlay `uv run --with`, sem entrar no projeto; 6–19 s por mix
+em CPU. Andamento local contra o escrito na tab humana, os dois GP5 levados ao
+áudio por `alinhar` (fração dos pontos a < 2% / < 4%):
+
+| música | Beat This (mediana de intervalos) | Beat This (reta, dobrado ao global) | Thoth atual |
+| --- | --- | --- | --- |
+| Você | 0,72 / 0,82 | 0,60 / 0,69 | 0,67 / 0,84 |
+| Gesu | 1,00 / 1,00 | 1,00 / 1,00 | 1,00 / 1,00 |
+| Fear | 0,76 / 0,80 | 0,49 / 0,67 | 0,16 / 0,69 |
+| Dance | 0,48 / 0,66 | 0,39 / 0,75 | 0,31 / 0,45 (GP5 antigo) |
+| Plague | dobro (mediana 1,95) | 0,03 / 0,24 | 0,36 / 0,37 |
+
+Plague: as duas medianas ficam em 0,955, porque a tab humana não segue a
+gravação; essa música não decide. Nas fontes constantes, o Beat This bruto oscila:
+grade de 20 ms (degraus de ~4%), metade/dobro por trecho (Se Eu Cair 60↔120,
+Arde Outra Vez 82↔125) e Is It A Crime (ao vivo) instável. Resultado depende
+do estimador local, então não escolher o estimador olhando estas 5 músicas.
+Conclusão: o modelo acerta onde o mapa atual erra (Fear, Dance), mas não serve
+como troca direta. Precisa de mapa robusto (continuidade de andamento, dobra
+por oitava) avaliado deixando uma música de fora.
+
+Híbrido medido em 2026-10-30 (script `hibrido/medir.py` no scratchpad). As
+batidas do Beat This! entram como pontos do `mapa_de_andamento`, com o global
+e a faixa ±10% do Thoth. Foram duas variantes, só batidas (B) e notas ∪ batidas
+(U), com λ de 250 a 8000. Métrica: andamento do mapa contra o escrito na tab
+humana, fração < 2% / < 4%. Na métrica do mapa, o atual tem Você 0,66/0,85,
+Fear 0,47/0,69 e Dance 0,10/0,72, e as 8 fontes estáveis ficam sem troca.
+
+| variante | Você | Fear | Dance | estáveis com troca |
+| --- | --- | --- | --- | --- |
+| B-1000 | 0,74 / 0,95 | 0,46 / 0,69 | 0,06 / 0,50 | 4 (Is It A Crime 3, Arde 2) |
+| B-2000 | 0,51 / 0,58 | 0,69 / 0,69 | 0,00 / 0,00 | 0 |
+| U-2000 | 0,73 / 0,92 | 0,47 / 0,69 | 0,06 / 0,36 | 2 |
+| U-4000 | 0,67 / 0,88 | 0,33 / 0,69 | 0,00 / 0,00 | 0 |
+
+Nenhuma combinação de variante e λ mantém as estáveis sem troca e, ao mesmo
+tempo, empata ou melhora Você, Fear e Dance. Com λ alto Dance perde todas as
+trocas, e com λ baixo aparecem trocas falsas. **Híbrido não adotado**: sem plano
+e sem ADR de integração, e o Beat This! continua fora do projeto.
+
+Custo de troca proporcional ao salto (aprovado: "pode seguir"; só medição,
+programa intacto). Hipótese: hoje toda troca custa 2000 ms·nota, então o passo
+pequeno da aceleração de Você custa o mesmo que o salto espúrio de Arde Outra
+Vez (124 → 135). Variante no scratchpad: trocar de b para b' custa
+`fixo + k·|b' − b|/bpm·100` (k em ms·nota por 1% de salto), varrendo `fixo` e
+`k`; `fixo = 2000, k = 0` é o atual. Régua congelada **antes** de rodar:
+
+1. Nenhuma das fontes do cache sem troca na régua atual ganha troca (aproximação
+   `proxy2`, notas do stem antigo + `_medir_grade` real), e Gesu fica sem troca.
+2. Nenhuma das 4 músicas com tab humana perde mais de 0,02 na fração de
+   intervalos certos.
+3. Você, Fear e Plague melhoram nessa fração.
+4. O par (`fixo`, `k`) é escolhido deixando uma música de fora, entre os que
+   passam em 1; a de fora não pode piorar mais de 0,02.
+
+Se nenhum par passar, fica registrado como descartado. Se passar, plano de
+mudança com TDD, emenda ao ADR-053 e revisão do plano antes da aprovação.
+
+Resultado (2026-10-30): **descartado, nenhum par passa**. A variante com
+`fixo = 2000, k = 0` reproduz o mapa original em todas as 18 fontes, conferido
+com `assert`, e as rodadas reais de 20 s/2000 da varredura anterior. A grade
+varreu `fixo` ∈ {250, 500, 1000, 2000} e `k` ∈ {100, 250, 500, 1000, 2000}.
+
+- Critério 1: com `fixo` de 250 ou 500, Thalles, Sou Eu e Gesu ganham troca.
+  Com `fixo` 1000, Is It A Crime ganha 1–2 trocas e Smooth Operator 1–2.
+  Só `fixo` 2000 passa.
+- As trocas falsas são **passos pequenos**: Is It A Crime 107,7 → 111,8 → 111,0
+  e Smooth Operator 119,1 → 118,8. São do mesmo tamanho que os passos reais de
+  Você (113,7 → 116,1 → 118,7 → …). O tamanho do salto não separa uma coisa
+  da outra, e a hipótese cai.
+- Critérios 2 e 3 no pipeline real (fração de intervalos certos, trocas):
+
+| par | Você | Gesu | Fear | Plague |
+| --- | --- | --- | --- | --- |
+| 2000 / 0 (atual) | 0,949, 2 | 0,910, 0 | 0,835, 2 | 0,962, 6 |
+| 2000 / 100 | igual ao atual | igual | igual | igual |
+| 2000 / 250–500 | 0,921, 0 | 0,910, 0 | 0,835, 2 | 0,962, 6 |
+| 2000 / 1000 | 0,921, 0 | 0,910, 0 | 0,849, 2 | 0,963, 5 |
+| 1000 / 100 (falha em 1) | 0,968, 6 | 0,910, 0 | 0,853, 3 | 0,961, 8 |
+
+Entre os pares de `fixo` 2000, 100 não muda nada e os demais tiram as trocas de
+Você, que perde 0,028. Isso passa do limite de 0,02. O único par que melhora Você
+e Fear (1000/100) é o mesmo ganho de λ 1000, com as mesmas trocas falsas nas
+estáveis. Conclusão: o custo da troca, fixo ou proporcional, não separa
+aceleração real de troca espúria. A informação que falta não está no custo, e
+sim em outro sinal. Scripts (`prop.py`, `proxy_prop.py`, `rodar_prop.py`,
+`prop.sh`) no scratchpad, não versionados.
+
+### Boletim em 5 dimensões (aprovado: "pode", 2026-10-30)
+
+Objetivo: para cada música com tab humana, uma fração em [0, 1] por dimensão,
+para saber qual dimensão mais separa o Thoth da versão humana. Os pares vêm do
+alinhamento por altura que `comparar_ritmo` já faz, então o relógio não escolhe
+o par. As dimensões:
+
+- **andamento**: fração das janelas de 20 s com velocidade a < 4%.
+- **figuras**: intervalos corretos / intervalos comparáveis.
+- **posição no pulso**: pares com a mesma posição dentro da semínima
+  (`inicio_pulsos mod 1`). Suposição declarada: uso o pulso e não o compasso,
+  porque anacruse e compasso 3/4 deslocariam o compasso sem que o ritmo mudasse.
+- **altura**: pares com a mesma altura / notas da referência.
+- **digitação**: pares tocados na mesma corda / pares em que as duas têm corda.
+  A corda é identificada pela altura solta, o que permite comparar baixo de 4
+  cordas com o de 5.
+
+- [x] 1. Testes vermelhos em `test_avaliacao_ritmica.py`: posição no pulso,
+      digitação e `boletim`.
+- [x] 2. Implementar em `avaliacao_ritmica.py`: `EventoRitmico.corda` opcional,
+      contagens novas e a função `boletim`.
+- [x] 3. `_ler` do script lê a corda via `_tablatura`, e o resultado ganha o
+      boletim, com teste real em `test_corpus_ritmico.py`.
+- [x] 4. Medir nos GP5 atuais (Você, Gesu, Fear, Plague com 20 s/2000; Dance
+      ainda com o GP5 antigo) e registrar a tabela aqui.
+- [x] 5. Suíte, Ruff e mypy: 778 passed, Ruff e mypy limpos.
+
+Boletim medido em 2026-10-30 (manifesto e saída no scratchpad, `boletim/`).
+Dance e Eyrie usam GP5 antigos. Eyrie tem afinação de 4 cordas contra 6 da
+humana e velocidade 0,485, então não decide:
+
+| música | andamento | figuras | posição no pulso | altura | digitação |
+| --- | --- | --- | --- | --- | --- |
+| Você | 0,92 | 0,95 | **0,43** | 0,93 | 0,74 |
+| Gesu | 1,00 | 0,91 | **0,04** | 0,87 | 0,42 |
+| Fear | 0,87 | 0,84 | **0,27** | 0,72 | 0,44 |
+| Plague | 0,31 | 0,96 | **0,27** | 0,79 | 0,43 |
+| Dance | 0,19 | 0,71 | **0,24** | 0,55 | 0,24 |
+
+A maior distância é a **posição no pulso**: as figuras acertam e as notas caem
+na semicolcheia errada do tempo. Deslocamento (gerada − humana) mod 1 pulso,
+nos pares alinhados por altura (`boletim/fases.py`):
+
+- Gesu: 580 de 668 pares com exatamente −1 semicolcheia (0,75), constante do
+  começo ao fim.
+- Plague: +0,25 no primeiro terço e 0 no último.
+- Você: 0,75 no primeiro terço e 0 no último.
+
+Plague e Você mudam de deslocamento ao longo da música, junto com a deriva de
+andamento.
+
+Causa provável, conferida no código: `ajustar` e `recuo_de_fase` encontram a
+fase só dentro de uma semicolcheia (`grade = 60/bpm/4`). O resíduo é o mesmo
+para as 4 semicolcheias, e nada escolhe qual delas é a cabeça do tempo. O
+começo do tempo fica onde o primeiro tique cair. Próximo passo: escolher a
+semicolcheia do tempo por medição (candidatas: acentos do mix, batidas do
+Beat This!, densidade de notas por posição), com validação deixando uma
+música de fora. É mudança de comportamento do pipeline, então exige plano,
+ADR e revisão.
+
+### Cabeça do tempo — plano (2026-10-30) ✅ **FECHADO** (`d4944f1`)
+
+Medição prévia (`boletim/cabeca.py` no scratchpad). Janelas de 30 s em que um
+deslocamento domina pelo menos 60% dos pares, contando quantas vezes cada regra
+acerta a semicolcheia da cabeça do tempo indicada pela humana. Nenhuma regra tem
+parâmetro ajustado, então não há vazamento entre músicas:
+
+| música | janelas | atual (fase 0) | densidade | Beat This! | acentos do mix | **batidas do librosa** |
+| --- | --- | --- | --- | --- | --- | --- |
+| Você | 5 | 3 | 0 | 3 | 1 | **4** |
+| Gesu | 8 | 0 | 1 | 8 | 7 | **8** |
+| Fear | 2 | 0 | 2 | 1 | 1 | **1** |
+| Plague | 17 | 5 | 5 | 7 | 6 | **13** |
+| total | 32 | 8 | 8 | 19 | 15 | **26** |
+
+As batidas do `librosa.beat.beat_track` já são calculadas em `estimar_andamento`
+(`tempo.py:106`) e descartadas. Elas venceram o Beat This! sem dependência nova,
+sem rede e sem mudar o `models.lock.toml`. **O Beat This! sai do plano**: só volta
+se, numa etapa futura, superar o librosa fora da amostra.
+
+Revisões independentes (fable e Codex, ambas "aprovar com ajustes"), já
+incorporadas abaixo:
+
+- A causa raiz está certa: `ajustar` só busca fase dentro de uma semicolcheia, e
+  `recuo_de_fase` escolhe entre `fase` e `fase - grade`. Nada escolhe qual das 4
+  semicolcheias é a cabeça do tempo.
+- O deslocamento precisa entrar **antes** de `_nas_barras`, como parâmetro de
+  `mapa_de_andamento`. Somado ao recuo depois, ele tira as trocas da barra
+  (`marcas()`, `rhythm.py:131-143`; `gp5.py:125-130`).
+- 32 janelas sustentam um experimento, não uma adoção. A régua precisa ser
+  congelada antes da rodada que decide.
+
+Etapas:
+
+0. **Régua congelada, antes de qualquer código** (scratchpad). Janela, limiar de
+   dominância e critério ficam escritos aqui antes da rodada:
+   - Janela de 15 s, dominância ≥ 60%, mapa exato (não interpolação entre ataques
+     do baixo).
+   - Dance regerada com o pipeline atual; Eyrie segue fora (afinação errada).
+   - Relatar a cobertura (janelas excluídas e por quê) e a ambiguidade do
+     `_alinhar`.
+   - Decisão **global por música** (uma fase só), comparada com a humana; quando a
+     moda por trecho discorda da global, isso é relatado.
+   - Batidas em dobro ou metade: dobradas para a semínima. Se a paridade não
+     decidir (empate entre duas fases a meio tempo), o serviço se abstém e mantém
+     a fase atual.
+
+   Critério para seguir: nenhuma música pior que a fase atual e o total melhor.
+   Se surgir parâmetro, ele é escolhido deixando uma música de fora.
+
+   **Régua congelada (2026-10-30, aprovada: "pode"), escrita antes da rodada**
+   (`regua/medir.py` no scratchpad):
+   - Mapa exato: o `Resultado.mapa` (bpm, recuo, trocas) de cada rodada vai para
+     `mapa.json`. O tempo no áudio de uma nota é `mapa.para_audio(pulsos·60/bpm)`,
+     e o pulso de uma batida é `mapa.para_partitura(t)·bpm/60`. Sanidade: mediana
+     da distância entre a nota assim reconstruída e o ataque mais próximo do cache.
+   - Gabarito por janela de 15 s: moda de `(pulsos Thoth − pulsos humana) mod 1`,
+     arredondada à semicolcheia, nos pares do `_alinhar`. Uma janela conta com pelo
+     menos 12 pares e moda com pelo menos 60% deles.
+   - Candidata: **uma** fase por música, a moda da fração das batidas do librosa
+     (`beat_track` no `mix.wav`, como em `estimar_andamento`). Abstém-se, e fica
+     a fase 0, quando a segunda fração mais votada tem pelo menos 80% dos votos
+     da primeira (batidas em dobro sem paridade decidida).
+   - Medidas por música: (a) janelas dominantes acertadas pela fase global, contra
+     a fase 0; (b) **posição no pulso prevista**, a fração dos pares cujo
+     deslocamento é igual à fase escolhida (o `_alinhar` casa por altura, então
+     deslocar a grade não muda os pares nem as figuras); (c) teto: a melhor fase
+     global possível; (d) cobertura (janelas descartadas por poucos pares ou sem
+     dominância), altura (pares/notas da humana) e janelas cuja moda local das
+     batidas discorda da global.
+   - Músicas: Você, Gesu, Fear, Plague e Dance regerados agora (20 s, λ 2000).
+     Eyrie fica fora (afinação errada).
+   - Passa se, em (b), nenhuma música cai e a soma sobe, e se, em (a), o total
+     sobe. O 0,8 da abstenção e o 12/60% das janelas foram fixados aqui, sem rodar.
+
+   **Resultado da régua (2026-10-30)** (`regua/resultado.jsonl`). Sanidade do mapa
+   exato: 6,5 a 22,7 ms de mediana entre a nota reconstruída e o ataque do cache.
+
+   | música | trocas | votos das batidas (0 / ¼ / ½ / ¾) | fase | posição: fase 0 → escolhida (teto) | janelas: 0 → escolhida (teto) / dominantes |
+   | --- | --- | --- | --- | --- | --- |
+   | Você | 2 | 118 / 73 / 115 / 137 | abstém | 0,434 → 0,434 (0,434) | 5 → 5 (5) / 10 |
+   | Gesu | 0 | 53 / 33 / 2 / 424 | ¾ | **0,043 → 0,868** (0,868) | **0 → 14** (14) / 14 |
+   | Fear | 2 | 147 / 175 / 72 / 115 | abstém | 0,267 → 0,267 (0,307) | 1 → 1 (3) / 6 |
+   | Plague | 6 | 469 / 440 / 76 / 146 | abstém | 0,299 → 0,299 (0,456) | 10 → 10 (18) / 33 |
+   | Dance | 3 | 278 / 289 / 273 / 272 | abstém | 0,245 → 0,245 (0,285) | 0 / 0 dominantes |
+   | total | | | | pares 1801 → 2352 de 6577 | 16 → 30 (40) / 63 |
+
+   O critério congelado passa: nenhuma música cai, e as duas somas sobem. A
+   leitura honesta é mais estreita:
+   - Todo o ganho vem de Gesu, a única música sem troca de andamento. Nas quatro
+     com trocas, as batidas votam quase por igual nas quatro frações, e a regra se
+     abstém. As batidas não discordam da fase: o mapa é que deriva entre elas.
+   - Você se abstém por pouco (0,86 contra o limiar de 0,8), e escolheria ¾, fora
+     do teto 0. A abstenção é a salvaguarda que sustenta o "nenhuma pior".
+   - Em Plague, Fear e Dance, o teto global ganharia pouco (até +0,16). O ganho
+     maior está na fase por trecho, que depende de corrigir a deriva do mapa.
+
+   **Etapas 1 a 5 feitas (2026-10-30).** `services/cabeca_do_tempo.py`,
+   `Andamento.batidas`, `mapa_de_andamento(..., cabeca=)`, `Resultado.cabeca_do_tempo`
+   e aviso de abstenção na CLI, tudo por TDD.
+
+   Medição de ponta a ponta (scratchpad `etapa5/`):
+   - As 5 músicas foram regeneradas com o pipeline novo. A régua confirma a
+     previsão: Gesu sai com recuo 0,104 → 0,435 s (+3 semicolcheias), posição no
+     pulso 0,043 → 0,868 e janelas 0 → 14 de 14. As outras quatro se abstêm e
+     saem idênticas (BPM, recuo e trocas). Total de pares na posição certa:
+     1801 → 2352 de 6577.
+   - Nas 18 fontes do cache (notas do stem antigo):
+     - 7 decidem sem troca: Gesu, A Resposta, Sou Eu, Smooth Operator, Arde Outra
+       Vez, Se Eu Cair e O Sol. Nelas só o recuo muda; o BPM fica igual.
+     - 5 com troca escolhem 0 e não mudam. 5 se abstêm.
+     - Plague (com troca) decide ¼: as 6 trocas ficam iguais, mas o primeiro trecho
+       vai de 104,88 para 104,94 BPM, porque a primeira troca cai em outra barra
+       (16,1 → 18,6 s). É desvio da letra do critério "BPM igual", e não é defeito.
+     - Todas as trocas ficam na barra.
+   - Sem tab humana, as 6 fontes decididas sem troca não têm gabarito. A mudança
+     delas é aposta na mesma regra que acertou Gesu, e não um resultado medido.
+
+   **Etapa 6 feita (2026-10-30).** README, AGENTS e ADR-054 atualizados; sem lição,
+   porque não houve correção do usuário. Verificação: suíte padrão 798 passed;
+   `-m "slow and not network"` 51 passed e 1 skipped com `-n 2`. Com `-n auto`,
+   `test_caminho_real_ate_o_arquivo_baixado` falhou duas vezes, provavelmente por disputa de
+   memória, o que agora está documentado em AGENTS e `/verificacao` (`9f0790a`).
+   Ruff e mypy limpos.
+1. **ADR-054**: a cabeça do tempo é escolhida pelas batidas do librosa; o mapa
+   continua decidindo andamento e trocas (ADR-053 intacto). O ADR registra o
+   Beat This! medido e descartado.
+2. **Serviço puro `services/cabeca_do_tempo.py`**: dado o mapa e as batidas,
+   devolve o deslocamento em semicolcheias (0 a 3) ou abstenção. Moda da fração
+   do pulso onde as batidas caem, com tempo negativo (anacruse) dobrado para o
+   intervalo do pulso. TDD com dados sintéticos.
+3. **`estimar_andamento` devolve as batidas** que hoje descarta. Teste real num
+   WAV (barato: librosa já roda na suíte padrão).
+4. **Pipeline**:
+   - `mapa_de_andamento` recebe o deslocamento e o aplica antes de `_nas_barras`;
+     `recuo_de_fase` não é reaplicado por cima.
+   - Com BPM informado, as batidas são dobradas para o pulso dado.
+   - Na multifaixa, as batidas vêm do `mix.wav` e a mesma fase vai às três
+     chamadas de `_medir_grade` (`pipeline.py:731, 801, 856`).
+   - Abstenção ou falha → fase atual, com um campo legível por máquina em
+     `Resultado` e aviso no relatório.
+5. **Medição de ponta a ponta**:
+   - Boletim nas 5 músicas: posição no pulso precisa subir; andamento e figuras
+     não podem cair.
+   - Nas 18 fontes: BPM e número de trocas iguais; as trocas continuam na barra.
+     A fase pode mudar (o critério "mapa idêntico" da versão anterior estava
+     errado).
+   - Reler o GP5 gerado e conferir pela reprodução independente
+     (`test_gp5_reproducao_midi`).
+   - Hashes de `test_gp5_saida_estavel` atualizados só com justificativa.
+6. **Documentação**: README e AGENTS, lição e todo; verificação com a suíte
+   padrão, `-m "slow and not network"`, Ruff e mypy.
+
+Riscos:
+
+- Evidência curta: 32 janelas, e Gesu decide boa parte. A etapa 0 pode reprovar
+  a adoção; nesse caso nada é implementado e o resultado fica registrado.
+- Você e Plague mudam de deslocamento ao longo da faixa por deriva do mapa. Uma
+  fase global corrige só parte delas; a fase por trecho fica para depois.
+- Mudar a fase muda todos os GP5 gerados (hashes de saída estável).
+- O teto de 4/4 continua: compasso composto ou 3/4 não é tratado aqui.
+
+Sucesso desta etapa: uma base de avaliação que detecte as divergências audíveis
+e impeça promover outra candidata por F1 de cache ou ganho em uma única música.
+Uma melhoria local não encerra a tarefa de igualdade com a versão humana.
+Riscos: versões distintas da gravação, afinações incorretas em saídas antigas,
+compassos 3/4 e compostos contra o 4/4 fixo, articulação do player MIDI e
+arredondamento de BPM. Testes usam recursos reais; sem mocks de formato/leitor.
+Revisão de exploração: `diagnosticar_ritmo_notas` (corpus) e
+`explorar_comparacao` (reprodução independente). Não há revisor específico de
+áudio no harness; decisões de arquitetura, se necessárias, terão ADR próprio.
+
+## Você igual à tab humana por aprendizado, com Você fora (aprovado: "pode seguir", 2026-10-30)
+
+Meta: a saída de _Você_ igual à tab humana em nota, corda/casa e duração, das 846 notas. O caminho é só aprender com
+as outras tabs: Gesu, Dance of Death, Fear Is the Key, Plague, Eyrie e Fear of the Dark. _Você_ fica fora de todo
+ajuste, calibração e escolha de opção. O placar é `avaliar_tablatura` (ataque 0,1 s, duração 0,05 s), com o mesmo
+relógio do relatório de `out/Você/analise-algoritmo-2026-10-30`. As fontes sem tab humana não podem piorar.
+
+1. [ ] **Linha de base honesta.** Toda opção (modelo, digitação, alcance) é escolhida só pelas seis tabs de treino.
+   A régua, congelada antes de medir:
+   - na digitação isolada, cada perfil e alcance (0 a 4) é medido nas seis tabs de treino;
+   - vence a maior média por música, e só então _Você_ é medida com o vencedor;
+   - o `medium` não foi validado fora de _Você_ (ADR-009 o mediu só em fixtures), então a linha de base informa
+     `small` e `medium` lado a lado, sem escolher entre eles;
+   - a candidata de 687 notas fica registrada como contaminada, porque o alcance 3 foi escolhido olhando _Você_.
+
+   **Resultado: feito.** As seis tabs de treino escolhem `experiente` com alcance 0, média de 0,570 na digitação
+   isolada. _Você_, medida só depois, fica em **0,738**. O alcance 3 tem média de treino de 0,537 e só subia _Você_
+   para 0,936: foi escolha olhando a música de teste. O placar completo usa os GP5 regenerados do áudio, em
+   `small` e `medium`, com `experiente` e alcance 0. O relógio é o recuo que maximiza os ataques pareados, na grade
+   de 2 ms. Esse é um método novo, que dá à candidata 696 completas em vez das 687 do relatório; os números abaixo
+   usam todos o mesmo método.
+
+   | versão (846 notas humanas)                 | ataques | alturas | posições | durações | completas | faltam | sobram |
+   | ------------------------------------------ | ------: | ------: | -------: | -------: | --------: | -----: | -----: |
+   | `small`, experiente, alcance 0             |     779 |     746 |      549 |      732 |   **519** |     67 |     43 |
+   | `medium`, experiente, alcance 0            |     807 |     789 |      585 |      761 |   **557** |     39 |     27 |
+   | candidata `medium`, alcance 3 (contaminada) |     807 |     789 |      735 |      761 |       696 |     39 |     27 |
+
+   A diferença entre `medium` e a candidata é só a digitação: 150 posições. A escolha do `medium` continua validada
+   só em _Você_, porque não há inferência `medium` das seis tabs de treino.
+2. [ ] Corda/casa aprendida das tabs de treino (plano detalhado e revisão Fable + Codex antes do código).
+
+   **Plano detalhado, revisado por Fable e Codex (2026-10-30), aguardando confirmação.**
+
+   As revisões apontaram quatro problemas no rascunho anterior:
+   - logit local com Viterbi é um MEMM, com viés de rótulo, e foi treinado só com o contexto humano;
+   - a regularização era escolhida na mesma validação que aprova o modelo;
+   - _Você_ já está contaminada pelo ADR-050 e pelo alcance 3, então não serve como teste independente;
+   - a régua aceitava ganho mínimo com perda grande.
+
+   Desenho revisado:
+   - **Conjuntos.** O treino são cinco tabs: Gesu, Dance of Death, Fear Is the Key, Plague e Eyrie. O teste limpo é
+     _Fear of the Dark_, que nunca orientou decisão de digitação. A aceitação é _Você_, conhecida e contaminada.
+     A base `experiente` com alcance 0 fica em 0,605 de média no treino, 0,395 em _Fear of the Dark_ e 0,738 em
+     _Você_.
+   - **Modelo.** Perceptron estruturado com média, treinado sobre o próprio Viterbi, com normalização global e
+     decodificação igual à da inferência. As features são os termos do custo atual (casa, corda solta, Δmão,
+     Δcorda), mais |Δcasa| em faixas, região da casa e Δmão × intervalo curto/longo, com corte em 0,25 s. Esse
+     conjunto fica congelado agora. Ele nasceu em parte do diagnóstico de _Você_, o que fica registrado, e não muda
+     depois de medir.
+   - **Hiperparâmetros fixos antes de medir.** São 10 épocas, sem busca. Cada época tem o mesmo número de frases
+     por música, para a música longa não pesar mais.
+   - **Passo 0, barato.** Decompor os erros do `experiente` nas cinco tabs de treino: corda solta contra pisada,
+     salto de região, troca de corda. Se a classe dominante não couber nas features, a 2a para aqui.
+
+   Régua 2a, congelada:
+   1. Na validação deixando uma de fora entre as cinco de treino, a média por música sobe pelo menos 0,02 sobre
+      0,605. Nenhuma música perde mais de 0,03. Pelo menos 3 das 5 melhoram, e diferença menor que 0,005 conta como
+      empate. Os resultados saem também por número de cordas.
+   2. Com o modelo treinado nas cinco, _Fear of the Dark_ sobe acima de 0,395 + 0,02, medida uma vez.
+   3. Aceitação em _Você_: a digitação isolada fica acima de 0,738, e o placar completo melhora as posições em
+      `small` (acima de 549) e em `medium` (acima de 585), com o relógio e o cache da etapa 1.
+
+   **Resultado 2a (2026-10-30): reprovado no item 1.** O passo 0 passou: 84% dos erros do `experiente` são "Thoth
+   mais grave no braço, uma corda" (42,5%) e "Thoth solta, humano pisada" (41,3%). O Viterbi do script com os pesos
+   iniciais reproduz o `experiente` nas cinco tabs. Na validação deixando uma de fora:
+
+   | tab fora do treino | cordas | `experiente` | aprendida |      Δ |
+   | ------------------ | -----: | -----------: | --------: | -----: |
+   | Gesu               |      4 |        0,582 |     0,661 | +0,079 |
+   | Dance of Death     |      4 |        0,387 |     0,479 | +0,092 |
+   | Fear Is the Key    |      4 |        0,633 |     0,734 | +0,100 |
+   | Plague             |      5 |        0,677 |     0,618 | −0,059 |
+   | Eyrie              |      6 |        0,745 |     0,652 | −0,093 |
+   | média              |        |        0,605 |     0,629 | +0,024 |
+
+   A média sobe 0,024 e 3 de 5 melhoram, mas Plague e Eyrie perdem mais que 0,03. As três de 4 cordas ganham
+   de 0,08 a 0,10; as duas de 5 e 6 cordas, do mesmo baixista, perdem. _Fear of the Dark_ e _Você_ não foram
+   medidas. Scripts: `scratchpad/aprender/perceptron.py`, `loo.json`.
+
+   **2a′ — só para baixo de 4 cordas (aprovado: "pode seguir", 2026-10-30).** A ideia nasceu de olhar a validação
+   acima, não os testes; por isso a régua é nova e congelada antes de medir. O modelo é o mesmo `pesos.json`,
+   treinado nas cinco tabs, sem novo treino nem ajuste. Ele vale só com afinação de 4 cordas; com 5 ou 6, a
+   digitação continua `experiente`, igual por construção.
+   1. Validação: cada tab de 4 cordas melhora pelo menos 0,02 fora do treino. Já cumprido pela tabela acima
+      (+0,079, +0,092, +0,100) — não é evidência nova.
+   2. _Fear of the Dark_ (4 cordas, faixa 4), medida uma vez: digitação isolada acima de 0,395 + 0,02 = 0,415.
+   3. _Você_, só depois do item 2: digitação isolada acima de 0,738 e posições no placar completo acima de 549
+      (`small`) e de 585 (`medium`).
+   Falhou um item: registra e encerra a linha de digitação, sem nova tentativa.
+
+   **Resultado 2a′ (2026-10-30): aprovado nos três itens**, cada teste medido uma vez.
+
+   | medida                                   | `experiente` | aprendida |   piso |
+   | ---------------------------------------- | -----------: | --------: | -----: |
+   | _Fear of the Dark_, isolada (2297 notas) |        0,395 |     0,800 |  0,415 |
+   | _Você_, isolada (846 notas)              |        0,738 |     0,858 |  0,738 |
+   | _Você_ `small`, posições no placar       |          549 |       618 |    549 |
+   | _Você_ `medium`, posições no placar      |          585 |       633 |    585 |
+
+   No placar, só posições e completas mudam (`small` 519 → 581, `medium` 557 → 597); ataques, alturas, durações,
+   faltam e sobram são idênticos, como devem ser. A candidata contaminada tinha 735 posições: a diferença para 633
+   é o que a digitação aprendida ainda não alcança. Scripts: `item2.py`, `item3.py`, `gerar.py` (troca o assigner
+   da CLI) no scratchpad; GP5 em `scratchpad/aprender/aprendida-{small,medium}/Você/`.
+
+   Se qualquer item falhar, o resultado é registrado sem nova tentativa olhando os testes. Passar na régua não
+   entrega as 846 notas: a digitação não corrige notas que faltam, alturas ou durações.
+
+   2b, só se a 2a passar: ADR-055, TDD e um `FretAssigner` novo atrás do `Protocol` (`--digitacao aprendida`).
+   Os pesos ficam versionados com os hashes do corpus, as features e os hiperparâmetros. O treino é reproduzível por
+   script e conferido por teste `slow`; o default só muda com ADR próprio. A evidência acústica de corda (piloto
+   SVM: 745 contra 728 em _Você_, regressão em Plague) fica para depois, como custo de emissão atrás de um `Protocol`
+   e com a mesma régua.
+
+   **2b feita (2026-10-30, ADR-055):** `services/digitacao_aprendida.py` + `digitacao_aprendida.json` (pesos, sha256
+   das 5 tabs, hiperparâmetros), `--digitacao aprendida` na CLI. O treino pelo código de produção reproduz os pesos da
+   régua bit a bit. `-m slow` do módulo: 4 passaram (hashes, retreino, _Fear of the Dark_ 0,800, _Você_ 0,858). A CLI
+   real gera o mesmo GP5 do script (633 posições, 597 completas). 18 fontes sem tab: nenhuma falha, ≤ 0,14 s. Suíte
+   padrão 807 passaram; ruff e mypy limpos. Falta a API oferecer `aprendida`.
+3. [ ] Notas que faltam e sobram: filtro aprendido nas tabs de treino. Plano revisado pelo Fable e pelo Codex
+   (2026-10-30), aguardando aprovação:
+
+   Treino nas 5 tabs. _Fear of the Dark_ (faixa 4) é o teste reservado deste filtro — não é um teste intocado,
+   porque já foi olhada nos ADRs 030 e 055. _Você_ é aceitação conhecida e não sustenta generalização.
+   O transcritor (`small` ou `medium`) é escolhido pelo F1 de nota nas 5 de treino, não por _Você_. Gerar o
+   `medium` das músicas de treino custa minutos de CPU por música; o `notas.jsonl` de _Você_ é restaurado
+   depois de cada rodada.
+
+   **Pareamento.** O `avaliar_tablatura` casa só pelo instante, e por isso os 39 que faltam e os 27 que sobram
+   em _Você_ não são erros de ataque e altura. Para rotular as candidatas e medir o F1, o casamento é um a um
+   por instante (0,1 s) e altura. O placar completo continua separado, com relógio e formato fixos. Antes de
+   comparar, as linhas de base de _Você_ (66 / 597) são reproduzidas.
+
+   3.0. **Decomposição, sem código de produção**, só nas tabs de treino.
+   - A tab humana vai ao tempo do stem pelo ADR-042. Rótulos de treino só nas janelas conclusivas
+     (`veredito_de_nota`); a fração de faltas e sobras em janela inconclusiva é relatada.
+   - Cada evento da transcrição bruta em cache é rastreado por estágio, inclusive a rejeição por rótulo que
+     não entra em `descartadas`.
+   - Classes de sobra, com precedência nesta ordem: par de tempo (ataque deslocado de 0,1 a 0,3 s), par de
+     altura, duplicata (mesma classe de altura a menos de 50 ms), oitava de nota vizinha do Thoth, curta
+     (abaixo de uma fusa), rótulo devolvido pelo `rotulos`, outra.
+   - Classes de falta, na mesma lógica: presente na bruta e descartada (por qual estágio), presente com outra
+     altura, re-ataque engolido por nota sustentada, ausente da bruta.
+   - Intocáveis por filtro, contados à parte: fora do braço, simultâneas do `monofonizar`, nota da tab sem som.
+   - Resultados por número de cordas.
+   - **Corte por ganho máximo recuperável:** um seletor perfeito escolhe entre as candidatas, e a saída passa
+     de novo por monofonização e exportação. Segue só se esse teto der pelo menos +0,02 de F1 médio no treino
+     (o dobro do ganho exigido abaixo). Senão, registra e vai para a etapa 4.
+
+   3a. **Viabilidade no scratchpad.** O filtro entra logo depois do filtro de rótulos, antes da grade; toda
+   medida é da saída final. Candidatas = notas mantidas + descartadas da bruta.
+   - **Primeiro, uma regra simples**, se a 3.0 mostrar uma classe dominante: um parâmetro, escolhido no treino.
+   - **Regressão logística só se várias classes somarem.** Features congeladas agora, antes da 3.0: duração,
+     rótulo, distância e altura relativa às vizinhas do Thoth, duplicata, oitava de vizinha, intervalo até a
+     anterior. L2 fixa, normalização só no treino de cada divisão, peso igual por música, limiar 0,5. Sem busca.
+   - Régua, congelada antes de medir:
+     1. validação deixando uma de fora: F1 de nota médio pelo menos +0,01; nenhuma música perde mais que 0,005;
+        pelo menos 3 de 5 melhoram. Publicar os cinco deltas, precisão e revocação, sem alegar significância.
+     2. _Fear of the Dark_, medida uma vez: F1 acima da linha de base + 0,01.
+     3. _Você_ (digitação aprendida): faltam + sobram até 61 (−5) e completas pelo menos 597 (não piora; um
+        filtro que tira nota não cria completas).
+   - Se um item falhar: registra, sem nova tentativa olhando os testes.
+
+   3b. **Integração, só se a 3a passar:** ADR-056, TDD, filtro atrás de um `Protocol`, opção na CLI, default
+   inalterado; conferir as fontes sem tab (quantas notas o filtro tira ou devolve, nada quebra).
+
+   **Resultado da 3.0 (2026-10-30), medido uma vez.** Script `decompor.py` no scratchpad, conferido por
+   subagente.
+   - **Transcritor:** fica o `small`. F1 de nota médio nas 5 de treino: 0,623 contra 0,618 do `medium`. O
+     `medium` vence 3 de 5, mas a régua é a média. O `medium` também estimou andamentos absurdos
+     (527 BPM em _Dance of Death_, 400 em _Eyrie_), um defeito separado, a investigar.
+   - **Alinhamento:** _Dance of Death_ não tem nenhuma janela conclusiva, e _Eyrie_ tem 1 de 10. Os rótulos de
+     treino vêm, na prática, de _Gesu_, _Fear Is the Key_ e _Plague_.
+   - **Sobras** (820, `small`): par de altura 40%, par de tempo 30%, outra 26%, oitava de vizinha 5%, curta 0%.
+   - **Faltas** (1436): ausente da bruta 35%, par de altura 26%, par de tempo 19%, descartada por simultânea
+     11%, re-ataque engolido 10%.
+   - **Corte:** o teto do seletor perfeito dá +0,094 de F1 médio, e por isso o corte congelado passa. Mas quase
+     todo esse ganho vem de apagar sobras que são pares de altura ou de tempo, e apagá-las piora o placar (a
+     falta de ataque sobe). Tirando só as sobras puras (outra, oitava, curta), o teto cai para +0,017 a
+     +0,023 nas três músicas com rótulo; Eyrie dá +0,091, mas com 61 notas.
+   - **Leitura:** um filtro de sobras e faltas tem pouco a ganhar. O erro dominante é altura e tempo errados
+     sobre um ataque certo, e nota que nem chega à transcrição bruta.
+
+   **Perfil dos pares (3.1, 2026-10-30)**, script `pares.py` no scratchpad, pareando um a um pela nota mais
+   próxima.
+   - **Pares de tempo** (228): mediana de −0,11 a −0,13 s, 75% adiantados, ou seja, logo depois da
+     tolerância de 0,1 s. Os acertos também saem levemente adiantados (mediana −0,016 s). Não dá para separar
+     erro do Thoth de erro do alinhamento. Na partitura, a nota vai para a grade de qualquer forma.
+   - **Pares de altura** (332): sem classe dominante. Oitava ±12 dá 23%, quarta e quinta ±5/±7 dão 24%, ±2 dá
+     15%, e o resto se espalha. A correção de oitava, mesmo perfeita, mexe em cerca de 76 notas nas três
+     músicas, perto de +0,01 de F1.
+   - **Decisão proposta:** encerrar a etapa 3 sem filtro e sem correção. Nenhuma classe tem teto que pague a
+     régua de +0,01. A maior alavanca restante é a revocação do transcritor (35% das faltas), e ela não se
+     aprende com as tabs sem retreinar o modelo.
+4. [ ] Duração: figura escrita aprendida nas tabs de treino.
+
+   **Medição 4.0 (2026-10-30)**, script `duracoes.py` no scratchpad. Só treino, `small`, janelas conclusivas,
+   notas pareadas por ataque e altura. A duração do Thoth foi aproximada sem a grade, como `rhythm.eventos`
+   (`min(fim, próximo ataque)`), com tolerância de 0,05 s, a mesma do placar.
+   - **Hoje acerta 3406 de 4087 (83%).** As tabs humanas escrevem legato: de 81% em _Gesu_ a 99% em _Eyrie_ das
+     notas vão até o ataque seguinte.
+   - **Regras simples não ajudam.** Preencher até o próximo ataque do Thoth dá 3246, menos que hoje. Mesmo
+     sabendo o próximo ataque humano (oráculo), o resultado é 3437, só +31.
+   - **O erro de duração vem do ataque vizinho errado.** Das 681 durações erradas, 507 (74%) têm o próximo ataque
+     do Thoth diferente do humano, ou seja, é nota faltando ou sobrando ao lado. Sobram cerca de 174 (4%) de
+     duração própria.
+   - Em _Você_, a linha de base `small` já acerta 732 de 779 durações pareadas.
+   - **Decisão proposta:** encerrar a etapa 4 sem mudança. A duração segue os ataques e não tem alavanca
+     própria que se aprenda das tabs.
+5. [ ] Em cada etapa, conferir as fontes sem tab e gerar a nova _Você_ para abrir no Guitar Pro.
+
+   **Resultado (2026-10-30).** _Você_ foi regerada pela CLI do commit `fbb9c7c` com `--modelo small --digitacao
+   aprendida`, em `out/Você (aprendida)/Você/`. O cache de notas não mudou.
+
+   | versão (846 notas humanas) | ataques | alturas | posições | durações | completas | faltam | sobram |
+   | -------------------------- | ------: | ------: | -------: | -------: | --------: | -----: | -----: |
+   | `small`, experiente        |     779 |     746 |      549 |      732 |       519 |     67 |     43 |
+   | `small`, aprendida (CLI)   |     779 |     746 |  **618** |      732 |   **581** |     67 |     43 |
+
+   O resultado é idêntico ao da geração pelo script provisório da etapa 2. As 18 fontes sem tab rodam com a
+   aprendida sem erro: no máximo 0,14 s, e até 62,8% das posições mudam (`yt_g81jzIwyDjg`). As etapas 3 e 4 não
+   mudaram código. O que separa _Você_ da tab humana é a revocação e a altura do transcritor (67 notas faltam,
+   33 com altura errada) e as posições restantes (161).
+6. [x] Andamento absurdo do `medium` corrigido e escolha `small` × `medium` refeita (2026-10-30, emenda do ADR-024).
+
+   **Causa.** O `medium` dá notas simultâneas (748 pares a menos de 5 ms no treino), que colidem em qualquer grade, e
+   `desdobrar` dobrava até o teto: _Dance_ 528, _Eyrie_ 400, _FITK_ 187 BPM. O baixo passou a medir o andamento
+   com um ataque por grupo simultâneo, numa janela de 10 ms (`_SIMULTANEAS_NO_BAIXO_S`). A janela de acorde (50 ms)
+   fundiria semicolcheias a 360 BPM. A correção tem teste das duas pontas, visto falhar sem ela. Suíte padrão 809
+   passaram, `slow and not network` 55 passaram e 1 pulado; ruff e mypy limpos.
+
+   **Nova escolha, regra congelada** (média de `f1_total` nas 5 músicas de treino, script `gerar_fix.sh` e
+   `decompor.py` no scratchpad `etapa3/`; resultado anterior em `antes-fix/`; cache restaurado e conferido):
+
+   | modelo   | BPM _Dance_ / _FITK_ / _Eyrie_ | média `f1_total` antes | depois     |
+   | -------- | ------------------------------ | ---------------------: | ---------: |
+   | `small`  | 144,6 / 93,4 / 103,7 (iguais)  |                 0,6233 | **0,6235** |
+   | `medium` | 528 → 142 / 187 → 93 / 400 → 98 |                0,6178 |     0,6142 |
+
+   O `small` continua escolhido. O andamento absurdo não era o que fazia o `medium` perder: corrigido, ele perde
+   um pouco mais (_FITK_ 0,743 → 0,727). Por isso _Você_ não foi medida com `medium`, como previa o plano. No
+   `small`, a correção só mexeu em 2 notas de _Dance_ e 2 de _Plague_, sem mudar o BPM.
+
+## Transcrição de Você igual à referência humana — objetivo corrigido (2026-10-30)
+
+O usuário esclareceu que a tarefa exige modificar o programa para obter o
+resultado humano a partir do áudio. A derivação `.referencia` entregue antes
+não atende ao pedido. Assumir `samples/catedral-voce_build.gp5` correto, inclusive
+ritmos e corda/casa; não aceitar apenas altura MIDI ou F1 alto como igualdade.
+O trabalho de correção do programa continua autorizado; não repetir a aprovação
+do escopo. Não usar a tab como entrada da inferência nem codificar exceções por
+título, tempo da música ou notas copiadas. Manter os arquivos existentes.
+
+Origem: serviços e medições locais (ADR-021, 032, 033, 041, 042, 050, 053).
+Banco de soluções consultado; não há solução de transcrição musical entre os
+projetos catalogados. Hipótese inicial: a política de digitação para iniciante
+favorece corda solta e mede só altura; avaliar antes de alterar.
+
+1. [x] Estabelecer diagnóstico por alturas, ataques, durações e corda/casa, com
+   referência humana e recursos reais; conferir numeração de cordas.
+2. [ ] Reproduzir causas em testes e corrigir o algoritmo, sem memorizar a música.
+3. [ ] Regenerar do áudio, medir igualdade e verificar regressões nas outras tabs,
+   pytest, Ruff e mypy. Registrar qualquer diferença restante explicitamente.
+
+Riscos: o modelo não fornece corda/traste e preenche durações até o ataque
+seguinte (ADR-033); inferir execução exata pode exigir informação adicional ou
+outro método. Não prometer igualdade sem verificá-la. Mudanças de arquitetura,
+se necessárias, exigem ADR. Exploração/revisão do plano: `explorar_comparacao`
+e `diagnosticar_ritmo_notas`, somente leitura, antes de escolher alterações.
+
+Progresso do programa, sem copiar a tab: leitor preserva corda/casa e afinação;
+`avaliar_tablatura` mede ataques, alturas, posições, durações, omissões e extras,
+sem reutilizar pares. Viterbi aceita alcance da mão (CLI `--alcance-mao`), com
+janela preservada nas cordas soltas. CLI aceita `--modelo medium` para o baixo,
+com cache por identidade e sem mudar os defaults dos outros instrumentos.
+
+O teste do caso Sol3/Ré5/Sol3 voltou a falhar ao reverter somente a janela:
+escolheu Ré solto e o GP5 relido teve 2/3 notas completas. Restaurada a correção,
+o caso passa com 3/3. Alcance 3 melhora a digitação isolada de Você de 0,738 para
+0,936, mas piora três outras tabs; permanece opcional, não padrão.
+
+Execução real via CLI, sem referência como entrada: medium, experiente, alcance
+3 → 834 notas após três descartes (837 brutas). Candidata em
+`out/Você/analise-algoritmo-2026-10-30/candidata/Você/`. Avaliação no mesmo
+relógio (fase da partitura devolvida), tolerância de ataque 100 ms e duração
+50 ms: 687 eventos completos contra 517 da small/iniciante anterior, sobre 846
+referências. **Não coincide com o gabarito**: ainda há 29 Ré gerados em corda
+solta, notas ausentes/extras e figuras rítmicas divergentes. As etapas 2 e 3
+permanecem abertas; 755 testes de software passando não encerram o objetivo.
+
+Experimentos rejeitados para produção: preencher buracos com detector de ataques
+(5 candidatos corretos/35); mapa curto, mais largo e menos penalizado (fabrica
+35 trocas no controle Equus); correção YIN+harmônicos (três semitons corrigidos
+em Você, ainda sem validação nas outras músicas). Não aplicar regras por título
+nem substituir eventos da inferência pelos da tab para fazer o teste passar.
+
+Verificação desta etapa: 755 testes padrão passaram, Ruff zero diagnósticos,
+mypy zero erros em 46 arquivos. MuScriptor medium real executado em CPU e
+pipeline real gerou GP5/MusicXML/WAVs e auralização. Relatório e scripts de
+medição ficam em `out/Você/analise-algoritmo-2026-10-30/`; a tarefa geral não
+está concluída. Não há revisor arquitetural específico de áudio no harness;
+o plano e a hipótese da janela foram conferidos pelo `explorar_comparacao`.
+
+Critério estrito agora reproduzido em cinco testes privados de GP5 real:
+quantidade, sequência de alturas, corda/casa, figuras/durações e andamento
+inicial. **Os cinco falharam**: 834/846 notas, divergências de altura e posição,
+terceira figura 0,75/0,5 semínima e andamento 116/106. O teste está em
+`out/Você/analise-algoritmo-2026-10-30/scripts/test_fidelidade_voce.py` e não
+confunde igualdade da tab com tolerância de áudio. Não declarar o objetivo
+concluído porque a suíte portável passou.
+
+Piloto adicional executado por `piloto_corda_acustica`, sem produção: alinhamentos
+independentes das quatro outras tabs, features de harmônicos/envelope, SVM fixo
+e validação deixando uma música fora. Você não entrou no treino. Na inferência
+dos 834 eventos MuScriptor, sem consultar gabarito, 789 tiveram previsão e 45
+ficaram sem evidência. Avaliação posterior: nas mesmas 765 notas com altura e
+ataque pareados e cobertura acústica, posição correta 745 no SVM contra 728 no
+Viterbi3. Entre 135 Ré2 pareados: 133 Lá/5 e dois Ré/0 no SVM, contra 108 e 27
+no Viterbi3. Não integrado: cobertura incompleta, regressão em Plague na
+validação e nenhuma correção das notas e ritmos restantes. Dados e relatório
+reproduzíveis em `out/Você/analise-algoritmo-2026-10-30/corda-acustica/`.
+
+## Correção de Você contra a tab humana (2026-10-30)
+
+Plano aprovado pelo usuário. Referência: `samples/catedral-voce_build.gp5`;
+saída antiga de 30/09: 802 notas, 120 BPM fixos. A referência contém 846
+notas executadas, repetições e mudanças de andamento. Reaproveitar ADR-041/042
+para comparar e ADR-053 para regenerar, sem presumir que 44 notas de diferença
+na contagem sejam exatamente 44 omissões.
+
+1. [x] Preservar a saída antiga e regenerar com o pipeline atual e caches compatíveis.
+2. [x] Medir a saída relida contra a referência; corrigir somente defeitos comprovados,
+   com teste antes de qualquer alteração de código.
+3. [x] Validar GP5/MusicXML e executar pytest, Ruff e mypy; registrar os limites.
+
+Dependências reais: GP5 via PyGuitarPro, MusicXML via music21 e áudio local.
+Não usar mocks na medição. O cache Demucs antigo (`4.1.0`) não corresponde ao
+atual (`4.1.0-shifts0`); preservar ambos e gerar o atual quando necessário.
+Subagente: `explorar_comparacao` (`explorer`, leitura das decisões e métodos).
+
+Diagnóstico durante a execução: as 802 alturas do GP5 antigo são idênticas às
+do cache, na ordem; o arquivo relido antecipa ataques em 30–420 ms. O GP5 grava
+119,86 como 120 BPM, conforme a limitação do ADR-021. O MusicXML também era
+arredondado sem necessidade: `sound@tempo` aceita decimal na especificação W3C.
+Corrigir esse arredondamento após reproduzir a deriva em teste de arquivo real;
+preservar a quantização e o contrato do GP5. Mudança de uma camada, sem decisão
+arquitetural nova; emendar o ADR-021 para corrigir a premissa sobre MusicXML.
+
+Resultado: saída automática regenerada e publicada em `out/Você`, com 822 notas
+(antes: 802), mapa com dois pontos de troca e auralização real sem falha. O F1 de
+altura + ataque no tempo do áudio foi de 0,915 para 0,926; no MusicXML relido,
+de 0,178 para 0,885. Não são porcentagens de alturas corretas. O GP5 continua
+limitado ao BPM inteiro e a transcrição automática ainda difere da referência.
+
+Entrega corrigida supervisionada: `Você.referencia.gp5` e
+`Você.referencia.musicxml`, ambos com as 846 notas humanas, mantendo cordas e
+casas. O GP5 mantém as repetições; o MusicXML as escreve por extenso. Dois testes
+locais de arquivo real confirmaram alturas, ataques, durações e digitação.
+Não afirmar que essa derivação é melhoria do modelo nem sincronismo com a gravação.
+
+Código: MusicXML preserva andamento decimal nos exportadores de cordas, piano
+e bateria. TDD: seis falhas antes, seis testes passando depois; retirar apenas o
+fix reproduziu cinco falhas. Verificação: 730 testes padrão passaram; Ruff zero
+diagnósticos; mypy zero erros em 46 arquivos. Cinco testes do MuseScore real
+passaram. Demucs e MuScriptor reais executados separadamente, em CPU. Backups,
+medições, scripts e relatório estão em `out/Você/comparacao-2026-10-30/`.
+
+## Alinhamento das configurações locais aos globais (2026-10-30)
+
+Plano aprovado pelo usuário: manter a herança dos globais do Claude Code e do Codex,
+preservando as exceções do Thoth (projeto pessoal, sem Django ou Infisical).
+Origem conferida: regras e configurações instaladas dos dois harnesses e
+`claude-md/installer/rules.py`. Sucesso: instruções locais coerentes com os globais,
+permissões locais específicas e verificação de entrega passando.
+
+1. [x] Conferir a herança e registrar o plano. Subagente `conferir_heranca`
+   (`explorer`, `gpt-6-luna`, esforço `high`): auditoria somente de leitura.
+2. [x] Atualizar `AGENTS.md` e `CLAUDE.md`: herança, leitura prévia e exemplos
+   headless com modelo/esforço explícitos. Preservar os detalhes do projeto.
+3. [x] Conferir permissões locais, validar os arquivos e executar pytest, Ruff e mypy.
+
+Verificação: JSON válido, herança global e restrição de leitura de áudio preservadas;
+`git diff --check` sem erros. `uv run pytest -n auto`: **725 passaram**, 40 avisos de
+depreciação de dependências, em 28,93 s. `uv run ruff check src/ tests/`: **0 erros**.
+`uv run mypy src/`: **0 erros em 46 arquivos**. A suíte padrão exclui `slow`,
+`network` e `navegador`; essas camadas não foram alteradas nesta tarefa.
+
+Trade-off: manter modelos, esforço, subagentes e hooks nos globais evita cópias que
+ficariam desatualizadas. Remover a autorização genérica de `uv run python` faz esse
+comando voltar ao fluxo normal de aprovação. Nenhuma alteração de arquitetura.
+
+## Backlog aberto, com Codex e subagentes (2026-10-23)
+
+Pedido do usuário: "pode fazer tudo", usando o Codex e os agentes, depois de alinhar a configuração dos dois
+harnesses ao `CLAUDE.md` global. Escrita sequencial no repositório; medições em paralelo, com script em scratchpad e
+número impresso ao lado do piso.
+
+0. [x] Configuração: `AGENTS.md` com o mapa de módulos atual e a consulta entre agentes; skill `verificacao` para o
+   Codex em `.agents/skills/`, espelho do `/verificacao`.
+1. [x] Mapa de andamento, etapa 1b (Claude): resíduo do mapa **contínuo** (fase herdada, troca de andamento só quando
+   paga) nas 15 músicas do cache, e quantas trocas ele escreve nas planas. Emenda ao ADR-034; sem código de produto.
+   **Resultado:** com λ pequeno o mapa sobreajusta (fora da amostra, pior que o andamento único em 3 músicas). Com
+   λ = 2000 ms·nota, nenhuma piora, zero trocas nas planas e ganho de até 41% fora da amostra em 12 das 21 fontes.
+   A etapa 2 (produto) depende de decisão.
+2. [x] Demucs `--shifts 0` (Codex, worktree): o stem do baixo fica idêntico entre duas rodadas? Os pisos do baixo e
+   o F1 se mantêm? Adotar só se a medição sustentar; senão, registrar por quê.
+   **Resultado:** WAV byte a byte idêntico no `misto` (antes: pico 0,048, SNR 29,9 dB); 115 métricas de piso iguais
+   antes e depois, 48 testes pesados passaram nas duas rodadas. **Adotado**: escopo do cache `4.1.0-shifts0`, stems
+   antigos ficam no disco sem reuso. Emendas aos ADR-010, 026 e 044.
+3. [x] Discriminador de oitava para baixo (subagente): as tabs de *Você* e *Gesu* (2026-09-30) são posteriores à
+   última medição do ADR-030. Remedir o AUC com as seis tabs; candidato novo só se a amostra ampliada o permitir.
+   **Resultado:** as duas somam 5 casos "abaixo"; AUC agregado 0,748 (44 casos, 26 numa música só). Nenhum candidato
+   testado, veredito igual. Emenda de 2026-10-23 ao ADR-030.
+4. [x] *Eyrie*, entrada e saída de cada stem (subagente): energia por stem no tempo, como audibilidade — não é
+   veredito musical (ADR-048). Referência humana por parte continua inexistente; o item 6 de lá depende dela.
+   **Resultado:** intervalos por stem estáveis entre 20 e 50 dB abaixo do pico; eventos do pipeline dentro da presença
+   (bass 99,9%, bateria 100%, vocais 78,1%). Por parte continua pendente. Emenda de 2026-10-23 ao ADR-048.
+5. [x] Verificação de entrega e registro de cada resultado aqui e no ADR da área.
+   pytest padrão 709 passaram; ruff limpo; mypy sem erros (46 arquivos); Demucs real em develop: 4 passaram.
+6. [x] Conferir as trocas de ~10 bpm do mapa contra a tab humana de *Dance of Death*.
+   **Resultado:** as três trocas escritas são reais (mediana de 2 bpm da gravação entre 220 e 460 s). O que falta é o
+   trecho lento (83 a 90 bpm) e os de 150, fora da faixa de ±10% (116 a 142). Emenda ao ADR-034.
+
+## Mapa de andamento, etapa 2 (aprovada em 2026-10-23)
+
+1. [x] Medir a largura da faixa (só medição): ±10% atual, faixa larga (±40%) e ±10% com metade/dobro como candidatos,
+   nas 21 fontes, com o controle fora da amostra da etapa 1b. Critério: nenhuma música pior que o andamento único,
+   nenhuma troca nas planas e o trecho lento de *Dance of Death* alcançado. Se nenhuma opção cumprir, fica ±10%.
+   **Resultado:** nenhuma cumpriu (±40% alcança o trecho lento piorando 4 músicas; ±40% sem troca piora 9). Fica
+   ±10% com custo em ms e λ = 2000. Emenda ao ADR-034.
+2. [x] `services/tempo`: `mapa_de_andamento(onsets, bpm, λ)` → trechos `(início, bpm)`, trocas puxadas para a barra de
+   compasso mais próxima. TDD, com estímulo sintético de andamento conhecido. O primeiro trecho é reajustado e o BPM
+   depois da troca é refinado junto com a barra: sem isso, a troca saía um compasso antes (ADR-053).
+3. [x] `rhythm` quantiza cada trecho no próprio andamento; música plana sai idêntica à de hoje (teste de regressão).
+   Fora da amostra: nenhuma música pior que +0,2%, planas sem troca, *And Plague Flowers* −45%.
+4. [x] Exportadores: andamento por compasso no GP5 (`mixTableChange`) e no MusicXML (`<sound tempo>` + metrônomo).
+   Round-trip afirmando estrutura (em que compasso troca, para qual BPM).
+5. [x] Auralização e cursor da página de estudo seguindo o mapa (`-m navegador`).
+6. [x] ADR novo (ADR-053), verificação de entrega e seleções `slow` e `navegador`.
+
 ## Eficiência: revisão conjunta Claude + Codex (2026-10-23)
 
 Revisão somente leitura: Claude (`fable`) e Codex (`gpt-6.1-sol`, `high`). Os achados principais foram conferidos na
@@ -48,8 +928,9 @@ existente.
 - [x] `test_mede_perfil[guitarra-acustica-mix-stem]` intermitente nos acordes de seis notas (21 < 22): três rodadas
   sem mudança deram 23, 21 e 21 — variação do Demucs. Folga dos acordes de seis no `mix-stem` passou a 2 notas,
   como a `FOLGA_DEMUCS` do F1 já absorvia (emenda do ADR-044, 2026-10-23).
-- [ ] Demucs determinístico (`--shifts 0`) para tirar as folgas do `mix-stem`: muda também o stem do baixo, exige
-  remedir os pisos do baixo. Decisão própria.
+- [x] Demucs determinístico (`--shifts 0`): adotado em 2026-10-23 (item 2 do backlog do topo).
+- [ ] Tirar as folgas do `mix-stem` (`FOLGA_DEMUCS`, `FOLGA_DEMUCS_SEIS_NOTAS`): só depois de rodadas repetidas com
+  `shifts 0` mostrarem a contagem estável.
 
 ### Fora, por ora
 
@@ -127,8 +1008,9 @@ Comparação de _Você_ (Catedral) e _Watashi Igai Watashi Ja Nai No_ (Gesu) com
 5. [x] Mapa de andamento por trecho, etapa 1 (medir): por janela de 20 s acompanha a tab humana de _Você_ (erro
    mediano 0,3 contra 2,7 BPM do global) e nunca erra mais que o global nas cinco tabs; a razão do ADR-034 não
    separa; resíduo da grade cai 35–73% no acervo inteiro, com fase livre (teto otimista). Emenda ao ADR-034.
-6. [ ] Mapa de andamento, etapa 1b: resíduo de um mapa contínuo (fase herdada, mudança só quando paga) e quantas
+6. [x] Mapa de andamento, etapa 1b: resíduo de um mapa contínuo (fase herdada, mudança só quando paga) e quantas
    mudanças ele escreve nas músicas planas. Só depois decidir exportadores e pipeline.
+   **Resultado (2026-10-23):** candidato λ = 2000 ms·nota; ver a emenda do ADR-034 e o item 1 do backlog do topo.
 
 ## Conformidade Markdown do repositório (2026-09-29)
 
@@ -272,7 +1154,7 @@ decidem se cada instrumento está correto.
    - [x] Consultar créditos do encarte de `Urn`: baixo, bateria, duas guitarras, violino, viola, cello e vozes são
      candidatos confirmados para `Eyrie`; não há crédito de piano/teclado ou coro confirmado para esta faixa.
    - [ ] Mapear timestamps de entrada/saída no áudio local; os créditos não substituem escuta nem anotação de
-     referência.
+     referência. Por stem, feito em 2026-10-23 (emenda ao ADR-048); por parte, depende de anotação humana.
 4. [ ] Obter referência humana independente por parte quando existir e registrar cobertura temporal, afinação e
    confiabilidade. Sem referência, limitar o veredito a separação/audibilidade e marcar a transcrição como
    inconclusiva.
@@ -558,7 +1440,26 @@ sintético é métrica de regressão, não de qualidade real.
 - [ ] Discriminador do erro **para baixo** que separe melhor que o `f0 / 2·f0` (AUC 0,75, segunda emenda do ADR-030).
   Candidatos já medidos e descartados: ímpares/pares, `3f0/(2f0+4f0)`, meios-harmônicos. Com 84 casos em duas
   músicas, diferença pequena entre candidatos não se distingue de acaso: esperar mais tabs. _Eyrie_ acrescentou só 2
-  (quarta emenda do ADR-030): linha repetitiva demais para as janelas serem conclusivas
+  (quarta emenda do ADR-030): linha repetitiva demais para as janelas serem conclusivas. _Você_ e _Gesu_, mais 5
+  (emenda de 2026-10-23): falta tab de música com **mais erro de oitava**, não só mais tabs
+  - Tentativa de escolher a próxima tab pelo próprio aviso (2026-10-30, só medição, script `oitava/ranking.py` no
+    scratchpad): `verificar_oitavas` no stem em cache de cada uma das 18 fontes. **Não serve para escolher.** O
+    aviso não acompanha o erro real que as tabs confirmam. Gesu alarma 41,9% das notas, com poucos casos reais;
+    Fear, 26,7% com 13; Plague, 10,9% com 26, o maior número; Dance, 24,3% sem nenhum caso conclusivo. A
+    sugestão `pitch + 12` sai em quase todos os avisos e não filtra nada. O topo da lista (Hallowed Be Thy
+    Name 36%, Feel Like Makin' Love 20%) não indica mais erro de oitava. A próxima tab continua dependendo de
+    escolha externa
+  - Tab nova: _Fear of the Dark_ (`samples/Iron Maiden - Fear Of The Dark.gp5`, faixa 4 "Steve Harris", 4 cordas;
+    cache `yt_bePCRKGUwAY`). Método da emenda de 2026-10-23 do ADR-030: `alinhar_ao_stem`, `veredito_de_nota`, e
+    `verificar_oitavas(limiar=1e300)` sobre o `bass.wav`, só em janelas conclusivas. O script é conferido antes
+    reproduzindo os 13 casos de _Fear Is the Key_ e os 26 de _Plague_. Régua congelada antes de medir: a tab
+    **amplia a amostra** se render pelo menos 10 casos "abaixo" em janelas conclusivas, porque aí _Plague_ deixa
+    de ter metade dos positivos. Nesse caso, os candidatos a discriminador são comparados num plano próprio. Se
+    render menos, entra como a quinta tab que não amplia
+  - Resultado (2026-10-30): **não amplia**. Foram 3 casos "abaixo" contra 786 notas concordantes, em 4 janelas
+    conclusivas. A conferência reproduziu _Fear Is the Key_ (13 casos, AUC 0,70) e _Plague_ (27 casos, AUC 0,76).
+    O agregado passa a 47 casos, 27 deles em _Plague_. Registrado na emenda de 2026-10-30 do ADR-030. A próxima
+    tab continua dependendo de escolha externa
 - [x] MuScriptor silencioso no fim de _Eyrie_ (`_RMax1LS3pM`): o _prelude forcing_ trava o modelo em vazio de 557 a 671
   s. Segunda passada sem ele, só quando há buraco, só dentro do buraco (emenda do ADR-008). 0 → 382 notas no trecho,
   travado em `tests/integration/test_prelude_eyrie.py`

@@ -20,12 +20,12 @@ primeira tab lida:
 from __future__ import annotations
 
 from collections import defaultdict
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from pathlib import Path
 
 import guitarpro as gp
 
-from thoth.domain.models import NoteEvent
+from thoth.domain.models import NoteEvent, TabNote
 
 PPQ = gp.Duration.quarterTime
 #: C3, a corda mais aguda do baixo de seis cordas. A da guitarra é E4 (64).
@@ -36,13 +36,21 @@ MAIS_AGUDA_DO_BAIXO = 48
 class Referencia:
     faixa: str
     notas: list[NoteEvent]
+    tablatura: list[TabNote]
+    afinacao: tuple[int, ...]
 
 
 def ler_tab(caminho: Path, faixa: int | None = None) -> Referencia:
     """Lê a faixa de baixo; `faixa` (1 = primeira) força uma quando a escolha é ambígua."""
     song = gp.parse(str(caminho))
     track = _faixa(song, faixa, caminho.name)
-    return Referencia(track.name, _notas(song, track))
+    tablatura = _tablatura(song, track)
+    return Referencia(
+        track.name,
+        [tab.event for tab in tablatura],
+        tablatura,
+        tuple(c.value for c in reversed(track.strings)),
+    )
 
 
 def _faixa(song: gp.Song, faixa: int | None, nome: str) -> gp.Track:
@@ -109,10 +117,15 @@ def _segundos(posicao: int, trechos: list[tuple[int, int]]) -> float:
 
 
 def _notas(song: gp.Song, track: gp.Track) -> list[NoteEvent]:
+    """Visão das alturas e tempos, para quem não precisa avaliar a digitação."""
+    return [tab.event for tab in _tablatura(song, track)]
+
+
+def _tablatura(song: gp.Song, track: gp.Track) -> list[TabNote]:
     andamentos = _andamentos(song)
     bpm = song.tempo
     relogio = 0.0
-    notas: list[NoteEvent] = []
+    notas: list[TabNote] = []
     # (voz, corda) → índice da nota em `notas`. A corda sozinha não basta: a outra
     # voz pode atacar na mesma corda antes da continuação.
     soando: dict[tuple[int, int], int] = {}
@@ -128,13 +141,19 @@ def _notas(song: gp.Song, track: gp.Track) -> list[NoteEvent]:
                     chave = (v, nota.string)
                     if nota.type == gp.NoteType.tie and chave in soando:
                         anterior = notas[soando[chave]]
-                        notas[soando[chave]] = NoteEvent(
-                            anterior.pitch, anterior.onset_s, fim, anterior.instrument
+                        notas[soando[chave]] = replace(
+                            anterior, event=replace(anterior.event, offset_s=fim)
                         )
                     elif nota.type == gp.NoteType.normal:
                         altura = track.strings[nota.string - 1].value + nota.value
                         soando[chave] = len(notas)
-                        notas.append(NoteEvent(altura, inicio, fim, "electric_bass"))
+                        notas.append(
+                            TabNote(
+                                NoteEvent(altura, inicio, fim, "electric_bass"),
+                                len(track.strings) - nota.string,
+                                nota.value,
+                            )
+                        )
         relogio += _segundos(medida.header.length, trechos)
         bpm = trechos[-1][1]
-    return sorted(notas, key=lambda n: (n.onset_s, n.pitch))
+    return sorted(notas, key=lambda n: (n.event.onset_s, n.event.pitch))

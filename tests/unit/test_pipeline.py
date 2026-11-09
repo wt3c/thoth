@@ -8,17 +8,20 @@ caminho completo com os dois de verdade está marcado `slow` no fim do arquivo.
 
 from __future__ import annotations
 
+import copy
 from dataclasses import dataclass, field
 from pathlib import Path
 
+import guitarpro as gp
 import numpy as np
 import pytest
 import soundfile as sf
 
-from tests.sintetico import SOUNDFONT, renderizar
+from tests.sintetico import FIXTURES, SOUNDFONT, execucao_em_andamentos, renderizar, renderizar_midi
 from thoth.domain.models import TUNING_BASS_5, AudioAsset, NoteEvent, Transcricao
 from thoth.services.cache_notas import ler
 from thoth.services.pipeline import ROTULOS_DE_BAIXO, ParteVazia, transcrever
+from thoth.services.rhythm import COMPASSO
 
 
 @dataclass(frozen=True, slots=True)
@@ -189,6 +192,7 @@ def test_caminho_completo_com_demucs_e_muscriptor_reais(tmp_path: Path) -> None:
 
     resultado = transcrever(str(wav), tmp_path / "out", bpm=90, cache_dir=tmp_path / "cache")
 
+    print(f"\nPIPELINE baixo: notas={resultado.notas} piso exclusivo=10")
     assert resultado.notas > 10  # a escala tem 15 notas
     assert all(c.exists() for c in resultado.artefatos.values())
     # Com o Demucs real os três stems são arquivos distintos, e não o próprio mix
@@ -247,6 +251,105 @@ def test_andamento_estimado_e_desdobrado_quando_as_notas_colidem(tmp_path: Path)
     assert resultado.bpm >= 180
     # O que motivou o ADR-024: nenhuma nota perdida para colisão na grade.
     assert resultado.notas == 16
+
+
+@requer_soundfont
+def test_notas_simultaneas_no_baixo_nao_enganam_o_desdobramento(tmp_path: Path) -> None:
+    """Emenda do ADR-024: o `medium` dá duas notas no mesmo instante, e elas colidem em
+    qualquer grade. Contadas uma a uma, dobravam _Dance of Death_ de 129 para 516 BPM.
+
+    Colcheias a 90 com uma oitava junto de cada ataque: metade das notas colide, nenhum
+    ataque distinto.
+    """
+    wav, _ = renderizar("escala", tmp_path)
+    passo = 60.0 / 90 / 2
+    notas = tuple(
+        n for i in range(16) for n in (_nota(36, i * passo), _nota(48, i * passo + 0.003))
+    )
+    resultado = transcrever(
+        str(wav),
+        tmp_path / "out",
+        bpm=None,
+        cache_dir=tmp_path / "cache",
+        separator=SeparadorFalso(),
+        transcriber=TranscritorFalso(notas),
+    )
+
+    assert resultado.desdobrado is False
+    assert resultado.andamento is not None
+    assert resultado.andamento.bpm == pytest.approx(90, abs=2)
+
+
+def _em_dois_andamentos() -> tuple[NoteEvent, ...]:
+    """20 compassos a 90 e 20 a 84: 107 s, a troca na barra do compasso 20."""
+    return tuple(
+        NoteEvent(pitch=33 + i % 5, onset_s=t, offset_s=t + 0.1, instrument="electric_bass")
+        for i, t in enumerate(execucao_em_andamentos([(20, 90), (20, 84)]))
+    )
+
+
+@requer_soundfont
+def test_andamento_estimado_que_muda_vira_mapa_e_o_cache_fica_no_audio(tmp_path: Path) -> None:
+    """ADR-053: a partitura troca de andamento na barra; o cache não sai da hora do áudio."""
+    notas = _em_dois_andamentos()
+
+    resultado = _rodar(tmp_path, notas, bpm=None)
+
+    ((tique, bpm),) = resultado.mapa.marcas()
+    assert bpm == pytest.approx(84, abs=0.3)
+    gravadas = ler(tmp_path / "cache" / resultado.asset.source_id / "notas.jsonl")
+    assert [n.onset_s for n in gravadas] == pytest.approx([n.onset_s for n in notas])
+    musica = gp.parse(str(resultado.artefatos["gp5"]))
+    trocas = [
+        (m.number - 1, m.voices[0].beats[0].effect.mixTableChange.tempo.value)
+        for m in musica.tracks[0].measures
+        if m.voices[0].beats[0].effect.mixTableChange
+    ]
+    assert trocas == [(0, round(resultado.bpm)), (tique // COMPASSO, round(bpm))]
+
+
+@requer_soundfont
+def test_bpm_informado_nao_ganha_mapa(tmp_path: Path) -> None:
+    """O número que você deu manda (ADR-019): nada de trocar por cima dele."""
+    resultado = _rodar(tmp_path, _em_dois_andamentos(), bpm=90)
+
+    assert resultado.mapa.trocas == ()
+
+
+@requer_soundfont
+@pytest.mark.parametrize("bpm", [90, None])
+def test_as_batidas_do_mix_escolhem_a_cabeca_do_tempo(tmp_path: Path, bpm: int | None) -> None:
+    """ADR-054: a grade acerta as notas, mas só as batidas dizem onde o pulso começa.
+
+    O `walking` começa 0,5 s depois do zero: três semicolcheias a 90. As notas
+    sozinhas deixam a grade com fase zero e a primeira nota no ¾ do primeiro pulso;
+    as batidas do mix a trazem para a cabeça do tempo. Vale também com o BPM
+    informado, que manda no andamento e não em onde o pulso começa.
+    """
+    midi = copy.deepcopy(FIXTURES["walking"])
+    for nota in midi.instruments[0].notes:
+        nota.start, nota.end = nota.start + 0.5, nota.end + 0.5
+    wav = renderizar_midi(midi, "atrasado", tmp_path)
+    notas = tuple(
+        NoteEvent(n.pitch, n.start, n.end, "electric_bass") for n in midi.instruments[0].notes
+    )
+
+    resultado = transcrever(
+        str(wav),
+        tmp_path / "out",
+        bpm=bpm,
+        cache_dir=tmp_path / "cache",
+        separator=SeparadorFalso(),
+        transcriber=TranscritorFalso(notas),
+    )
+
+    assert resultado.cabeca_do_tempo == 3
+    assert resultado.mapa.recuo == pytest.approx(0.5, abs=0.02)
+    musica = gp.parse(str(resultado.artefatos["gp5"]))
+    # A primeira nota abre o compasso, em vez de três semicolcheias de pausa antes.
+    assert musica.tracks[0].measures[0].voices[0].beats[0].status == gp.BeatStatus.normal
+    gravadas = ler(tmp_path / "cache" / resultado.asset.source_id / "notas.jsonl")
+    assert gravadas[0].onset_s == pytest.approx(0.5)
 
 
 # --- BPM fora de faixa não chega à grade (ADR-025) ---------------------------

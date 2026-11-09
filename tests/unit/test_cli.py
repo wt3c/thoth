@@ -12,6 +12,7 @@ from typer.testing import CliRunner
 from thoth.cli import app
 from thoth.domain.models import TUNING_BASS_6, TUNING_BASS_DROP_D, AudioAsset
 from thoth.services import pipeline
+from thoth.services.digitacao_aprendida import DigitacaoAprendida
 from thoth.services.fretboard import PADRAO
 from thoth.services.vocais import ResultadoVocais
 
@@ -167,7 +168,6 @@ def test_serve_aceita_o_host_em_que_foi_aberto(monkeypatch, host: str, pela_rede
     """`--host` abre a página para a rede: o endereço pelo qual ela chega tem de passar."""
     from fastapi.testclient import TestClient
 
-
     recebido: dict[str, object] = {}
     monkeypatch.setattr("uvicorn.run", lambda app, **kw: recebido.update(kw, app=app))
 
@@ -295,7 +295,7 @@ def test_comparar_com_stem_relata_nota_errada_por_janela(tmp_path: Path) -> None
     tab, origem, cache = _tab_e_cache(tmp_path, {0: 12, 5: -12, 9: 7})
     fonte = next(p for p in cache.iterdir() if p.is_dir() and p.name != "stems")
     notas = ler(fonte / "notas.jsonl")
-    pasta = cache / "stems" / fonte.name / "htdemucs_ft" / "4.1.0"
+    pasta = cache / "stems" / fonte.name / "htdemucs_ft" / "4.1.0-shifts0"
     pasta.mkdir(parents=True)
     _stem(pasta / "bass.wav", notas, notas[-1].offset_s + 2.0)
 
@@ -310,15 +310,18 @@ def test_comparar_com_stem_relata_nota_errada_por_janela(tmp_path: Path) -> None
     assert "limite inferior" in saida
 
 
-def test_comparar_ignora_stem_de_outra_versao_do_demucs(tmp_path: Path) -> None:
-    """O stem é o do separador do pipeline (ADR-026): o de outra versão não mede nada."""
+@pytest.mark.parametrize("configuracao", ["4.0.0-shifts0", "4.1.0"])
+def test_comparar_ignora_stem_de_outra_configuracao_do_demucs(
+    tmp_path: Path, configuracao: str
+) -> None:
+    """O comparador usa o mesmo modelo, versão e configuração do pipeline (ADR-026)."""
     from tests.unit.test_alinhamento_audio import _stem
     from thoth.services.cache_notas import ler
 
     tab, origem, cache = _tab_e_cache(tmp_path, {})
     fonte = next(p for p in cache.iterdir() if p.is_dir() and p.name != "stems")
     notas = ler(fonte / "notas.jsonl")
-    pasta = cache / "stems" / fonte.name / "htdemucs_ft" / "4.0.0"
+    pasta = cache / "stems" / fonte.name / "htdemucs_ft" / configuracao
     pasta.mkdir(parents=True)
     _stem(pasta / "bass.wav", notas, notas[-1].offset_s + 2.0)
 
@@ -418,6 +421,73 @@ def test_afinacao_e_digitacao_escolhidas_chegam_ao_pipeline(
 
     assert recebido["tuning"] == TUNING_BASS_DROP_D
     assert recebido["assigner"].custos is PADRAO
+
+
+def test_alcance_da_mao_chega_ao_posicionador_do_baixo(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    recebido: dict[str, object] = {}
+
+    def espiao(ref: str, out: Path, **kw: object):
+        recebido.update(kw)
+        raise typer.Exit(code=0)
+
+    monkeypatch.setattr(pipeline, "transcrever", espiao)
+    resultado = runner.invoke(
+        app, ["transcribe", "x.mp3", "--digitacao", "experiente", "--alcance-mao", "3"]
+    )
+
+    assert resultado.exit_code == 0, resultado.output
+    assert recebido["assigner"].alcance_da_mao == 3
+    assert recebido["assigner"].custos is PADRAO
+
+
+def test_alcance_da_mao_negativo_e_recusado() -> None:
+    resultado = runner.invoke(app, ["transcribe", "x.mp3", "--alcance-mao", "-1"])
+
+    assert resultado.exit_code != 0
+    assert "-1" in resultado.output
+
+
+def test_modelo_medium_e_encaminhado_com_cache(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    from thoth.services.cache_transcricao import TranscritorEmCache
+
+    recebido: dict[str, object] = {}
+
+    def espiao(ref: str, out: Path, **kw: object):
+        recebido.update(kw)
+        raise typer.Exit(code=0)
+
+    monkeypatch.setattr(pipeline, "transcrever", espiao)
+    resultado = runner.invoke(
+        app, ["transcribe", "x.mp3", "--modelo", "medium", "--cache", str(tmp_path)]
+    )
+
+    assert resultado.exit_code == 0, resultado.output
+    transcritor = recebido["transcriber"]
+    assert isinstance(transcritor, TranscritorEmCache)
+    assert transcritor.base.model == "medium"
+    assert transcritor.pasta == tmp_path / "transcricoes"
+
+
+def test_modelo_desconhecido_e_recusado() -> None:
+    resultado = runner.invoke(app, ["transcribe", "x.mp3", "--modelo", "gigante"])
+
+    assert resultado.exit_code != 0
+    assert "small" in resultado.output and "medium" in resultado.output
+
+
+@pytest.mark.parametrize(("opcao", "valor"), [("--modelo", "medium"), ("--alcance-mao", "3")])
+def test_ajustes_do_baixo_nao_sao_aplicados_a_bateria(opcao: str, valor: str) -> None:
+    resultado = runner.invoke(
+        app, ["transcribe", "x.mp3", "--instrumento", "bateria", opcao, valor]
+    )
+
+    assert resultado.exit_code != 0
+    assert "baixo" in resultado.output
 
 
 def test_o_tom_informado_chega_ao_pipeline(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -702,6 +772,7 @@ def test_a_guitarra_relata_rotulo_contaminacao_e_acorde_impossivel(
             erro_de_rotulo={"distorted_electric_guitar": 3},
             contaminacao={"acoustic_piano": 5},
             acordes_impossiveis=[AcordeImpossivel(notas, "2 notas na mesma corda")],
+            cabeca_do_tempo=0,
         ),
     )
 
@@ -761,3 +832,68 @@ def test_a_bateria_relata_cada_causa_de_ataque_fora(
     assert "ataque(s) fora da partitura: 1 fora do mapa de percussão, 2 repetida no tique" in (
         resultado.output
     )
+
+
+@pytest.mark.parametrize(("cabeca", "avisa"), [(None, True), (0, False), (3, False)])
+def test_a_cabeca_do_tempo_sem_decisao_e_relatada(
+    tmp_path: Path, monkeypatch, cabeca: int | None, avisa: bool
+) -> None:
+    """ADR-054: quando as batidas do mix empatam, a fase fica a da grade — e isso se diz."""
+    from thoth.services import pipeline as modulo
+    from thoth.services.pipeline import Resultado
+
+    asset = AudioAsset(wav=tmp_path / "mix.wav", source_id="abc123", title="t", duration_s=1.0)
+    monkeypatch.setattr(
+        modulo,
+        "transcrever",
+        lambda *a, **k: Resultado(
+            asset=asset,
+            stem=tmp_path / "bass.wav",
+            artefatos={"gp5": tmp_path / "abc123.gp5"},
+            notas=1,
+            rotulos={"electric_bass": 1},
+            descartadas=[],
+            fora_do_braco=[],
+            bpm=90,
+            avisos_de_oitava=[],
+            cabeca_do_tempo=cabeca,
+        ),
+    )
+
+    resultado = runner.invoke(app, ["transcribe", "x.mp3", "--out", str(tmp_path), "--bpm", "90"])
+
+    assert resultado.exit_code == 0, resultado.output
+    assert ("cabeça do tempo" in resultado.output) is avisa
+
+
+def test_digitacao_aprendida_chega_ao_pipeline(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Aprendida nas tabs humanas (ADR-055); fora de 4 cordas, o `experiente`."""
+    recebido: dict[str, object] = {}
+
+    def espiao(ref: str, out: Path, **kw: object):
+        recebido.update(kw)
+        raise typer.Exit(code=0)
+
+    monkeypatch.setattr(pipeline, "transcrever", espiao)
+    resultado = runner.invoke(app, ["transcribe", "x.mp3", "--digitacao", "aprendida"])
+
+    assert resultado.exit_code == 0, resultado.output
+    assert isinstance(recebido["assigner"], DigitacaoAprendida)
+    assert recebido["assigner"].reserva.custos is PADRAO
+    assert recebido["atribuidor_de_acordes"].custos is PADRAO
+
+
+def test_digitacao_aprendida_nao_tem_alcance_da_mao() -> None:
+    """Foi treinada com alcance zero (ADR-032); outro alcance seria outro modelo."""
+    resultado = runner.invoke(
+        app, ["transcribe", "x.mp3", "--digitacao", "aprendida", "--alcance-mao", "3"]
+    )
+
+    assert resultado.exit_code != 0
+    assert "aprendida" in resultado.output
+
+
+def test_digitacao_fora_do_catalogo_lista_a_aprendida() -> None:
+    resultado = runner.invoke(app, ["transcribe", "x.mp3", "--digitacao", "virtuose"])
+
+    assert "aprendida" in resultado.output

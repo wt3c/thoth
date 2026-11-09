@@ -15,3 +15,5 @@ spike
 tasks
 tests
 web/vendor
+braco/node_modules
+braco/dist

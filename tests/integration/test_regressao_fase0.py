@@ -79,5 +79,10 @@ def test_fixture_nao_regrediu(
 
     resultado = avaliar(referencia, estimativa)
 
+    print(
+        f"\nBAIXO {nome}: onset={resultado.onset_f1} piso={piso_onset - FOLGA}; "
+        f"nota={resultado.note_f1} piso={piso_nota - FOLGA}"
+    )
+
     assert resultado.onset_f1 >= piso_onset - FOLGA, f"{nome}: onset F1 {resultado}"
     assert resultado.note_f1 >= piso_nota - FOLGA, f"{nome}: nota F1 {resultado}"
