@@ -57,7 +57,8 @@ autorização); M8 com quantização opcional, desligada por padrão.
 18. [x] Republicado no Pages com os ícones (2026-11-09): run 42721033483 a partir de `e724995`; `favicon.svg`
     responde 200 como `image/svg+xml` e o bundle traz o ícone do link.
 19. [x] O braço abre com 21 casas (`feat/braco-21-casas`); emenda do ADR-062.
-20. [ ] Republicar no Pages com 21 casas, depois do merge na `main`.
+20. [x] Republicado no Pages com 21 casas (2026-11-09): run 42721952838 a partir de `ad9bdc5`; o site no ar
+    abre com "E A D G · 21 casas" e 88 posições.
 
 Dono exclusivo de `package.json`/lockfile, configs, `tasks/*`, `Containerfile`, `app.py`: o integrador (Claude).
 
