@@ -1,0 +1,7 @@
+[
+  { "id": "baixo-4", "nome": "E A D G", "instrumento": "baixo", "cordas": [28, 33, 38, 43] },
+  { "id": "baixo-5", "nome": "B E A D G", "instrumento": "baixo", "cordas": [23, 28, 33, 38, 43] },
+  { "id": "baixo-6", "nome": "B E A D G C", "instrumento": "baixo", "cordas": [23, 28, 33, 38, 43, 48] },
+  { "id": "baixo-drop-d", "nome": "Drop D", "instrumento": "baixo", "cordas": [26, 33, 38, 43] },
+  { "id": "guitarra-6", "nome": "E A D G B E", "instrumento": "guitarra", "cordas": [40, 45, 50, 55, 59, 64] }
+]

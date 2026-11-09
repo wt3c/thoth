@@ -1,0 +1,42 @@
+/* Tokens de tema (ADR-060). As paletas completas e o modo daltônico chegam com a Trilha A. */
+:root {
+  color-scheme: light;
+  --fundo: #f6f3ee;
+  --texto: #1d1b18;
+  --braco-madeira: #6b4423;
+  --braco-traste: #c9c4bb;
+  --braco-corda: #e8e2d6;
+  --nota-fundo: #fdfaf4;
+  --nota-texto: #1d1b18;
+  --foco: #1565c0;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-tema='claro']) {
+    color-scheme: dark;
+    --fundo: #15130f;
+    --texto: #ece7dd;
+    --braco-madeira: #3a2616;
+    --braco-traste: #8f8a80;
+    --braco-corda: #b8b2a6;
+    --nota-fundo: #ece7dd;
+    --nota-texto: #15130f;
+    --foco: #64b5f6;
+  }
+}
+:root[data-tema='escuro'] {
+  color-scheme: dark;
+  --fundo: #15130f;
+  --texto: #ece7dd;
+  --braco-madeira: #3a2616;
+  --braco-traste: #8f8a80;
+  --braco-corda: #b8b2a6;
+  --nota-fundo: #ece7dd;
+  --nota-texto: #15130f;
+  --foco: #64b5f6;
+}
+body {
+  margin: 0;
+  background: var(--fundo);
+  color: var(--texto);
+  font-family: system-ui, sans-serif;
+}

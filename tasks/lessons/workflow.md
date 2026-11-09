@@ -152,3 +152,9 @@ erro "no papel, não no som". O usuário corrigiu: partitura é som por definiç
 **Regra:** a métrica que vale é a da partitura reproduzida (andamento lido pelo player, figuras, pausas). Se a medição
 diz "acerta" e ele ouve "errado", essa divergência é o próximo objeto de investigação, e não se resolve com uma
 distinção. O primeiro passo é reproduzir no mesmo player que ele usou.
+
+## A regra de deny de `audio/` alcança qualquer `audio/` aninhado
+
+Em 2026-11-09, criar `braco/src/audio/tipos.ts` foi negado: `Read(./audio/**)` em `.claude/settings.json`, que
+protege os áudios do usuário, casou também com a pasta da SPA. **Regra:** a regra fica como está (ela é a proteção);
+código de som usa outro nome de pasta — no braço, `src/som/`.

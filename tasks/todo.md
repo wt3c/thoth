@@ -8,11 +8,12 @@ ADR-056 a 061. Celular pelo build estático publicado (Pages, ação externa só
 autorização); M8 com quantização opcional, desligada por padrão.
 
 0. [x] ADRs 056–061 e este plano.
-1. [ ] Esqueleto: `braco/` (Vite+Vue+TS+Pinia+Vitest, dependências congeladas),
-   contratos de `dominio/`, `audio/`, `stores/`; braço de 4 cordas com clique tocando;
+1. [x] Esqueleto: `braco/` (Vite+Vue+TS+Pinia+Vitest, dependências congeladas),
+   contratos de `dominio/`, `som/` (não `audio/`: a regra de deny dos áudios casa com qualquer
+   `audio/`, `tasks/lessons/workflow.md`), `stores/`; braço de 4 cordas com clique tocando;
    `/braco/` no FastAPI com 503 sem build; Containerfile; teste offline do Web Audio.
 2. [ ] Trilha A `dominio/` (Codex, worktree): afinações, braço, teoria grafada, frequência, paleta e contraste.
-3. [ ] Trilha B `audio/` (Claude, worktree): agendador, metrônomo completo (inventário Musicca), reprodução.
+3. [ ] Trilha B `som/` (Claude, worktree): agendador, metrônomo completo (inventário Musicca), reprodução.
 4. [ ] Trilha C UI: controles, teoria, tema, acessibilidade, responsivo — depois do merge da A.
 5. [ ] Integração: M8, S6, S8 (URL > localStorage > padrão, esquema versionado), e2e `-m navegador`,
    README, `/verificacao` + skill Codex, workflow do Pages (sem publicar).
