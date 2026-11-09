@@ -53,6 +53,8 @@ autorização); M8 com quantização opcional, desligada por padrão.
 15. [x] Guia "Como usar" no fim da página, com link no cabeçalho (`feat/braco-limpar`); ADR-064.
 16. [x] Republicado no Pages com o braço limpo, a legenda e o guia (2026-11-09): run 42718737888 a partir de
     `12eed6e`; o bundle publicado traz `#como-usar`, a legenda e "Limpar".
+17. [x] Ícone na aba e no link "Como usar", link na cor de destaque (`feat/braco-icones`); emenda do ADR-064.
+18. [ ] Republicar no Pages com os ícones, depois do merge na `main`.
 
 Dono exclusivo de `package.json`/lockfile, configs, `tasks/*`, `Containerfile`, `app.py`: o integrador (Claude).
 

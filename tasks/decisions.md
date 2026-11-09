@@ -4502,3 +4502,15 @@ separado ou o README ficariam fora de onde a dúvida aparece.
   do comentário em `BracoSvg.vue`; o guia cita só Tab, setas e Enter.
 - Medido no Chromium (`tests/navegador/test_braco.py`), com todos os blocos abertos, em 390 × 844 e 1280 × 800:
   link no cabeçalho, 9 blocos, guia abaixo dos painéis e sem rolagem horizontal.
+
+### Emenda (2026-11-09) — ícones da aba e do link
+
+- **Aba:** `braco/public/favicon.svg` é um desenho próprio: um pedaço do braço com madeira, 2 trastes, 4 cordas e uma
+  nota acesa. As cores são fixas, porque o ícone da aba não lê as variáveis do tema. O `index.html` aponta para
+  `/favicon.svg`, e o Vite reescreve esse caminho para `./favicon.svg` com `base: './'`. Assim, o mesmo build serve
+  em `/braco/` e no Pages.
+- **Link "Como usar":** um "?" num círculo, em SVG inline com `currentColor` e `aria-hidden`. O nome lido continua
+  "Como usar". Sem emoji: o desenho varia entre sistemas e o leitor de tela lê o emoji em voz alta.
+- O link usa a cor `--destaque`. A cor padrão de link do navegador sumia no tema escuro.
+- Medido no Chromium: o ícone da aba responde 200 como `image/svg+xml`; no tema escuro, o link tem o SVG decorativo,
+  o texto "Como usar" e a cor de destaque.

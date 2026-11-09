@@ -332,6 +332,41 @@ def test_guia_de_uso_abre_pelo_link_do_cabecalho_sem_transbordar(
     }
 
 
+ICONES = """(async () => {
+  const corDoDestaque = () => {
+    const amostra = document.createElement('span')
+    amostra.style.color = 'var(--destaque)'
+    document.body.append(amostra)
+    const cor = getComputedStyle(amostra).color
+    amostra.remove()
+    return cor
+  }
+  const icone = document.querySelector('link[rel="icon"]')
+  const resposta = icone ? await fetch(icone.href) : null
+  const link = document.querySelector('header a[href="#como-usar"]')
+  return JSON.stringify({
+    status: resposta?.status ?? null,
+    tipo: resposta?.headers.get('content-type')?.split(';')[0] ?? null,
+    svgNoLink: link?.querySelector('svg')?.getAttribute('aria-hidden') ?? null,
+    textoDoLink: link?.textContent.trim() ?? null,
+    corDoLinkEhDestaque: !!link && getComputedStyle(link).color === corDoDestaque(),
+  })
+})()"""
+
+
+def test_aba_e_link_como_usar_tem_icone(servidor: str) -> None:
+    # No tema escuro, a cor padrão de link do navegador some no fundo; o link usa o destaque.
+    estado = json.loads(sessao(f"{servidor}/braco/?tema=escuro", [(1.5, ICONES)])[0])
+    print("ícones:", estado)
+    assert estado == {
+        "status": 200,
+        "tipo": "image/svg+xml",
+        "svgNoLink": "true",
+        "textoDoLink": "Como usar",
+        "corDoLinkEhDestaque": True,
+    }
+
+
 OITAVAS = """JSON.stringify({
   referencia: [...document.querySelectorAll('[data-referencia="true"]')]
     .map((n) => `${n.dataset.corda}-${n.dataset.casa}`),
