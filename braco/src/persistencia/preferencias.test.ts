@@ -17,7 +17,7 @@ describe('preferências (S8)', () => {
       instrumento: 'baixo',
       numCordas: 5,
       afinacaoId: 'baixo-5',
-      casas: 21,
+      casas: 17,
       modo: 'teoria',
       filtro: [0, 4, 7, 11],
       selecionada: 10,
@@ -64,7 +64,7 @@ describe('preferências (S8)', () => {
   it('campo inválido é recusado e relatado; os outros valem', () => {
     const { preferencias, rejeitados } = carregar('?v=1&casas=99&modo=jazz&tonica=4&padrao=escala-xyz', null)
     expect(preferencias.tonica).toBe(4)
-    expect([preferencias.casas, preferencias.modo, preferencias.padraoId]).toEqual([12, 'notas', null])
+    expect([preferencias.casas, preferencias.modo, preferencias.padraoId]).toEqual([21, 'notas', null])
     expect(rejeitados).toEqual(['url: casas=99', 'url: modo=jazz', 'url: padrao=escala-xyz'])
   })
 

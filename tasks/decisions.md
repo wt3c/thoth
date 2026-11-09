@@ -4456,6 +4456,14 @@ Como a URL e o armazenado só guardam o que difere do padrão, a troca muda a le
 A ordem URL > armazenado > padrão não mudou. Medido no Chromium, `/braco/` abre com as 52 posições tocáveis, nenhum
 marcador e o botão "Limpar".
 
+### Emenda (2026-11-09) — o braço abre com 21 casas
+
+A pedido do usuário, o padrão de casas passou de 12 (`CASAS_MIN`) para 21 (`CASAS_PADRAO`). O intervalo continua de
+12 a 24. Pelo mesmo motivo da emenda anterior, um link ou estado guardado sem `casas` passa a abrir com 21. Quem
+escolheu 12 antes, quando 12 era o padrão, não tinha a escolha escrita e também passa a ver 21. Os testes no navegador
+que contam posições fixam `casas=12` na URL e continuam medindo o mesmo. Medido no Chromium, `/braco/` abre com
+88 posições tocáveis (4 cordas × 22) e nenhum marcador.
+
 ## ADR-063 — braço vertical no celular em pé e metrônomo rápido fixo
 
 **Data:** 2026-11-09 · **Status:** aceito

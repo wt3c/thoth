@@ -17,10 +17,10 @@ const lugar = (corda: number, casa: number) => {
 describe('useConfigStore', () => {
   beforeEach(() => setActivePinia(createPinia()))
 
-  it('começa no baixo de 4 cordas em E A D G, 12 casas, modo notas com o braço limpo', () => {
+  it('começa no baixo de 4 cordas em E A D G, 21 casas, modo notas com o braço limpo', () => {
     const config = useConfigStore()
     expect(config.afinacao.cordas).toEqual([28, 33, 38, 43])
-    expect(config.casas).toBe(12)
+    expect(config.casas).toBe(21)
     expect(config.escolhas).toMatchObject({ modo: 'notas', selecionada: null, tonica: null, padrao: null })
     expect(config.escolhas.filtro).toEqual([])
   })

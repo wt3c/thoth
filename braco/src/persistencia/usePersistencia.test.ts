@@ -44,7 +44,7 @@ describe('ligarPersistencia (S8)', () => {
     ligarPersistencia()
     await nextTick()
     expect(aviso).toHaveBeenCalledWith('preferências recusadas', ['url: casas=99'])
-    expect(useConfigStore().casas).toBe(12)
+    expect(useConfigStore().casas).toBe(21)
     aviso.mockRestore()
   })
 })
