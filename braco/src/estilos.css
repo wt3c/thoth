@@ -9,6 +9,11 @@
   --nota-fundo: #fdfaf4;
   --nota-texto: #1d1b18;
   --foco: #1565c0;
+  --texto-suave: #5c564d;
+  --borda: #b9b2a6;
+  --superficie: #fffdf9;
+  --destaque: #8a3b12;
+  --destaque-texto: #ffffff;
 }
 @media (prefers-color-scheme: dark) {
   :root:not([data-tema='claro']) {
@@ -33,10 +38,81 @@
   --nota-fundo: #ece7dd;
   --nota-texto: #15130f;
   --foco: #64b5f6;
+  --texto-suave: #b3ac9f;
+  --borda: #5a554c;
+  --superficie: #211e19;
+  --destaque: #f0a36b;
+  --destaque-texto: #15130f;
 }
 body {
   margin: 0;
   background: var(--fundo);
   color: var(--texto);
   font-family: system-ui, sans-serif;
+}
+
+/* Blocos comuns aos painéis (Trilha C). */
+.painel {
+  background: var(--superficie);
+  border: 1px solid var(--borda);
+  border-radius: 14px;
+  padding: 16px;
+  display: grid;
+  gap: 12px;
+}
+.painel h2 {
+  margin: 0;
+  font-size: 1.05rem;
+}
+.painel .dica {
+  margin: 0;
+  color: var(--texto-suave);
+}
+.painel .acoes {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.campo {
+  display: grid;
+  gap: 4px;
+  font-size: 0.9rem;
+  color: var(--texto-suave);
+}
+.interruptor {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 44px;
+}
+.interruptor input {
+  width: 22px;
+  height: 22px;
+  accent-color: var(--destaque);
+}
+button,
+select,
+input[type='number'] {
+  min-height: 44px;
+  font: inherit;
+  color: var(--texto);
+  background: var(--fundo);
+  border: 1px solid var(--borda);
+  border-radius: 10px;
+  padding: 0 12px;
+}
+button {
+  cursor: pointer;
+  font-weight: 600;
+}
+button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+input[type='range'] {
+  accent-color: var(--destaque);
+}
+:focus-visible {
+  outline: 3px solid var(--foco);
+  outline-offset: 2px;
 }
