@@ -4413,6 +4413,17 @@ no próximo toque.
 Medido no Chromium, tocando o C da corda A, casa 3 (C2): anel em `1-3`, `=` na corda E casa 8, `+1` na corda D
 casa 10 e na corda G casa 5. Contra o build anterior, o mesmo teste não encontra referência nem etiqueta.
 
+### Emenda (2026-11-09) — legenda das oitavas
+
+A pedido do usuário, `LegendaDoBraco.vue` fica logo abaixo do braço e aparece só no modo Notas, o único onde há
+oitavas. Ela explica o anel e as etiquetas `+1`, `+2`, `−1` e `=` em linguagem de quem não lê música e diz o que é
+uma oitava: a mesma nota mais aguda ou mais grave, 12 casas adiante na mesma corda. Cada sinal é desenhado com as
+mesmas classes e cores do braço (`.anel-referencia`, `.oitava`), e o desenho fica fora da árvore de
+acessibilidade: quem usa leitor de tela já ouve a oitava no nome de cada nota.
+
+Medido no Chromium, a legenda começa 16 px abaixo do fim do braço, a 390×844 e a 1280×800, sem rolagem
+horizontal. No celular em pé ela vem depois do braço inteiro, que é longo na vertical.
+
 ## ADR-062 — preferências do braço num único texto de query string, na URL e no localStorage
 
 **Data:** 2026-11-09 · **Status:** aceito
@@ -4430,6 +4441,20 @@ localStorage (`thoth-braco:preferencias`). Na abertura, a URL vence o armazenado
   os põe de acordo, voltando à afinação padrão do instrumento com aviso.
 - localStorage indisponível (aba privada, cota) não impede a página; ela só não lembra.
 - O padrão do store de configuração vem de `PREFERENCIAS_PADRAO`, para não haver dois padrões.
+
+### Emenda (2026-11-09) — o braço abre limpo; "Nenhuma" vira "Limpar"
+
+A pedido do usuário, o filtro padrão passou a ser vazio: quem abre o site vê o braço sem nenhuma nota acesa e
+acende as notas tocando nelas. Antes, o padrão eram as 12 notas. O botão que esconde todas as notas passou de
+"Nenhuma" para "Limpar" (`data-acao="limpar"`) e faz o mesmo de antes.
+
+Como a URL e o armazenado só guardam o que difere do padrão, a troca muda a leitura do que já existe:
+- link ou estado sem `filtro`, que antes valia as 12 notas, agora abre limpo;
+- "todas" passou a ser uma escolha escrita (`filtro=0123456789ab`);
+- quem guardou uma escolha própria, inclusive o filtro vazio, segue com ela.
+
+A ordem URL > armazenado > padrão não mudou. Medido no Chromium, `/braco/` abre com as 52 posições tocáveis, nenhum
+marcador e o botão "Limpar".
 
 ## ADR-063 — braço vertical no celular em pé e metrônomo rápido fixo
 
@@ -4457,3 +4482,23 @@ indicador de tempos. Ela usa o mesmo store do painel completo.
   - 844 × 390: horizontal, com barra;
   - 1280 × 800: horizontal, sem barra.
 - Pendência anterior a este ADR: com número ímpar de cordas, o ponto de marcação fica sob a corda do meio.
+
+## ADR-064 — guia "Como usar" dentro do site
+
+**Data:** 2026-11-09 · **Status:** aceito
+
+O site é usado por quem não lê música e não tinha nenhuma explicação dos controles. O guia fica **na própria
+página**, no fim, depois dos painéis, e um link "Como usar" no cabeçalho leva a ele (`#como-usar`). Um arquivo
+separado ou o README ficariam fora de onde a dúvida aparece.
+
+- Cada assunto é um `<details>` fechado (começar, notas, oitavas, teoria, metrônomo, instrumento, exibição, link e
+  escolhas salvas, teclado). Fechado, o guia ocupa poucas linhas e não empurra os painéis, e funciona sem JavaScript
+  próprio, com teclado e leitor de tela.
+- Os títulos dos blocos dos painéis são os títulos dos painéis ("Notas", "Metrônomo", "Instrumento", "Exibição"),
+  e os botões são citados pelo rótulo da tela. Os dois casos têm teste (`GuiaDeUso.test.ts`): renomear um painel
+  sem atualizar o guia quebra o teste.
+- O texto descreve só o que foi conferido no código: limites de BPM (30–244), o Tap (2 toques, esquece após 3 s),
+  as casas (12–24), a ordem URL > navegador > padrão e o que não é salvo. Não há atalho de Espaço no braço, apesar
+  do comentário em `BracoSvg.vue`; o guia cita só Tab, setas e Enter.
+- Medido no Chromium (`tests/navegador/test_braco.py`), com todos os blocos abertos, em 390 × 844 e 1280 × 800:
+  link no cabeçalho, 9 blocos, guia abaixo dos painéis e sem rolagem horizontal.

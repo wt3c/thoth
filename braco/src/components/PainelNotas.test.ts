@@ -18,7 +18,7 @@ const botao = (painel: ReturnType<typeof montar>) => painel.get('[data-acao="toc
 describe('PainelNotas: tocar as notas acesas no metrônomo', () => {
   it('sem nota acesa, o botão fica desligado', async () => {
     const painel = montar()
-    await painel.get('[data-acao="nenhuma"]').trigger('click')
+    await painel.get('[data-acao="limpar"]').trigger('click')
     expect(botao(painel).attributes('disabled')).toBeDefined()
   })
 

@@ -47,7 +47,7 @@ export const PREFERENCIAS_PADRAO: Preferencias = {
   afinacaoId: 'baixo-4',
   casas: CASAS_MIN,
   modo: 'notas',
-  filtro: TODAS_AS_CLASSES,
+  filtro: [],
   selecionada: null,
   tonica: null,
   padraoId: null,

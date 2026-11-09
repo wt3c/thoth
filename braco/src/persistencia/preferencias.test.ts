@@ -45,9 +45,14 @@ describe('preferências (S8)', () => {
     expect(carregar(texto, null)).toEqual({ preferencias: p, rejeitados: [] })
   })
 
-  it('filtro vazio é uma escolha, não ausência', () => {
-    const p = { ...PREFERENCIAS_PADRAO, filtro: [] }
-    expect(carregar(escrever(p), null).preferencias.filtro).toEqual([])
+  it('o braço começa limpo: o filtro padrão é vazio', () => {
+    expect(PREFERENCIAS_PADRAO.filtro).toEqual([])
+  })
+
+  it('todas as notas acesas é uma escolha, não ausência', () => {
+    const p = { ...PREFERENCIAS_PADRAO, filtro: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11] }
+    expect(escrever(p)).toContain('filtro=0123456789ab')
+    expect(carregar(escrever(p), null).preferencias.filtro).toHaveLength(12)
   })
 
   it('URL vence o armazenado, que vence o padrão', () => {

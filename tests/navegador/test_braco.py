@@ -266,6 +266,72 @@ def test_notas_acesas_soam_no_metronomo_da_grave_a_aguda(servidor: str) -> None:
     assert statistics.fmean(intervalos) == pytest.approx(0.5, abs=1e-6)
 
 
+def test_o_site_abre_com_o_braco_limpo(servidor: str) -> None:
+    estado = json.loads(
+        sessao(
+            f"{servidor}/braco/",
+            [
+                (
+                    1.5,
+                    """JSON.stringify({
+  posicoes: document.querySelectorAll('svg.braco .nota').length,
+  marcadores: document.querySelectorAll('svg.braco .marcador').length,
+  limpar: document.querySelector('[data-acao="limpar"]')?.textContent.trim() ?? null,
+})""",
+                )
+            ],
+        )[0]
+    )
+    print("braço ao abrir:", estado)
+    assert estado == {"posicoes": 4 * 13, "marcadores": 0, "limpar": "Limpar"}
+
+
+LEGENDA = """JSON.stringify({
+  sinais: [...document.querySelectorAll('.legenda [data-sinal]')].map((i) => i.dataset.sinal),
+  topoLegenda: document.querySelector('.legenda')?.getBoundingClientRect().top ?? null,
+  fimBraco: document.querySelector('svg.braco').getBoundingClientRect().bottom,
+  transborda: document.documentElement.scrollWidth > innerWidth,
+})"""
+
+
+@pytest.mark.parametrize("tela", [(390, 844), (1280, 800)])
+def test_legenda_das_oitavas_fica_logo_abaixo_do_braco(
+    servidor: str, tela: tuple[int, int]
+) -> None:
+    estado = json.loads(sessao(f"{servidor}/braco/", [(1.5, LEGENDA)], tela=tela)[0])
+    print(tela, "legenda:", estado)
+    # O sinal de menos é o da etiqueta no braço (U+2212), não o hífen.
+    assert estado["sinais"] == ["referencia", "+1", "+2", "\u22121", "="]
+    assert estado["topoLegenda"] >= estado["fimBraco"]
+    assert not estado["transborda"]
+
+
+GUIA = """(() => {
+  for (const d of document.querySelectorAll('#como-usar details')) d.open = true
+  return JSON.stringify({
+    link: document.querySelector('header a[href="#como-usar"]')?.textContent.trim() ?? null,
+    blocos: document.querySelectorAll('#como-usar details').length,
+    abaixoDosPaineis: document.querySelector('#como-usar')?.getBoundingClientRect().top
+      >= document.querySelector('.paineis').getBoundingClientRect().bottom,
+    transborda: document.documentElement.scrollWidth > innerWidth,
+  })
+})()"""
+
+
+@pytest.mark.parametrize("tela", [(390, 844), (1280, 800)])
+def test_guia_de_uso_abre_pelo_link_do_cabecalho_sem_transbordar(
+    servidor: str, tela: tuple[int, int]
+) -> None:
+    estado = json.loads(sessao(f"{servidor}/braco/", [(1.5, GUIA)], tela=tela)[0])
+    print(tela, "guia:", estado)
+    assert estado == {
+        "link": "Como usar",
+        "blocos": 9,
+        "abaixoDosPaineis": True,
+        "transborda": False,
+    }
+
+
 OITAVAS = """JSON.stringify({
   referencia: [...document.querySelectorAll('[data-referencia="true"]')]
     .map((n) => `${n.dataset.corda}-${n.dataset.casa}`),

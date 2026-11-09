@@ -3,6 +3,8 @@ import { useMediaQuery } from '@vueuse/core'
 import { computed, watchEffect } from 'vue'
 import BarraMetronomo from '@/components/BarraMetronomo.vue'
 import BracoSvg from '@/components/BracoSvg.vue'
+import GuiaDeUso from '@/components/GuiaDeUso.vue'
+import LegendaDoBraco from '@/components/LegendaDoBraco.vue'
 import PainelExibicao from '@/components/PainelExibicao.vue'
 import PainelInstrumento from '@/components/PainelInstrumento.vue'
 import PainelMetronomo from '@/components/PainelMetronomo.vue'
@@ -40,6 +42,7 @@ function tocar(posicao: Posicao) {
     <header>
       <h1>Mapa do braço</h1>
       <p>{{ config.afinacao.nome }} · {{ config.casas }} casas</p>
+      <a href="#como-usar">Como usar</a>
     </header>
     <main>
       <div class="braco">
@@ -52,12 +55,14 @@ function tocar(posicao: Posicao) {
           @tocar="tocar"
         />
       </div>
+      <LegendaDoBraco />
       <div class="paineis">
         <PainelNotas />
         <PainelMetronomo />
         <PainelInstrumento />
         <PainelExibicao />
       </div>
+      <GuiaDeUso />
     </main>
     <BarraMetronomo class="rapida" />
   </div>
@@ -83,6 +88,9 @@ h1 {
 header p {
   margin: 0;
   color: var(--texto-suave);
+}
+header a {
+  margin-left: auto;
 }
 .braco {
   overflow-x: auto;

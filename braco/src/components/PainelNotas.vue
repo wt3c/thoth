@@ -89,10 +89,10 @@ function tocarSequencia() {
         </button>
         <button
           type="button"
-          data-acao="nenhuma"
+          data-acao="limpar"
           @click="config.mostrarClasses([])"
         >
-          Nenhuma
+          Limpar
         </button>
       </div>
       <p class="dica">
