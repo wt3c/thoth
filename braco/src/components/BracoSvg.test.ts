@@ -1,7 +1,7 @@
 import { mount } from '@vue/test-utils'
 import { describe, expect, it } from 'vitest'
 import { PALETAS } from '@/dominio/cores'
-import type { Afinacao } from '@/dominio/tipos'
+import type { Afinacao, Posicao } from '@/dominio/tipos'
 import { TODAS_AS_CLASSES, type EscolhasDaVista } from '@/dominio/vista'
 import BracoSvg from './BracoSvg.vue'
 
@@ -19,7 +19,7 @@ const NOTAS: EscolhasDaVista = {
 const montar = (
   escolhas: Partial<EscolhasDaVista> = {},
   casas = 12,
-  soando: number | null = null,
+  soando: number | Posicao | null = null,
   orientacao: 'horizontal' | 'vertical' = 'horizontal',
 ) => mount(BracoSvg, { props: { afinacao: BAIXO_4, casas, escolhas: { ...NOTAS, ...escolhas }, soando, orientacao } })
 
@@ -77,6 +77,12 @@ describe('BracoSvg', () => {
     // 33 = A1: corda E casa 5 e corda A solta.
     const acesas = montar({}, 12, 33).findAll('[data-soando="true"]')
     expect(acesas.map((n) => `${n.attributes('data-corda')}-${n.attributes('data-casa')}`)).toEqual(['0-5', '1-0'])
+  })
+
+  it('a posição que soa acende sozinha, mesmo que outra dê o mesmo som', () => {
+    // A1 na corda A solta; a corda E casa 5 tem o mesmo som e fica apagada.
+    const acesas = montar({}, 12, { corda: 1, casa: 0, altura: 33, classe: 9 }).findAll('[data-soando="true"]')
+    expect(acesas.map((n) => `${n.attributes('data-corda')}-${n.attributes('data-casa')}`)).toEqual(['1-0'])
   })
 
   it('marcações nas casas 3, 5, 7, 9 e 12, dupla na 12', () => {

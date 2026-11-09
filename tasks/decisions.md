@@ -4344,6 +4344,19 @@ sequência tocando não altera o que soa até ela ser parada e tocada de novo.
 Medido no Chromium, com E e A em 5 casas a 120 BPM: E e A acendem alternando, uma por tempo, e os instantes ficam
 espaçados exatamente 0,5 s.
 
+### Emenda (2026-11-09) — nota a nota, por posição
+
+A emenda anterior tocava cada **altura** uma vez, e o braço acendia todas as posições daquela altura. Com isso,
+o mesmo som em dois lugares acendia os dois juntos (o usuário viu "um conjunto"), e a segunda posição nunca tinha
+um tempo próprio. Agora o modo Notas toca as **posições** acesas (`posicoesVisiveis`), uma por tempo: da mais grave
+à mais aguda, e no mesmo som, da corda mais grave para a mais aguda. O `soando` do store aceita altura ou posição.
+A altura continua acendendo todas as posições dela (sequência do modo Teoria, S6, sem mudança). A posição acende
+só aquele lugar.
+
+Medido no Chromium, com E e A nas 12 casas do baixo de 4 cordas a 120 BPM: `A 0-5` → `A 1-0` → `E 0-12`, uma
+posição por leitura, e os instantes espaçados exatamente 0,5 s. A medição da emenda anterior dizia "5 casas", mas
+`casas=5` na URL é recusado (o mínimo é 12), e o braço tinha 12 casas.
+
 ## ADR-058 — baixo de 7 cordas: B-E-A-D-G-C-F padrão, F♯-B-E-A-D-G-C como preset
 
 **Data:** 2026-11-09 · **Status:** aceito

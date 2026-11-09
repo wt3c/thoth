@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import { exibirNome, nomeDaClasse } from '@/dominio/nomes'
-import { alturasDaSequencia, alturasVisiveis } from '@/dominio/sequencia'
+import { alturasDaSequencia, posicoesVisiveis } from '@/dominio/sequencia'
 import { PADROES } from '@/dominio/teoria'
 import type { ClasseAltura, TipoPadrao } from '@/dominio/tipos'
 import { TODAS_AS_CLASSES } from '@/dominio/vista'
@@ -26,9 +26,9 @@ const padraoId = computed({
   set: (v: string) => (config.padraoId = v === '' ? null : v),
 })
 
-const acesas = computed(() => alturasVisiveis(config.afinacao, config.casas, config.escolhas))
+const acesas = computed(() => posicoesVisiveis(config.afinacao, config.casas, config.escolhas))
 
-/** Modo notas: as alturas acesas no braço soam nos pulsos, pela mesma sequência do S6. */
+/** Modo notas: cada posição acesa soa e acende sozinha num pulso, pela mesma sequência do S6. */
 function tocarAcesas() {
   metro.tocarSequencia(acesas.value).catch((erro: unknown) => console.error('falha ao tocar as notas', erro))
 }

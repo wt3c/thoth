@@ -222,16 +222,17 @@ def test_layout_responsivo(
 
 
 SOANDO = """JSON.stringify({
-  notas: [...new Set([...document.querySelectorAll('[data-soando="true"]')]
-    .map((n) => n.dataset.nota))],
+  lugares: [...document.querySelectorAll('[data-soando="true"]')]
+    .map((n) => `${n.dataset.nota} ${n.dataset.corda}-${n.dataset.casa}`),
   inicios: window.__registro.inicios,
   botao: document.querySelector('[data-acao="tocar-notas"]').textContent.trim(),
 })"""
 
 
 def test_notas_acesas_soam_no_metronomo_da_grave_a_aguda(servidor: str) -> None:
-    # E e A acesas em 5 casas do baixo de 4 cordas: E1, A1, E2, A2, uma por tempo a 120 BPM.
-    url = f"{servidor}/braco/?filtro=49&casas=5&bpm=120"
+    # E e A acesas nas 12 casas do baixo de 4 cordas: dez posições, uma por tempo a 120 BPM.
+    # A1 aparece em duas (corda E casa 5, corda A solta) e cada uma tem o seu tempo.
+    url = f"{servidor}/braco/?filtro=49&bpm=120"
     leituras = sessao(
         url,
         [
@@ -243,11 +244,12 @@ def test_notas_acesas_soam_no_metronomo_da_grave_a_aguda(servidor: str) -> None:
         script_inicial=INSTRUMENTACAO,
     )
     estados = [json.loads(v) for v in leituras[1:]]
-    acesas = [e["notas"] for e in estados]
+    acesas = [e["lugares"] for e in estados]
     print("acesas por leitura:", acesas)
     assert estados[0]["botao"] == "Parar notas"
-    assert all(len(n) == 1 and n[0] in {"E", "A"} for n in acesas), "só E ou A acendem, uma por vez"
-    assert acesas[0] != acesas[1], "a nota do tempo seguinte é outra"
+    assert all(len(n) == 1 for n in acesas), "uma posição por vez, nunca um conjunto"
+    assert all(n[0].split()[0] in {"E", "A"} for n in acesas), "só E ou A acendem"
+    assert len({n[0] for n in acesas}) == len(acesas), "cada tempo acende outra posição"
 
     quandos = sorted({round(i["quando"], 6) for i in estados[-1]["inicios"]})
     intervalos = [b - a for a, b in pairwise(quandos)]
