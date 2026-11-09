@@ -40,3 +40,11 @@ testes afirmavam posição, alvo e ordem; nenhum afirmava a espessura. O usuári
 
 **Regra:** todo atributo visual que carrega significado (espessura, cor, ordem) precisa de uma asserção sobre a
 relação que ele expressa, por exemplo "a grave é a mais grossa e a espessura cai até a aguda". O valor exato não basta.
+
+## Dois estados que mostram a mesma coisa precisam ser limpos juntos
+
+No braço (2026-11-09), "Nenhuma" esvaziava o filtro, mas a nota tocada no braço (`selecionada`) continuava acesa,
+porque a vista mostra a selecionada mesmo fora do filtro. Na URL isso aparecia como `filtro=&nota=3`.
+
+**Regra:** quando dois estados decidem o que aparece na tela, a ação que esconde precisa limpar os dois. O teste
+afirma o resultado visível ("nada aceso"), não só o campo que a ação altera.

@@ -63,6 +63,16 @@ describe('useConfigStore', () => {
     expect(config.escolhas.padrao?.graus).toHaveLength(7)
   })
 
+  it('esconder a classe da nota selecionada solta a seleção; "Nenhuma" limpa tudo', () => {
+    const config = useConfigStore()
+    config.aoTocar(posicao(45))
+    config.mostrarClasses([9, 0])
+    expect(config.selecionada).toBe(9)
+    config.mostrarClasses([])
+    expect(config.selecionada).toBeNull()
+    expect(config.escolhas.filtro).toEqual([])
+  })
+
   it('o filtro alterna uma classe e mantém a ordem cromática', () => {
     const config = useConfigStore()
     config.mostrarClasses([])
