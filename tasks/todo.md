@@ -69,6 +69,8 @@ autorização); M8 com quantização opcional, desligada por padrão.
     e passar para Teoria mostra "Tônica: D", com "Limpar" na linha do Rótulo.
 25. [x] Tema Matte Black, com as cores do tema do Omarchy, e a sequência que recomeça ao trocar o padrão
     (`feat/braco-matte-black`); emendas dos ADR-060 e ADR-061.
+26. [x] Republicado no Pages (2026-11-11): run 42951558864 a partir de `1cac329`; o bundle publicado traz
+    `matte-black`, `#e68e0d` e `tocar-sequencia`.
 
 Dono exclusivo de `package.json`/lockfile, configs, `tasks/*`, `Containerfile`, `app.py`: o integrador (Claude).
 
