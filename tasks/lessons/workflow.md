@@ -158,3 +158,10 @@ distinção. O primeiro passo é reproduzir no mesmo player que ele usou.
 Em 2026-11-09, criar `braco/src/audio/tipos.ts` foi negado: `Read(./audio/**)` em `.claude/settings.json`, que
 protege os áudios do usuário, casou também com a pasta da SPA. **Regra:** a regra fica como está (ela é a proteção);
 código de som usa outro nome de pasta — no braço, `src/som/`.
+
+## `gh workflow run` logo após o push pode publicar o commit anterior
+
+Em 2026-11-11, o `workflow_dispatch` do Pages disparado logo após `git push` resolveu `main` no commit anterior
+(run 42952356758, `73d5944` em vez de `183c48c`); o run passou e o site seguiu com o pacote velho, o que parecia
+cache. **Regra:** antes do `gh run watch`, conferir o `headSha` do run contra `git ls-remote origin main`; diferente,
+disparar de novo. Só depois de o SHA bater, esperar o cache do `index.html`.

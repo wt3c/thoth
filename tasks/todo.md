@@ -73,6 +73,8 @@ autorização); M8 com quantização opcional, desligada por padrão.
     `matte-black`, `#e68e0d` e `tocar-sequencia`.
 27. [x] Metrônomo abaixo de Notas, Instrumento e Exibição, na largura toda, com os controles em 4 colunas
     lado a lado que se empilham em tela estreita (`feat/braco-metronomo-horizontal`).
+28. [x] Republicado no Pages (2026-11-11): run 42953659069 a partir de `183c48c` (o disparo anterior, 42952356758,
+    pegou `73d5944`; lição em `tasks/lessons/workflow.md`); o pacote publicado traz `largo` e `colunas`.
 
 Dono exclusivo de `package.json`/lockfile, configs, `tasks/*`, `Containerfile`, `app.py`: o integrador (Claude).
 
