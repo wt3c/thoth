@@ -61,6 +61,8 @@ autorização); M8 com quantização opcional, desligada por padrão.
     abre com "E A D G · 21 casas" e 88 posições.
 21. [x] A nota escolhida no modo Notas vira a tônica da Teoria; "Limpar" na Teoria (`fix/braco-teoria`);
     emenda do ADR-061.
+22. [x] Republicado no Pages (2026-11-10): run 42948977831 a partir de `4ee6162`; o bundle publicado traz
+    `limpar-teoria`.
 
 Dono exclusivo de `package.json`/lockfile, configs, `tasks/*`, `Containerfile`, `app.py`: o integrador (Claude).
 
