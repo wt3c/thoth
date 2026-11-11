@@ -88,9 +88,9 @@ function tocar(posicao: Posicao) {
       <LegendaDoBraco />
       <div class="paineis">
         <PainelNotas />
-        <PainelMetronomo />
         <PainelInstrumento />
         <PainelExibicao />
+        <PainelMetronomo class="largo" />
       </div>
       <GuiaDeUso />
     </main>
@@ -154,5 +154,9 @@ header a {
   grid-template-columns: repeat(auto-fit, minmax(min(100%, 300px), 1fr));
   gap: 16px;
   align-items: start;
+}
+/* O metrônomo é o painel mais alto: abaixo dos outros, na largura toda, com os controles lado a lado. */
+.paineis > .largo {
+  grid-column: 1 / -1;
 }
 </style>

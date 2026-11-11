@@ -105,6 +105,8 @@ body {
 .interruptor input {
   width: 22px;
   height: 22px;
+  /* Texto longo ao lado não pode encolher a caixa. */
+  flex-shrink: 0;
   accent-color: var(--destaque);
 }
 button,

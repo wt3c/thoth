@@ -86,6 +86,16 @@ describe('PainelExibicao', () => {
 })
 
 describe('PainelMetronomo', () => {
+  it('agrupa os controles em colunas, que ficam lado a lado na faixa larga', () => {
+    const painel = montar(PainelMetronomo)
+    const grupos = painel.findAll('.colunas > .grupo')
+    expect(grupos).toHaveLength(4)
+    expect(grupos[0]!.find('[aria-pressed]').exists()).toBe(true)
+    expect(grupos[1]!.find('select[name="tempos"]').exists()).toBe(true)
+    expect(grupos[2]!.find('input[name="volume"]').exists()).toBe(true)
+    expect(grupos[3]!.find('input[name="quantizar"]').exists()).toBe(true)
+  })
+
   it('andamento por campo e pelos botões ±, limitado à faixa', async () => {
     const painel = montar(PainelMetronomo)
     const metro = useMetronomoStore()

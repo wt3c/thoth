@@ -71,6 +71,8 @@ autorização); M8 com quantização opcional, desligada por padrão.
     (`feat/braco-matte-black`); emendas dos ADR-060 e ADR-061.
 26. [x] Republicado no Pages (2026-11-11): run 42951558864 a partir de `1cac329`; o bundle publicado traz
     `matte-black`, `#e68e0d` e `tocar-sequencia`.
+27. [x] Metrônomo abaixo de Notas, Instrumento e Exibição, na largura toda, com os controles em 4 colunas
+    lado a lado que se empilham em tela estreita (`feat/braco-metronomo-horizontal`).
 
 Dono exclusivo de `package.json`/lockfile, configs, `tasks/*`, `Containerfile`, `app.py`: o integrador (Claude).
 
