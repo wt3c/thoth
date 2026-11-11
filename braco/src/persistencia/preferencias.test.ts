@@ -45,6 +45,12 @@ describe('preferências (S8)', () => {
     expect(carregar(texto, null)).toEqual({ preferencias: p, rejeitados: [] })
   })
 
+  it('o tema Matte Black vai e volta pela URL', () => {
+    const p: Preferencias = { ...PREFERENCIAS_PADRAO, tema: 'matte-black' }
+    expect(escrever(p)).toContain('tema=matte-black')
+    expect(carregar(escrever(p), null)).toEqual({ preferencias: p, rejeitados: [] })
+  })
+
   it('o braço começa limpo: o filtro padrão é vazio', () => {
     expect(PREFERENCIAS_PADRAO.filtro).toEqual([])
   })

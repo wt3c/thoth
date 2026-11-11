@@ -75,6 +75,14 @@ describe('PainelExibicao', () => {
     await painel.get('input[type=checkbox]').setValue(true)
     expect([config.nomenclatura, config.acidente, config.tema, config.daltonico]).toEqual(['solfejo', 'bemol', 'escuro', true])
   })
+
+  it('tem o tema Matte Black, que usa a paleta própria no braço', async () => {
+    const painel = montar(PainelExibicao)
+    const config = useConfigStore()
+    await painel.get('input[type=radio][value="matte-black"]').setValue()
+    expect([config.tema, config.temaEfetivo, config.escolhas.paleta.id]).toEqual(['matte-black', 'matte-black', 'matte-black'])
+    expect(painel.text()).toContain('Matte Black')
+  })
 })
 
 describe('PainelMetronomo', () => {

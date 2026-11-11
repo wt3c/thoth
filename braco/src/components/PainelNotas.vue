@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed, watch } from 'vue'
 import { exibirNome, nomeDaClasse } from '@/dominio/nomes'
 import { alturasDaSequencia, posicoesVisiveis } from '@/dominio/sequencia'
 import { PADROES } from '@/dominio/teoria'
@@ -49,6 +49,11 @@ function tocarSequencia() {
   const alturas = alturasDaSequencia(config.afinacao, config.casas, config.tonica, config.escolhas.padrao)
   metro.tocarSequencia(alturas).catch((erro: unknown) => console.error('falha ao tocar a sequência', erro))
 }
+
+/** Trocar o padrão com a sequência tocando recomeça nela, na mesma tônica: a anterior não segue soando. */
+watch(() => config.padraoId, () => {
+  if (metro.sequenciaAtiva && config.modo === 'teoria') tocarSequencia()
+})
 </script>
 
 <template>
@@ -168,6 +173,7 @@ function tocarSequencia() {
       <div class="acoes">
         <button
           type="button"
+          data-acao="tocar-sequencia"
           :disabled="config.tonica === null"
           @click="metro.sequenciaAtiva ? metro.pararSequencia() : tocarSequencia()"
         >

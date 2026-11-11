@@ -57,6 +57,12 @@ export const PALETAS: Record<IdTema, Paleta> = {
     id: 'daltonico', braco: { madeira: '#fff5e5', traste: '#f0e7d9', corda: '#e7dfd2', marcacao: '#746957' },
     porClasse: CLASSES_DALTONICAS, tonica: '#181818', porGrau: graus(CLASSES_DALTONICAS),
   },
+  // Cores do tema Matte Black do Omarchy (`colors.toml`): preto fosco e o laranja de destaque na tônica.
+  // A corda (#4a4a4a) fica entre `muted` e `dark_foreground`: com #555555 o marcador cai a 2,93 (piso 3).
+  'matte-black': {
+    id: 'matte-black', braco: { madeira: '#1e1e1e', traste: '#333333', corda: '#4a4a4a', marcacao: '#8a8a8d' },
+    porClasse: CLASSES_ESCURAS, tonica: '#e68e0d', porGrau: graus(CLASSES_ESCURAS),
+  },
 }
 
 export function corDoGrau(paleta: Paleta, grau: Grau): Cor {
