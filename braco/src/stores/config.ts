@@ -153,7 +153,12 @@ export const useConfigStore = defineStore('config', () => {
   }
 
   function alternarClasse(c: ClasseAltura) {
-    mostrarClasses(filtro.value.includes(c) ? filtro.value.filter((x) => x !== c) : [...filtro.value, c])
+    if (filtro.value.includes(c)) mostrarClasses(filtro.value.filter((x) => x !== c))
+    else {
+      mostrarClasses([...filtro.value, c])
+      // O braço abre limpo: escolher a nota é ligá-la aqui, e essa escolha vale na teoria.
+      tonica.value = c
+    }
   }
 
   return {

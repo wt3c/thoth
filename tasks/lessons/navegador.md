@@ -58,3 +58,15 @@ e o ADR registrou "5 casas" sem conferir.
 
 **Regra:** ao destacar algo no braço, o teste afirma **quantas posições** acendem (`corda-casa`), não só qual nome
 aparece. Parâmetro de URL usado em teste tem o efeito conferido na leitura antes de ir para o ADR.
+
+## "Escolher a nota" é o gesto que a tela permite, não o que o código chama de seleção
+
+No braço (2026-11-10), o pedido "a nota escolhida em Notas tem que servir na Teoria" foi implementado no toque
+numa casa (`aoTocar`, a `selecionada`). Só que o braço abre limpo: a única forma de escolher uma nota é ligá-la
+no filtro, e esse caminho não chegava na tônica. Os testes passaram e o Pages foi publicado; o usuário relatou
+que nada mudou. O plano declarava a suposição, mas ela não foi conferida reproduzindo o caminho a partir do
+estado inicial da página.
+
+**Regra:** antes de implementar uma interação descrita pelo usuário, reproduzi-la no navegador a partir do
+estado em que a página abre e anotar o gesto real (qual botão, qual campo muda na URL). O teste de componente
+segue esse mesmo gesto, não a ação da store que parece equivalente.

@@ -4438,6 +4438,14 @@ com a sequência ainda tocando. As preferências salvas antes desta mudança pod
 `aplicar` usa a nota como tônica; uma tônica salva explicitamente continua valendo. Os dois casos foram apontados
 pela revisão do Codex.
 
+### Emenda (2026-11-11) — a escolha pelo filtro também vira tônica
+
+O usuário relatou que a nota escolhida em Notas ainda não aparecia na Teoria. A emenda anterior ligava à tônica
+só o toque numa casa, mas o braço abre limpo (emenda do ADR-062): a nota é escolhida no filtro de 12 classes,
+antes de haver casa acesa para tocar. Agora ligar uma classe no filtro (`alternarClasse`) também a torna tônica;
+vale a última escolha, seja pelo filtro, seja pelo toque. Desligar outra classe, "Todas" e o "Limpar" do modo
+Notas não alteram a tônica. Na Teoria, "Limpar" fica na mesma linha do Rótulo, ao lado de "Grau".
+
 ## ADR-062 — preferências do braço num único texto de query string, na URL e no localStorage
 
 **Data:** 2026-11-09 · **Status:** aceito

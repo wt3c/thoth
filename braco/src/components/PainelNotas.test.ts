@@ -27,6 +27,21 @@ describe('PainelNotas: modo teoria', () => {
     expect([config.tonica, config.filtro]).toEqual([null, []])
   })
 
+  it('a nota ligada no modo Notas chega na Teoria como tônica', async () => {
+    const painel = montar()
+    await painel.get('[data-classe="2"]').trigger('click')
+    await painel.get('input[name="modo"][value="teoria"]').setValue(true)
+    expect(painel.get('.dica').text()).toContain('Tônica: D')
+  })
+
+  it('"Limpar" fica na mesma linha do Rótulo', async () => {
+    const painel = montar()
+    useConfigStore().modo = 'teoria'
+    await painel.vm.$nextTick()
+    expect(painel.get('.rotulo-e-limpar').find('[data-acao="limpar-teoria"]').exists()).toBe(true)
+    expect(painel.get('.rotulo-e-limpar').find('input[name="rotulo"]').exists()).toBe(true)
+  })
+
   it('"Limpar" durante a sequência também a para', async () => {
     const painel = montar()
     const config = useConfigStore()

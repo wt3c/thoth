@@ -78,6 +78,20 @@ describe('useConfigStore', () => {
     expect([config.selecionada, config.tonica]).toEqual([null, 2])
   })
 
+  it('ligar uma nota no filtro do modo notas a faz tônica; desligar outra ou "Todas" não mexe nela', () => {
+    const config = useConfigStore()
+    config.alternarClasse(2)
+    expect(config.tonica).toBe(2)
+    config.alternarClasse(9)
+    expect(config.tonica).toBe(9)
+    config.alternarClasse(2)
+    config.mostrarClasses([0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11])
+    expect(config.tonica).toBe(9)
+    config.mostrarClasses([])
+    expect(config.tonica).toBe(9)
+    expect(config.preferencias.tonica).toBe(9)
+  })
+
   it('preferência antiga com nota e sem tônica restaura a nota como tônica; tônica explícita prevalece', () => {
     const config = useConfigStore()
     config.aplicar({ ...PREFERENCIAS_PADRAO_SEM_METRONOMO, selecionada: 2, tonica: null })

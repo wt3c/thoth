@@ -150,13 +150,13 @@ function tocarSequencia() {
           </optgroup>
         </select>
       </label>
-      <GrupoDeOpcoes
-        v-model="config.rotulo"
-        legenda="Rótulo"
-        nome="rotulo"
-        :opcoes="[{ valor: 'nome', rotulo: 'Nome' }, { valor: 'grau', rotulo: 'Grau' }]"
-      />
-      <div class="acoes">
+      <div class="rotulo-e-limpar">
+        <GrupoDeOpcoes
+          v-model="config.rotulo"
+          legenda="Rótulo"
+          nome="rotulo"
+          :opcoes="[{ valor: 'nome', rotulo: 'Nome' }, { valor: 'grau', rotulo: 'Grau' }]"
+        />
         <button
           type="button"
           data-acao="limpar-teoria"
@@ -179,6 +179,15 @@ function tocarSequencia() {
 </template>
 
 <style scoped>
+.rotulo-e-limpar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 8px;
+}
+.rotulo-e-limpar button {
+  min-height: 44px;
+}
 .filtro {
   display: grid;
   grid-template-columns: repeat(6, minmax(44px, 1fr));
