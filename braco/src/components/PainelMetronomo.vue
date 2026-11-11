@@ -47,186 +47,208 @@ function silencio(parcial: Partial<ConfigMetronomo['silencio']>) {
       Metrônomo
     </h2>
 
-    <div class="principal">
-      <button
-        type="button"
-        class="tocar"
-        :aria-pressed="metro.tocando"
-        @click="metro.alternar()"
-      >
-        {{ metro.tocando ? '■ Parar' : '▶ Tocar' }}
-      </button>
-      <IndicadorDeTempos />
-    </div>
+    <div class="colunas">
+      <div class="grupo">
+        <div class="principal">
+          <button
+            type="button"
+            class="tocar"
+            :aria-pressed="metro.tocando"
+            @click="metro.alternar()"
+          >
+            {{ metro.tocando ? '■ Parar' : '▶ Tocar' }}
+          </button>
+          <IndicadorDeTempos />
+        </div>
 
-    <div class="andamento">
-      <button
-        type="button"
-        data-acao="menos"
-        aria-label="Diminuir andamento"
-        @click="mudarBpm(metro.config.bpm - 1)"
-      >
-        −
-      </button>
-      <label class="campo bpm">
-        <span>BPM</span>
+        <div class="andamento">
+          <button
+            type="button"
+            data-acao="menos"
+            aria-label="Diminuir andamento"
+            @click="mudarBpm(metro.config.bpm - 1)"
+          >
+            −
+          </button>
+          <label class="campo bpm">
+            <span>BPM</span>
+            <input
+              type="number"
+              name="bpm"
+              :min="BPM_MIN"
+              :max="BPM_MAX"
+              :value="metro.config.bpm"
+              @change="mudarBpm(numero($event))"
+            >
+          </label>
+          <button
+            type="button"
+            data-acao="mais"
+            aria-label="Aumentar andamento"
+            @click="mudarBpm(metro.config.bpm + 1)"
+          >
+            +
+          </button>
+          <button
+            type="button"
+            data-acao="tap"
+            @click="tap"
+          >
+            Tap
+          </button>
+        </div>
         <input
-          type="number"
-          name="bpm"
+          type="range"
+          name="bpm-slider"
+          aria-label="Andamento"
           :min="BPM_MIN"
           :max="BPM_MAX"
           :value="metro.config.bpm"
-          @change="mudarBpm(numero($event))"
+          @input="mudarBpm(numero($event))"
         >
-      </label>
-      <button
-        type="button"
-        data-acao="mais"
-        aria-label="Aumentar andamento"
-        @click="mudarBpm(metro.config.bpm + 1)"
-      >
-        +
-      </button>
-      <button
-        type="button"
-        data-acao="tap"
-        @click="tap"
-      >
-        Tap
-      </button>
+      </div>
+
+      <div class="grupo">
+        <div class="linha">
+          <label class="campo">
+            <span>Tempos</span>
+            <select
+              name="tempos"
+              :value="metro.config.temposPorCompasso"
+              @change="mudar({ temposPorCompasso: numero($event) })"
+            >
+              <option
+                v-for="n in 12"
+                :key="n"
+                :value="n"
+              >{{ n }}</option>
+            </select>
+          </label>
+          <label class="campo">
+            <span>Som</span>
+            <select
+              name="som"
+              :value="metro.config.som"
+              @change="mudar({ som: ($event.target as HTMLSelectElement).value as SomDoClique })"
+            >
+              <option
+                v-for="s in SONS"
+                :key="s.valor"
+                :value="s.valor"
+              >{{ s.rotulo }}</option>
+            </select>
+          </label>
+          <label class="campo">
+            <span>Contagem</span>
+            <select
+              name="contagem"
+              :value="metro.config.contagemEntrada"
+              @change="mudar({ contagemEntrada: numero($event) })"
+            >
+              <option :value="0">Sem contagem</option>
+              <option :value="1">1 compasso</option>
+              <option :value="2">2 compassos</option>
+            </select>
+          </label>
+        </div>
+
+        <GrupoDeOpcoes
+          v-model="subdivisao"
+          legenda="Subdivisão"
+          nome="subdivisao"
+          :opcoes="[{ valor: 1, rotulo: '♩' }, { valor: 2, rotulo: '♫' }, { valor: 3, rotulo: '3' }, { valor: 4, rotulo: '♬' }]"
+        />
+      </div>
+
+      <div class="grupo">
+        <label class="campo">
+          <span>Volume</span>
+          <input
+            type="range"
+            name="volume"
+            min="0"
+            max="1"
+            step="0.05"
+            :value="metro.config.volume"
+            @input="mudar({ volume: numero($event) })"
+          >
+        </label>
+
+        <label class="interruptor">
+          <input
+            type="checkbox"
+            name="acento"
+            :checked="metro.config.acentoNoUm"
+            @change="mudar({ acentoNoUm: ($event.target as HTMLInputElement).checked })"
+          >
+          Acento no tempo 1
+        </label>
+
+        <label class="interruptor">
+          <input
+            type="checkbox"
+            name="silencio"
+            :checked="metro.config.silencio.ativo"
+            @change="silencio({ ativo: ($event.target as HTMLInputElement).checked })"
+          >
+          Compassos em silêncio
+        </label>
+        <div
+          v-if="metro.config.silencio.ativo"
+          class="linha"
+        >
+          <label class="campo">
+            <span>Tocar</span>
+            <input
+              type="number"
+              name="silencio-tocar"
+              min="1"
+              max="99"
+              :value="metro.config.silencio.tocar"
+              @change="silencio({ tocar: numero($event) })"
+            >
+          </label>
+          <label class="campo">
+            <span>Silenciar</span>
+            <input
+              type="number"
+              name="silencio-silenciar"
+              min="1"
+              max="99"
+              :value="metro.config.silencio.silenciar"
+              @change="silencio({ silenciar: numero($event) })"
+            >
+          </label>
+        </div>
+      </div>
+
+      <div class="grupo">
+        <label class="interruptor">
+          <input
+            v-model="config.quantizar"
+            type="checkbox"
+            name="quantizar"
+          >
+          Encaixar o clique no braço na grade do metrônomo
+        </label>
+      </div>
     </div>
-    <input
-      type="range"
-      name="bpm-slider"
-      aria-label="Andamento"
-      :min="BPM_MIN"
-      :max="BPM_MAX"
-      :value="metro.config.bpm"
-      @input="mudarBpm(numero($event))"
-    >
-
-    <div class="linha">
-      <label class="campo">
-        <span>Tempos</span>
-        <select
-          name="tempos"
-          :value="metro.config.temposPorCompasso"
-          @change="mudar({ temposPorCompasso: numero($event) })"
-        >
-          <option
-            v-for="n in 12"
-            :key="n"
-            :value="n"
-          >{{ n }}</option>
-        </select>
-      </label>
-      <label class="campo">
-        <span>Som</span>
-        <select
-          name="som"
-          :value="metro.config.som"
-          @change="mudar({ som: ($event.target as HTMLSelectElement).value as SomDoClique })"
-        >
-          <option
-            v-for="s in SONS"
-            :key="s.valor"
-            :value="s.valor"
-          >{{ s.rotulo }}</option>
-        </select>
-      </label>
-      <label class="campo">
-        <span>Contagem</span>
-        <select
-          name="contagem"
-          :value="metro.config.contagemEntrada"
-          @change="mudar({ contagemEntrada: numero($event) })"
-        >
-          <option :value="0">Sem contagem</option>
-          <option :value="1">1 compasso</option>
-          <option :value="2">2 compassos</option>
-        </select>
-      </label>
-    </div>
-
-    <GrupoDeOpcoes
-      v-model="subdivisao"
-      legenda="Subdivisão"
-      nome="subdivisao"
-      :opcoes="[{ valor: 1, rotulo: '♩' }, { valor: 2, rotulo: '♫' }, { valor: 3, rotulo: '3' }, { valor: 4, rotulo: '♬' }]"
-    />
-
-    <label class="campo">
-      <span>Volume</span>
-      <input
-        type="range"
-        name="volume"
-        min="0"
-        max="1"
-        step="0.05"
-        :value="metro.config.volume"
-        @input="mudar({ volume: numero($event) })"
-      >
-    </label>
-
-    <label class="interruptor">
-      <input
-        type="checkbox"
-        name="acento"
-        :checked="metro.config.acentoNoUm"
-        @change="mudar({ acentoNoUm: ($event.target as HTMLInputElement).checked })"
-      >
-      Acento no tempo 1
-    </label>
-
-    <label class="interruptor">
-      <input
-        type="checkbox"
-        name="silencio"
-        :checked="metro.config.silencio.ativo"
-        @change="silencio({ ativo: ($event.target as HTMLInputElement).checked })"
-      >
-      Compassos em silêncio
-    </label>
-    <div
-      v-if="metro.config.silencio.ativo"
-      class="linha"
-    >
-      <label class="campo">
-        <span>Tocar</span>
-        <input
-          type="number"
-          name="silencio-tocar"
-          min="1"
-          max="99"
-          :value="metro.config.silencio.tocar"
-          @change="silencio({ tocar: numero($event) })"
-        >
-      </label>
-      <label class="campo">
-        <span>Silenciar</span>
-        <input
-          type="number"
-          name="silencio-silenciar"
-          min="1"
-          max="99"
-          :value="metro.config.silencio.silenciar"
-          @change="silencio({ silenciar: numero($event) })"
-        >
-      </label>
-    </div>
-
-    <label class="interruptor">
-      <input
-        v-model="config.quantizar"
-        type="checkbox"
-        name="quantizar"
-      >
-      Encaixar o clique no braço na grade do metrônomo
-    </label>
   </section>
 </template>
 
 <style scoped>
+/* Em tela larga os grupos ficam lado a lado; em tela estreita, empilhados como antes. */
+.colunas {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 240px), 1fr));
+  gap: 12px 24px;
+  align-items: start;
+}
+.grupo {
+  display: grid;
+  gap: 12px;
+  align-content: start;
+}
 .principal {
   display: flex;
   align-items: center;
