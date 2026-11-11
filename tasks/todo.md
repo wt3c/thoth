@@ -77,6 +77,8 @@ autorização); M8 com quantização opcional, desligada por padrão.
     pegou `73d5944`; lição em `tasks/lessons/workflow.md`); o pacote publicado traz `largo` e `colunas`.
 29. [x] Coluna da Subdivisão 30% mais larga quando o metrônomo tem 4 colunas; nenhuma coluna abaixo de 300 px
     (`fix/braco-subdivisao-larga`); teste no navegador de 390 a 1920 px.
+30. [x] Republicado no Pages (2026-11-11): run 42954404916 a partir de `08d9cbc` (headSha conferido antes de
+    acompanhar); o CSS publicado, `index-EaNC1jeJ.css`, traz `container-type:inline-size` e `1fr 1.3fr 1fr 1fr`.
 
 Dono exclusivo de `package.json`/lockfile, configs, `tasks/*`, `Containerfile`, `app.py`: o integrador (Claude).
 
