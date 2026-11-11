@@ -97,7 +97,8 @@ export const useConfigStore = defineStore('config', () => {
     filtro.value = [...p.filtro]
     selecionada.value = p.selecionada
     tocada.value = null
-    tonica.value = p.tonica
+    // Preferência salva antes de a nota do modo notas virar tônica: a nota faz esse papel.
+    tonica.value = p.tonica ?? p.selecionada
     padraoId.value = p.padraoId
     rotulo.value = p.rotulo
     nomenclatura.value = p.nomenclatura
@@ -131,7 +132,15 @@ export const useConfigStore = defineStore('config', () => {
     } else {
       selecionada.value = p.classe
       tocada.value = { corda: p.corda, casa: p.casa }
+      // A escolha feita no modo notas vale na teoria: vira a tônica.
+      tonica.value = p.classe
     }
+  }
+
+  /** Sem tônica a teoria cai no filtro do modo notas (`vista`), então limpar a teoria limpa ele também. */
+  function limparTeoria() {
+    tonica.value = null
+    mostrarClasses([])
   }
 
   function mostrarClasses(classes: readonly ClasseAltura[]) {
@@ -150,6 +159,6 @@ export const useConfigStore = defineStore('config', () => {
   return {
     instrumento, numCordas, afinacaoId, casas, modo, filtro, selecionada, tonica, padraoId, rotulo,
     nomenclatura, acidente, tema, daltonico, quantizar, temaEfetivo, afinacao, afinacoesDisponiveis, escolhas, preferencias,
-    escolherNumCordas, escolherInstrumento, escolherCasas, aoTocar, mostrarClasses, alternarClasse, aplicar,
+    escolherNumCordas, escolherInstrumento, escolherCasas, aoTocar, mostrarClasses, alternarClasse, limparTeoria, aplicar,
   }
 })

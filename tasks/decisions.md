@@ -4424,6 +4424,20 @@ acessibilidade: quem usa leitor de tela já ouve a oitava no nome de cada nota.
 Medido no Chromium, a legenda começa 16 px abaixo do fim do braço, a 390×844 e a 1280×800, sem rolagem
 horizontal. No celular em pé ela vem depois do braço inteiro, que é longo na vertical.
 
+### Emenda (2026-11-10) — a nota do modo Notas vale na Teoria; "Limpar" na Teoria
+
+O usuário relatou que a nota escolhida no modo Notas era ignorada ao passar para Teoria e que a Teoria não tinha
+botão de limpeza. Agora, ao selecionar uma casa no modo Notas (`aoTocar`), a classe também vira a tônica: vale a
+escolha mais recente, que pode ter sido feita em qualquer um dos dois modos. Soltar a seleção não apaga a tônica.
+
+A Teoria ganha "Limpar" (`limparTeoria`). Sem tônica, `vistaDaNota` usa o filtro e a seleção do modo Notas. Se o
+botão apagasse só a tônica, o braço poderia continuar aceso. Por isso ele apaga a tônica e, como o "Limpar" de
+Notas, também o filtro e a seleção. Padrão e rótulo ficam, porque são ajustes de exibição e não marcas no braço.
+Se uma sequência estiver tocando, "Limpar" a interrompe: sem tônica, o botão "Parar sequência" ficaria desligado
+com a sequência ainda tocando. As preferências salvas antes desta mudança podem ter nota sem tônica. Nesse caso,
+`aplicar` usa a nota como tônica; uma tônica salva explicitamente continua valendo. Os dois casos foram apontados
+pela revisão do Codex.
+
 ## ADR-062 — preferências do braço num único texto de query string, na URL e no localStorage
 
 **Data:** 2026-11-09 · **Status:** aceito

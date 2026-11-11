@@ -38,6 +38,12 @@ function pararNotas() {
   metro.parar().catch((erro: unknown) => console.error('falha ao parar as notas', erro))
 }
 
+/** Sem tônica não há sequência: o botão de parar ficaria desligado com ela ainda soando. */
+function limparTeoria() {
+  if (metro.sequenciaAtiva) metro.pararSequencia()
+  config.limparTeoria()
+}
+
 function tocarSequencia() {
   if (config.tonica === null) return
   const alturas = alturasDaSequencia(config.afinacao, config.casas, config.tonica, config.escolhas.padrao)
@@ -150,6 +156,15 @@ function tocarSequencia() {
         nome="rotulo"
         :opcoes="[{ valor: 'nome', rotulo: 'Nome' }, { valor: 'grau', rotulo: 'Grau' }]"
       />
+      <div class="acoes">
+        <button
+          type="button"
+          data-acao="limpar-teoria"
+          @click="limparTeoria"
+        >
+          Limpar
+        </button>
+      </div>
       <div class="acoes">
         <button
           type="button"
