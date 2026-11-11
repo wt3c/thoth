@@ -77,7 +77,8 @@
         </li>
         <li>
           <strong>Tocar sequência no metrônomo</strong> toca as notas do padrão uma por tempo, subindo a partir da
-          tônica mais grave do braço. <strong>Parar sequência</strong> interrompe.
+          tônica mais grave do braço. Trocar o padrão enquanto ela toca recomeça com o novo, na mesma tônica.
+          <strong>Parar sequência</strong> interrompe.
         </li>
       </ul>
     </details>
@@ -124,7 +125,7 @@
           <strong>Acidentes</strong>: escrever com ♯ (sustenido) ou ♭ (bemol). C♯ e D♭ são o mesmo som com dois
           nomes.
         </li>
-        <li><strong>Tema</strong>: claro, escuro ou o do sistema.</li>
+        <li><strong>Tema</strong>: claro, escuro, Matte Black ou o do sistema.</li>
         <li><strong>Cores para daltonismo</strong>: troca as cores das notas por uma paleta mais fácil de distinguir.</li>
       </ul>
     </details>

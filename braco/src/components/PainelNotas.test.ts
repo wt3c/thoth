@@ -42,6 +42,42 @@ describe('PainelNotas: modo teoria', () => {
     expect(painel.get('.rotulo-e-limpar').find('input[name="rotulo"]').exists()).toBe(true)
   })
 
+  it('trocar o padrão com a sequência tocando recomeça na nova escala, mantendo a tônica', async () => {
+    const painel = montar()
+    const config = useConfigStore()
+    const metro = useMetronomoStore()
+    const tocadas: number[][] = []
+    metro.$onAction(({ name, args }) => {
+      if (name === 'tocarSequencia') tocadas.push([...(args[0] as number[])].map((a) => a % 12))
+    })
+    config.modo = 'teoria'
+    config.tonica = 2
+    config.padraoId = 'escala-maior'
+    await painel.vm.$nextTick()
+    await painel.get('[data-acao="tocar-sequencia"]').trigger('click')
+    metro.sequenciaAtiva = true
+    await painel.get('select').setValue('escala-menor-natural')
+    expect(tocadas).toHaveLength(2)
+    expect(new Set(tocadas[0])).toEqual(new Set([2, 4, 6, 7, 9, 11, 1]))
+    expect(new Set(tocadas[1])).toEqual(new Set([2, 4, 5, 7, 9, 10, 0]))
+    expect(config.tonica).toBe(2)
+  })
+
+  it('trocar o padrão sem sequência tocando não começa a tocar', async () => {
+    const painel = montar()
+    const config = useConfigStore()
+    const metro = useMetronomoStore()
+    let chamadas = 0
+    metro.$onAction(({ name }) => {
+      if (name === 'tocarSequencia') chamadas++
+    })
+    config.modo = 'teoria'
+    config.tonica = 2
+    await painel.vm.$nextTick()
+    await painel.get('select').setValue('escala-maior')
+    expect(chamadas).toBe(0)
+  })
+
   it('"Limpar" durante a sequência também a para', async () => {
     const painel = montar()
     const config = useConfigStore()

@@ -16,7 +16,7 @@ import type { ConfigMetronomo, SomDoClique, Subdivisao } from '@/som/tipos'
 
 export const VERSAO = 1
 
-export type Tema = 'sistema' | 'claro' | 'escuro'
+export type Tema = 'sistema' | 'claro' | 'escuro' | 'matte-black'
 
 export const CORDAS: Readonly<Record<Instrumento, readonly number[]>> = { baixo: [4, 5, 6, 7], guitarra: [6] }
 export const CASAS_MIN = 12
@@ -161,7 +161,7 @@ const CAMPOS: readonly Campo[] = [
   campo('rotulo', umDe<Rotulo>('nome', 'grau'), String, (p) => p.rotulo, (p, v) => (p.rotulo = v)),
   campo('nomes', umDe<Nomenclatura>('cifra', 'solfejo'), String, (p) => p.nomenclatura, (p, v) => (p.nomenclatura = v)),
   campo('acidente', umDe<Acidente>('sustenido', 'bemol'), String, (p) => p.acidente, (p, v) => (p.acidente = v)),
-  campo('tema', umDe<Tema>('sistema', 'claro', 'escuro'), String, (p) => p.tema, (p, v) => (p.tema = v)),
+  campo('tema', umDe<Tema>('sistema', 'claro', 'escuro', 'matte-black'), String, (p) => p.tema, (p, v) => (p.tema = v)),
   campo('daltonico', booleano, bit, (p) => p.daltonico, (p, v) => (p.daltonico = v)),
   campo('quantizar', booleano, bit, (p) => p.quantizar, (p, v) => (p.quantizar = v)),
   campo('bpm', inteiro(BPM_MIN, BPM_MAX), String, (p) => p.metronomo.bpm, (p, v) => metronomo(p, 'bpm', v)),

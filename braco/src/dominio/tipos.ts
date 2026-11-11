@@ -59,7 +59,7 @@ export interface OpcoesDeNome {
 /** Cor em `#rrggbb`. */
 export type Cor = string
 
-export type IdTema = 'claro' | 'escuro' | 'daltonico'
+export type IdTema = 'claro' | 'escuro' | 'daltonico' | 'matte-black'
 
 export interface CoresDoBraco {
   readonly madeira: Cor

@@ -4387,6 +4387,17 @@ e casa. Espaço fica com o metrônomo.
 Os temas (claro, escuro, daltônico) já são variáveis CSS; Tailwind traria uma segunda linguagem de estilo e
 configuração sem ganho num app deste tamanho.
 
+### Emenda (2026-11-11) — tema Matte Black
+
+A pedido do usuário, o braço ganha o tema Matte Black, o mesmo do Omarchy da estação. As cores vêm do
+`colors.toml` do tema (fundo `#121212`, superfície `#1e1e1e`, borda `#333333`, texto `#bebebe`, texto suave
+`#8a8a8d`, destaque `#e68e0d`) e foram copiadas para o código: o site publicado não lê nada da máquina. É mais um
+valor de `tema` (`matte-black`, persistido na URL), com bloco próprio de variáveis em `estilos.css` e paleta
+própria em `dominio/cores.ts`: a tônica usa o laranja de destaque e as classes reaproveitam as cores do tema
+escuro. A corda do braço ficou em `#4a4a4a`, fora do `colors.toml`: com `#555555` (`dark_foreground`) o
+contraste mínimo de marcador cai para 2,93, abaixo do piso de 3; medido com `#4a4a4a`: 3,48. O modo daltônico
+continua vencendo o tema.
+
 ## ADR-061 — cor por nota fora da teoria, cor por função dentro dela
 
 **Data:** 2026-11-09 · **Status:** aceito
@@ -4445,6 +4456,12 @@ só o toque numa casa, mas o braço abre limpo (emenda do ADR-062): a nota é es
 antes de haver casa acesa para tocar. Agora ligar uma classe no filtro (`alternarClasse`) também a torna tônica;
 vale a última escolha, seja pelo filtro, seja pelo toque. Desligar outra classe, "Todas" e o "Limpar" do modo
 Notas não alteram a tônica. Na Teoria, "Limpar" fica na mesma linha do Rótulo, ao lado de "Grau".
+
+### Emenda (2026-11-11) — trocar o padrão recomeça a sequência
+
+O braço já trocava as notas ao trocar a escala, mas a sequência do metrônomo, calculada uma vez no clique,
+continuava tocando a escala anterior. Agora, com a sequência tocando na Teoria, trocar o padrão a recomeça com
+o novo, na mesma tônica. Sem sequência tocando, trocar o padrão não começa a tocar.
 
 ## ADR-062 — preferências do braço num único texto de query string, na URL e no localStorage
 

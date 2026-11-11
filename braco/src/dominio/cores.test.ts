@@ -22,7 +22,13 @@ describe('contraste WCAG', () => {
 })
 
 describe('paletas acessíveis', () => {
-  it.each(['claro', 'escuro', 'daltonico'] as const)('%s respeita os pisos em todas as funções', (tema) => {
+  it('Matte Black usa as cores do tema do Omarchy: tônica no laranja de destaque, braço preto fosco', () => {
+    const p = PALETAS['matte-black']
+    expect(p.tonica).toBe('#e68e0d')
+    expect(p.braco.madeira).toBe('#1e1e1e')
+  })
+
+  it.each(['claro', 'escuro', 'daltonico', 'matte-black'] as const)('%s respeita os pisos em todas as funções', (tema) => {
     const p = PALETAS[tema]
     expect(p.id).toBe(tema)
     expect(p.porClasse).toHaveLength(12)

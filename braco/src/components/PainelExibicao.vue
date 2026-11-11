@@ -29,7 +29,7 @@ const config = useConfigStore()
       v-model="config.tema"
       legenda="Tema"
       nome="tema"
-      :opcoes="[{ valor: 'sistema', rotulo: 'Sistema' }, { valor: 'claro', rotulo: 'Claro' }, { valor: 'escuro', rotulo: 'Escuro' }]"
+      :opcoes="[{ valor: 'sistema', rotulo: 'Sistema' }, { valor: 'claro', rotulo: 'Claro' }, { valor: 'escuro', rotulo: 'Escuro' }, { valor: 'matte-black', rotulo: 'Matte Black' }]"
     />
     <label class="interruptor">
       <input

@@ -44,6 +44,23 @@
   --destaque: #f0a36b;
   --destaque-texto: #15130f;
 }
+/* Matte Black: as cores do tema homônimo do Omarchy (ADR-060, emenda de 2026-11-11). */
+:root[data-tema='matte-black'] {
+  color-scheme: dark;
+  --fundo: #121212;
+  --texto: #bebebe;
+  --braco-madeira: #1e1e1e;
+  --braco-traste: #8a8a8d;
+  --braco-corda: #bebebe;
+  --nota-fundo: #bebebe;
+  --nota-texto: #121212;
+  --foco: #e68e0d;
+  --texto-suave: #8a8a8d;
+  --borda: #333333;
+  --superficie: #1e1e1e;
+  --destaque: #e68e0d;
+  --destaque-texto: #121212;
+}
 body {
   margin: 0;
   background: var(--fundo);
