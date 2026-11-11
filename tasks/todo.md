@@ -63,6 +63,8 @@ autorização); M8 com quantização opcional, desligada por padrão.
     emenda do ADR-061.
 22. [x] Republicado no Pages (2026-11-10): run 42948977831 a partir de `4ee6162`; o bundle publicado traz
     `limpar-teoria`.
+23. [x] A nota ligada no filtro do modo Notas também vira tônica; "Limpar" ao lado de "Grau"
+    (`fix/braco-teoria-filtro`); emenda do ADR-061 e lição em `tasks/lessons/navegador.md`.
 
 Dono exclusivo de `package.json`/lockfile, configs, `tasks/*`, `Containerfile`, `app.py`: o integrador (Claude).
 
