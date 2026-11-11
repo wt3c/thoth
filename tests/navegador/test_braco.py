@@ -396,3 +396,21 @@ def test_nota_tocada_sinaliza_as_oitavas_das_outras(servidor: str) -> None:
     assert estado["referencia"] == ["1-3"]
     # Corda E casa 8: o mesmo C2. Corda D casa 10 e corda G casa 5: C3, uma oitava acima.
     assert estado["etiquetas"] == {"0-8": "=", "2-10": "+1", "3-5": "+1"}
+
+
+SUBDIVISAO = """JSON.stringify({
+  topos: [...document.querySelectorAll('input[name="subdivisao"]')]
+    .map((i) => Math.round(i.closest('label').getBoundingClientRect().top)),
+  colunas: new Set([...document.querySelectorAll('.colunas > .grupo')]
+    .map((g) => Math.round(g.getBoundingClientRect().left))).size,
+  transborda: document.documentElement.scrollWidth > innerWidth,
+})"""
+
+
+@pytest.mark.parametrize("largura", [390, 760, 1000, 1100, 1280, 1600, 1920])
+def test_subdivisao_cabe_numa_linha_em_qualquer_largura(servidor: str, largura: int) -> None:
+    estado = json.loads(sessao(f"{servidor}/braco/", [(1.5, SUBDIVISAO)], tela=(largura, 900))[0])
+    print(largura, "px:", estado)
+    assert len(estado["topos"]) == 4
+    assert len(set(estado["topos"])) == 1, "botões de Subdivisão quebrados em duas linhas"
+    assert not estado["transborda"]

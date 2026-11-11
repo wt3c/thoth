@@ -40,7 +40,7 @@ function silencio(parcial: Partial<ConfigMetronomo['silencio']>) {
 
 <template>
   <section
-    class="painel"
+    class="painel metronomo"
     aria-labelledby="titulo-metronomo"
   >
     <h2 id="titulo-metronomo">
@@ -237,12 +237,22 @@ function silencio(parcial: Partial<ConfigMetronomo['silencio']>) {
 </template>
 
 <style scoped>
-/* Em tela larga os grupos ficam lado a lado; em tela estreita, empilhados como antes. */
+/* Em tela larga os grupos ficam lado a lado; em tela estreita, empilhados como antes.
+   Os 4 botões de Subdivisão pedem ~292 px: nenhuma coluna fica abaixo de 300 px, e só com
+   espaço para 4 colunas a da Subdivisão (a 2ª) ganha 30% a mais que as outras. */
+.metronomo {
+  container-type: inline-size;
+}
 .colunas {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(min(100%, 240px), 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 300px), 1fr));
   gap: 12px 24px;
   align-items: start;
+}
+@container (min-width: 1080px) {
+  .colunas {
+    grid-template-columns: 1fr 1.3fr 1fr 1fr;
+  }
 }
 .grupo {
   display: grid;

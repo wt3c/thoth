@@ -70,3 +70,11 @@ estado inicial da página.
 **Regra:** antes de implementar uma interação descrita pelo usuário, reproduzi-la no navegador a partir do
 estado em que a página abre e anotar o gesto real (qual botão, qual campo muda na URL). O teste de componente
 segue esse mesmo gesto, não a ação da store que parece equivalente.
+
+## O servidor do Vite pode servir arquivo velho depois de troca de branch
+
+Em 2026-11-11, depois de `git switch` e `git merge` com o `vite` rodando, o servidor de desenvolvimento seguiu servindo
+o `App.vue` anterior: a página mostrava a ordem antiga dos painéis, embora o disco e o build estivessem certos.
+**Regra:** se a página do servidor de desenvolvimento contradiz o código, conferir `curl localhost:<porta>/src/<arquivo>`
+antes de concluir qualquer coisa; se estiver velho, reiniciar o `vite`. O teste `-m navegador` usa o build, não o
+servidor de desenvolvimento.

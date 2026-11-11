@@ -75,6 +75,8 @@ autorização); M8 com quantização opcional, desligada por padrão.
     lado a lado que se empilham em tela estreita (`feat/braco-metronomo-horizontal`).
 28. [x] Republicado no Pages (2026-11-11): run 42953659069 a partir de `183c48c` (o disparo anterior, 42952356758,
     pegou `73d5944`; lição em `tasks/lessons/workflow.md`); o pacote publicado traz `largo` e `colunas`.
+29. [x] Coluna da Subdivisão 30% mais larga quando o metrônomo tem 4 colunas; nenhuma coluna abaixo de 300 px
+    (`fix/braco-subdivisao-larga`); teste no navegador de 390 a 1920 px.
 
 Dono exclusivo de `package.json`/lockfile, configs, `tasks/*`, `Containerfile`, `app.py`: o integrador (Claude).
 
