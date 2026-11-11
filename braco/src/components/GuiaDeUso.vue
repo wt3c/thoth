@@ -62,7 +62,8 @@
       <summary>Modo Teoria</summary>
       <p>
         A <strong>tônica</strong> é a nota de onde a escala ou o acorde parte. No modo <strong>Teoria</strong>,
-        a nota que você toca vira a tônica; para trocar, toque outra.
+        a nota que você toca vira a tônica; para trocar, toque outra. A nota escolhida no modo Notas já chega
+        como tônica. <strong>Limpar</strong> apaga a tônica e deixa o braço vazio.
       </p>
       <ul>
         <li>

@@ -59,6 +59,8 @@ autorização); M8 com quantização opcional, desligada por padrão.
 19. [x] O braço abre com 21 casas (`feat/braco-21-casas`); emenda do ADR-062.
 20. [x] Republicado no Pages com 21 casas (2026-11-09): run 42721952838 a partir de `ad9bdc5`; o site no ar
     abre com "E A D G · 21 casas" e 88 posições.
+21. [x] A nota escolhida no modo Notas vira a tônica da Teoria; "Limpar" na Teoria (`fix/braco-teoria`);
+    emenda do ADR-061.
 
 Dono exclusivo de `package.json`/lockfile, configs, `tasks/*`, `Containerfile`, `app.py`: o integrador (Claude).
 

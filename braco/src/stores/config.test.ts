@@ -68,6 +68,36 @@ describe('useConfigStore', () => {
     expect(config.escolhas.padrao?.graus).toHaveLength(7)
   })
 
+  it('a nota escolhida no modo notas vira a tônica da teoria; soltá-la não apaga a tônica', () => {
+    const config = useConfigStore()
+    config.aoTocar(lugar(2, 0))
+    config.modo = 'teoria'
+    expect(config.tonica).toBe(2)
+    config.modo = 'notas'
+    config.aoTocar(lugar(2, 0))
+    expect([config.selecionada, config.tonica]).toEqual([null, 2])
+  })
+
+  it('preferência antiga com nota e sem tônica restaura a nota como tônica; tônica explícita prevalece', () => {
+    const config = useConfigStore()
+    config.aplicar({ ...PREFERENCIAS_PADRAO_SEM_METRONOMO, selecionada: 2, tonica: null })
+    expect(config.tonica).toBe(2)
+    config.aplicar({ ...PREFERENCIAS_PADRAO_SEM_METRONOMO, selecionada: 2, tonica: 7 })
+    expect(config.tonica).toBe(7)
+  })
+
+  it('"Limpar" da teoria apaga a tônica, o filtro e a seleção; padrão e rótulo ficam', () => {
+    const config = useConfigStore()
+    config.mostrarClasses([0, 4, 7])
+    config.aoTocar(lugar(1, 3))
+    config.modo = 'teoria'
+    config.padraoId = 'escala-maior'
+    config.rotulo = 'grau'
+    config.limparTeoria()
+    expect(config.escolhas).toMatchObject({ tonica: null, selecionada: null, referencia: null, filtro: [], rotulo: 'grau' })
+    expect(config.padraoId).toBe('escala-maior')
+  })
+
   it('esconder a classe da nota selecionada solta a seleção; "Limpar" limpa tudo', () => {
     const config = useConfigStore()
     config.aoTocar(posicao(45))

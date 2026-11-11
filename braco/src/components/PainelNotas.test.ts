@@ -15,6 +15,31 @@ beforeEach(() => {
 const montar = () => mount(PainelNotas, { global: { plugins: [pinia] } })
 const botao = (painel: ReturnType<typeof montar>) => painel.get('[data-acao="tocar-notas"]')
 
+describe('PainelNotas: modo teoria', () => {
+  it('tem "Limpar", que apaga a tônica e deixa o braço vazio', async () => {
+    const painel = montar()
+    const config = useConfigStore()
+    config.mostrarClasses([0, 7])
+    config.modo = 'teoria'
+    config.tonica = 9
+    await painel.vm.$nextTick()
+    await painel.get('[data-acao="limpar-teoria"]').trigger('click')
+    expect([config.tonica, config.filtro]).toEqual([null, []])
+  })
+
+  it('"Limpar" durante a sequência também a para', async () => {
+    const painel = montar()
+    const config = useConfigStore()
+    const metro = useMetronomoStore()
+    config.modo = 'teoria'
+    config.tonica = 9
+    metro.sequenciaAtiva = true
+    await painel.vm.$nextTick()
+    await painel.get('[data-acao="limpar-teoria"]').trigger('click')
+    expect(metro.sequenciaAtiva).toBe(false)
+  })
+})
+
 describe('PainelNotas: tocar as notas acesas no metrônomo', () => {
   it('sem nota acesa, o botão fica desligado', async () => {
     const painel = montar()
