@@ -21,7 +21,20 @@ def _toca(caminho: Path) -> Path:
 def test_comando_carrega_numpy_antigo() -> None:
     """O demucs declara mal as dependências e quebra com numpy 2 (ADR-010)."""
     comando = DemucsSeparator()._comando(Path("a.wav"), Path("/saida"))
-    assert comando[:3] == ["uvx", "--with", "numpy<2"]
+    assert comando[comando.index("--with") + 1] == "numpy<2"
+
+
+@pytest.mark.parametrize("classe", [DemucsSeparator, DemucsMultifaixaSeparator])
+def test_comando_prega_o_python_do_demucs(classe: type[DemucsSeparator]) -> None:
+    """Sem `--python`, o `uvx` escolhe o Python mais novo da estação.
+
+    Com o CPython 3.15 instalado, o `sphn` (dependência do demucs) não tinha
+    wheel e o `uvx` tentava compilá-lo em Rust, derrubando a separação. Mesma
+    regra do `muscriptor@0.3.0`, que já prega `--python 3.12`.
+    """
+    comando = classe()._comando(Path("a.wav"), Path("/saida"))
+    assert comando[0] == "uvx"
+    assert comando[comando.index("--python") + 1] == "3.12"
 
 
 def test_comando_prega_a_versao_do_demucs() -> None:
@@ -32,13 +45,13 @@ def test_comando_prega_a_versao_do_demucs() -> None:
     versão que esta estação já rodou.
     """
     comando = DemucsSeparator()._comando(Path("a.wav"), Path("/saida"))
-    assert comando[3] == "demucs@4.1.0"
+    assert "demucs@4.1.0" in comando
 
 
 def test_a_versao_pregada_e_a_que_vai_no_comando() -> None:
     """A versão é um campo só: o comando e a chave do cache leem o mesmo valor."""
     comando = DemucsSeparator(versao="4.0.1")._comando(Path("a.wav"), Path("/saida"))
-    assert comando[3] == "demucs@4.0.1"
+    assert "demucs@4.0.1" in comando
 
 
 def test_comando_fixa_modelo_dispositivo_e_dois_stems() -> None:

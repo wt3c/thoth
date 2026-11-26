@@ -9,6 +9,8 @@ arrasta torch. O `--with "numpy<2"` não é preferência — o demucs declara ma
 dependências e quebra com `ModuleNotFoundError: numpy` sem ele. A versão vai pregada
 (`demucs@4.1.0`), como a do transcritor: sem ela o `uvx` pega a mais nova do dia e os
 stems — e o cache e as medições do ADR-010 feitos sobre eles — mudam sem aviso.
+O Python também vai pregado (`--python 3.12`): sem ele o `uvx` escolhe o mais novo
+da estação, e no CPython 3.15 o `sphn` não tem wheel e a compilação em Rust falha.
 Pelo mesmo motivo a versão e a configuração entram na chave do cache, ao lado do
 modelo (ADR-026). O separador de um stem desliga os deslocamentos aleatórios com
 `--shifts 0`: a medição de 2026-10-23 reproduziu o WAV byte a byte. O escopo novo
@@ -55,6 +57,11 @@ def localizar_stems(out_dir: Path, stem: str = "bass") -> dict[str, Path]:
     return encontrados
 
 
+def _uvx_demucs(versao: str) -> tuple[str, ...]:
+    """O `uvx` do demucs, com o Python e a versão pregados (ver o docstring do módulo)."""
+    return ("uvx", "--python", "3.12", "--with", "numpy<2", f"demucs@{versao}")
+
+
 @dataclass(frozen=True, slots=True)
 class DemucsSeparator:
     """Mix → um stem e o resto (`--two-stems`). Baixo por padrão; o perfil escolhe outro."""
@@ -85,7 +92,7 @@ class DemucsSeparator:
         return base / (configuracao if self.stem == "bass" else f"{configuracao}-{self.stem}")
 
     def _comando(self, audio: Path, out_dir: Path) -> list[str]:
-        programa = self.binary or ("uvx", "--with", "numpy<2", f"demucs@{self.versao}")
+        programa = self.binary or _uvx_demucs(self.versao)
         return [
             *programa,
             "-n", self.model,
@@ -135,7 +142,7 @@ class DemucsMultifaixaSeparator:
         return out_dir / self.model / f"{self.versao}-multifaixa"
 
     def _comando(self, audio: Path, out_dir: Path) -> list[str]:
-        programa = self.binary or ("uvx", "--with", "numpy<2", f"demucs@{self.versao}")
+        programa = self.binary or _uvx_demucs(self.versao)
         return [
             *programa,
             "-n", self.model,

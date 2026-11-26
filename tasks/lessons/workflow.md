@@ -165,3 +165,10 @@ Em 2026-11-11, o `workflow_dispatch` do Pages disparado logo após `git push` re
 (run 42952356758, `73d5944` em vez de `183c48c`); o run passou e o site seguiu com o pacote velho, o que parecia
 cache. **Regra:** antes do `gh run watch`, conferir o `headSha` do run contra `git ls-remote origin main`; diferente,
 disparar de novo. Só depois de o SHA bater, esperar o cache do `index.html`.
+
+## `uvx` sem `--python` quebra quando a estação ganha um Python novo
+
+Em 2026-11-25, `thoth transcribe` morreu no demucs: com o CPython 3.15 instalado, o `uvx demucs@4.1.0` passou a
+resolver para 3.15, onde o `sphn` (dependência do demucs) não tem wheel, e a compilação em Rust via `maturin` falhou.
+O MuScriptor já pregava `--python 3.12`; o demucs não. **Regra:** toda ferramenta chamada por `uvx` prega o Python
+(`--python 3.12`), além da versão do pacote — pregar só o pacote não congela o ambiente.
